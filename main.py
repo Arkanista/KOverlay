@@ -51,6 +51,9 @@ class MainApp:
     def on_blink_finished(self):
         self.on_active_window_changed(self.tracker.last_state)
 
+    def save_config(self):
+        config.save_config(self.cfg)
+
     def show_settings(self):
         dialog = SettingsWindow(self.cfg)
         if dialog.exec():
