@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QPixmap, QPainter
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPoint
+from PyQt6.QtGui import QColor, QPixmap, QPainter, QPen
 
 class OverlayWindow(QWidget):
     blink_finished = pyqtSignal()
@@ -25,7 +25,7 @@ class OverlayWindow(QWidget):
             Qt.WindowType.WindowTransparentForInput
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         
         self.layout = QVBoxLayout()
@@ -80,9 +80,32 @@ class OverlayWindow(QWidget):
         
     def showEvent(self, event):
         super().showEvent(event)
-        # Force the position every time the window is shown to defeat X11/Wayland auto-centering
         if "pos_x" in self.config and "pos_y" in self.config:
             self.move(self.config["pos_x"], self.config["pos_y"])
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        opacity_normal = self.config.get("opacity_normal", 0.0)
+        opacity_move = self.config.get("opacity_move", self.config.get("opacity", 0.8))
+        hex_color = self.config.get("bg_color", "#000000")
+        
+        c = QColor(hex_color)
+        
+        if self.move_mode:
+            c.setAlphaF(opacity_move)
+            painter.setPen(QPen(QColor("#666666"), 2, Qt.PenStyle.DashLine))
+        else:
+            if getattr(self, 'is_blinking', False) and getattr(self, 'blink_state', False):
+                c.setAlphaF(max(opacity_normal, 0.4))
+                painter.setPen(QPen(QColor("red"), 3, Qt.PenStyle.SolidLine))
+            else:
+                c.setAlphaF(opacity_normal)
+                painter.setPen(Qt.PenStyle.NoPen)
+                
+        painter.setBrush(c)
+        painter.drawRoundedRect(self.rect().adjusted(1, 1, -2, -2), 5, 5)
         
     def start_blink(self):
         self.is_blinking = True
@@ -123,36 +146,11 @@ class OverlayWindow(QWidget):
         self.update_style()
         self.show()
         
-    def _hex_to_rgba(self, hex_color, opacity):
-        c = QColor(hex_color)
-        return f"rgba({c.red()}, {c.green()}, {c.blue()}, {int(opacity * 255)})"
-
     def update_style(self):
         self.header_widget.setVisible(self.config.get("show_header", True))
         
-        opacity_normal = self.config.get("opacity_normal", 0.0)
-        opacity_move = self.config.get("opacity_move", self.config.get("opacity", 0.8))
-        hex_color = self.config.get("bg_color", "#000000")
-        
-        if self.move_mode:
-            bg_color = self._hex_to_rgba(hex_color, opacity_move)
-            border = "border: 2px dashed #666;"
-        else:
-            bg_color = self._hex_to_rgba(hex_color, opacity_normal)
-            border = "border: none;"
-            
-        if self.is_blinking and self.blink_state:
-            border = "border: 3px solid red;"
-            if not self.move_mode:
-                 bg_color = self._hex_to_rgba(hex_color, max(opacity_normal, 0.4))
-                 
-        self.setStyleSheet(f"""
-            QWidget#OverlayWindowMain {{
-                background-color: {bg_color};
-                {border}
-                border-radius: 5px;
-            }}
-        """)
+        # Trigger a repaint
+        self.update()
         
         # Update fonts on style change
         font_family = self.config.get("font_family", "Sans Serif")
@@ -207,11 +205,11 @@ class OverlayWindow(QWidget):
     # Mouse events for dragging when in move mode
     def mousePressEvent(self, event):
         if self.move_mode and event.button() == Qt.MouseButton.LeftButton:
-            window = self.windowHandle()
-            if window:
-                window.startSystemMove()
+            self.drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             event.accept()
 
     def mouseMoveEvent(self, event):
-        # Native Wayland move handles this, so we do nothing here.
-        pass
+        if self.move_mode and event.buttons() == Qt.MouseButton.LeftButton:
+            if hasattr(self, 'drag_pos'):
+                self.move(event.globalPosition().toPoint() - self.drag_pos)
+            event.accept()
