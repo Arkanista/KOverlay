@@ -1,11 +1,11 @@
 pkgname=koverlay
 pkgver=0.1.0
-pkgrel=1
+pkgrel=2
 pkgdesc="A modern, universal Wayland/X11 TeamSpeak 3 overlay."
 arch=('any')
 url="https://github.com/arkanis/koverlay" # Replace with actual URL if known
 license=('GPL')
-depends=('python' 'python-pyqt6' 'kdotool' 'xdotool')
+depends=('python' 'python-pyqt6' 'qt6-svg' 'kdotool' 'xdotool')
 makedepends=('python-pip')
 source=()
 
@@ -33,7 +33,7 @@ Type=Application
 Name=KOverlay
 Comment=KOverlay TeamSpeak 3 Overlay
 Exec=/usr/bin/koverlay
-Icon=koverlay
+Icon=/usr/share/icons/hicolor/scalable/apps/koverlay.svg
 Terminal=false
 Categories=Utility;Network;
 EOF
