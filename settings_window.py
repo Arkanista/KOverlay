@@ -58,6 +58,40 @@ class SettingsWindow(QDialog):
         layout.addWidget(QLabel("Target Window Keywords (comma separated):"))
         layout.addWidget(self.keywords_input)
         
+        # Polling Interval Slider
+        poll_layout = QHBoxLayout()
+        self.poll_label = QLabel("Active Window Check Interval:")
+        self.poll_slider = QSlider(Qt.Orientation.Horizontal)
+        self.poll_slider.setMinimum(50)
+        self.poll_slider.setMaximum(1000)
+        self.poll_slider.setSingleStep(50)
+        self.poll_slider.setTickInterval(50)
+        self.poll_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        
+        # Enforce step of 50 manually using valueChanged
+        def on_poll_slider_changed(val):
+            snapped = round(val / 50) * 50
+            if snapped != val:
+                self.poll_slider.blockSignals(True)
+                self.poll_slider.setValue(snapped)
+                self.poll_slider.blockSignals(False)
+            self.poll_val_label.setText(f"{snapped} ms")
+            self._on_change()
+            
+        self.poll_slider.valueChanged.connect(on_poll_slider_changed)
+        
+        current_poll = self.config.get("polling_interval_ms", 50)
+        self.poll_val_label = QLabel(f"{current_poll} ms")
+        self.poll_val_label.setMinimumWidth(60)
+        self.poll_slider.blockSignals(True)
+        self.poll_slider.setValue(current_poll)
+        self.poll_slider.blockSignals(False)
+        
+        poll_layout.addWidget(self.poll_label)
+        poll_layout.addWidget(self.poll_slider)
+        poll_layout.addWidget(self.poll_val_label)
+        layout.addLayout(poll_layout)
+        
         # Overlays
         self.monitors_group = QGroupBox("Overlays")
         monitors_layout = QVBoxLayout()
@@ -237,6 +271,9 @@ class SettingsWindow(QDialog):
             self._on_change()
             
     def _on_change(self):
+        if not hasattr(self, 'monitor_checkboxes'):
+            return
+            
         # Update config directly
         if "overlay_ids" not in self.config:
             self.config["overlay_ids"] = {}
@@ -250,6 +287,7 @@ class SettingsWindow(QDialog):
         self.config["hide_delay_enabled"] = self.hide_delay_checkbox.isChecked()
         self.config["hide_delay_seconds"] = self.hide_delay_slider.value()
         self.config["target_keywords"] = [k.strip() for k in self.keywords_input.text().split(",") if k.strip()]
+        self.config["polling_interval_ms"] = self.poll_slider.value()
         self.config["opacity_normal"] = self.opacity_normal_slider.value() / 100.0
         self.config["opacity_move"] = self.opacity_move_slider.value() / 100.0
         self.config["dynamic_width"] = self.dynamic_width_checkbox.isChecked()

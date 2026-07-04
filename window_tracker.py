@@ -5,10 +5,11 @@ from PyQt6.QtCore import QThread, pyqtSignal
 class WindowTracker(QThread):
     active_window_changed = pyqtSignal(bool)
 
-    def __init__(self, target_keywords=None, parent=None):
+    def __init__(self, target_keywords=None, polling_interval_ms=50, parent=None):
         super().__init__(parent)
         # Usually EVE Online window contains "EVE - " or "exefile.exe"
         self.target_keywords = target_keywords or ["EVE - ", "exefile.exe"]
+        self.polling_interval_ms = polling_interval_ms
         self.running = True
         self.last_state = True
         self.kdotool_missing = False
@@ -68,7 +69,9 @@ class WindowTracker(QThread):
             except Exception as e:
                 print(f"Error tracking window: {e}")
                 
-            time.sleep(0.05) # Check every 50ms for MAXIMUM snappiness
+            # Safely get interval in seconds, fallback to 50ms if missing or invalid
+            interval_sec = getattr(self, 'polling_interval_ms', 50) / 1000.0
+            time.sleep(interval_sec)
 
     def stop(self):
         self.running = False

@@ -74,7 +74,10 @@ class MainApp:
         self.ts3_thread.start()
         
         # Window Tracker (for kdotool/EVE focus)
-        self.tracker = WindowTracker(target_keywords=self.cfg.get("target_keywords", ["EVE - ", "exefile.exe"]))
+        self.tracker = WindowTracker(
+            target_keywords=self.cfg.get("target_keywords", ["EVE - ", "exefile.exe"]),
+            polling_interval_ms=self.cfg.get("polling_interval_ms", 50)
+        )
         self.tracker.active_window_changed.connect(self.on_active_window_changed)
         self.tracker.start()
         
@@ -143,10 +146,14 @@ class MainApp:
         for overlay in self.overlays.values():
             overlay.update_style()
             
-        # Update WindowTracker keywords
+        # Update WindowTracker keywords and polling interval
         new_keywords = self.cfg.get("target_keywords", ["EVE - ", "exefile.exe"])
         if self.tracker.target_keywords != new_keywords:
             self.tracker.target_keywords = new_keywords
+            
+        new_interval = self.cfg.get("polling_interval_ms", 50)
+        if hasattr(self.tracker, 'polling_interval_ms') and self.tracker.polling_interval_ms != new_interval:
+            self.tracker.polling_interval_ms = new_interval
         
         # Check if API key changed
         if self.ts3_thread.api_key != self.cfg.get("api_key", ""):
