@@ -79,11 +79,12 @@ class MainApp:
 
     def on_active_window_changed(self, is_target_active):
         # If moving, always show.
-        if self.overlay.move_mode:
+        if self.overlay.move_mode or getattr(self.overlay, 'is_blinking', False):
             self.overlay.show()
             return
             
-        if is_target_active:
+        game_only = self.cfg.get("game_only", True)
+        if not game_only or is_target_active:
             self.overlay.show()
         else:
             self.overlay.hide()
