@@ -53,7 +53,7 @@ class OverlayWindow(QWidget):
         pixmap = QPixmap(icon_path).scaled(20, 20, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self.logo_label.setPixmap(pixmap)
         
-        self.title_label = QLabel(f"TS3 Overlay - ID {self.numeric_id}")
+        self.title_label = QLabel(f"KOverlay - ID {self.numeric_id}")
         title_font = self.title_label.font()
         title_font.setBold(True)
         self.title_label.setFont(title_font)

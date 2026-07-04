@@ -7,7 +7,7 @@ class SettingsWindow(QDialog):
 
     def __init__(self, current_config, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("TS3 Overlay Settings")
+        self.setWindowTitle("KOverlay Settings")
         self.setMinimumWidth(400)
         
         self.config = current_config

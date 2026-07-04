@@ -11,7 +11,7 @@ class TrayIcon(QSystemTrayIcon):
         super().__init__(parent)
         
         self.setIcon(QIcon("icon.svg"))
-        self.setToolTip("TS3 Overlay")
+        self.setToolTip("KOverlay")
         
         # Create menu
         self.menu = QMenu()
