@@ -44,7 +44,7 @@ class MainApp:
             mon_cfg = self.cfg["monitors"].get(s_name, {})
             is_enabled = mon_cfg.get("enabled", False)
             if is_enabled:
-                overlay = OverlayWindow(self.cfg, s_name)
+                overlay = OverlayWindow(self.cfg, s_name, screen.geometry())
                 overlay.save_callback = self.save_config
                 overlay.show()
                 self.overlays[s_name] = overlay
@@ -122,7 +122,7 @@ class MainApp:
         for screen in self.app.screens():
             s_name = screen.name()
             if self.cfg["monitors"].get(s_name, {}).get("enabled", False):
-                overlay = OverlayWindow(self.cfg, s_name)
+                overlay = OverlayWindow(self.cfg, s_name, screen.geometry())
                 overlay.save_callback = self.save_config
                 overlay.blink_finished.connect(self.on_blink_finished)
                 

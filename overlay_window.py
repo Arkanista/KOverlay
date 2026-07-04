@@ -5,8 +5,9 @@ from PyQt6.QtGui import QColor, QPixmap, QPainter, QPen
 class OverlayWindow(QWidget):
     blink_finished = pyqtSignal()
 
-    def __init__(self, config, screen_name, parent=None):
+    def __init__(self, config, screen_name, screen_geometry, parent=None):
         super().__init__(parent)
+        self.screen_geometry = screen_geometry
         self.config = config
         self.screen_name = screen_name
         self.move_mode = False
@@ -73,6 +74,8 @@ class OverlayWindow(QWidget):
         mon_cfg = self.config.get("monitors", {}).get(self.screen_name, {})
         if "pos_x" in mon_cfg and "pos_y" in mon_cfg:
             self.move(mon_cfg["pos_x"], mon_cfg["pos_y"])
+        else:
+            self.move(self.screen_geometry.topLeft())
             
         self.update_style()
         
@@ -81,6 +84,8 @@ class OverlayWindow(QWidget):
         mon_cfg = self.config.get("monitors", {}).get(self.screen_name, {})
         if "pos_x" in mon_cfg and "pos_y" in mon_cfg:
             self.move(mon_cfg["pos_x"], mon_cfg["pos_y"])
+        else:
+            self.move(self.screen_geometry.topLeft())
 
     def paintEvent(self, event):
         painter = QPainter(self)
