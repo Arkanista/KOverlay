@@ -182,6 +182,9 @@ class MainApp:
         sys.exit(self.app.exec())
 
 if __name__ == "__main__":
+    import signal
+    # This allows Ctrl+C in terminal to kill the Qt app gracefully without a core dump
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
     try:
         app = MainApp()
         app.run()
