@@ -179,19 +179,28 @@ class OverlayWindow(QWidget):
                 self.logo_label.setVisible(False)
                 self.title_label.setVisible(False)
                 self.header_widget.layout().setContentsMargins(0, 0, 0, 0)
-                self.icon_label.setStyleSheet("color: rgba(255, 255, 255, 180); font-weight: bold; font-size: 14px; padding: 0px; margin: 0px; line-height: 10px;")
+                self.icon_label.setStyleSheet("color: rgba(255, 255, 255, 180); font-weight: bold; font-size: 16px; padding: 0px; margin: 0px;")
+                self.icon_label.setFixedHeight(12)
+                self.layout.setContentsMargins(10, 2, 10, 10)
             elif show_header and not show_three_dots:
                 self.icon_label.setVisible(False)
                 self.logo_label.setVisible(True)
                 self.title_label.setVisible(True)
+                self.icon_label.setMinimumHeight(0)
+                self.icon_label.setMaximumHeight(16777215)
                 self.header_widget.layout().setContentsMargins(0, 0, 0, 10)
+                self.layout.setContentsMargins(10, 10, 10, 10)
             else:
                 self.icon_label.setVisible(True)
                 self.logo_label.setVisible(True)
                 self.title_label.setVisible(True)
+                self.icon_label.setMinimumHeight(0)
+                self.icon_label.setMaximumHeight(16777215)
                 self.header_widget.layout().setContentsMargins(0, 0, 0, 10)
+                self.layout.setContentsMargins(10, 10, 10, 10)
         else:
             self.header_widget.setVisible(False)
+            self.layout.setContentsMargins(10, 10, 10, 10)
         
         # Trigger a repaint
         self.update()
