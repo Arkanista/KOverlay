@@ -272,7 +272,7 @@ class OverlayWindow(QWidget):
                     join_time = 0 if (was_empty or changed_channel) else current_time
                     self.user_history[name] = {"join_time": join_time, "leave_time": None}
                     
-                    if not (was_empty or changed_channel) and self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False):
+                    if not (was_empty or changed_channel) and self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
                         delay = self.config.get("tts_delay_ms", 0)
                         if delay == 0:
                             self._play_tts(name)
@@ -284,7 +284,7 @@ class OverlayWindow(QWidget):
                         # Re-joined! We update join_time and clear leave_time
                         self.user_history[name] = {"join_time": current_time, "leave_time": None}
                         
-                        if self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False):
+                        if self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
                             delay = self.config.get("tts_delay_ms", 0)
                             if delay == 0:
                                 self._play_tts(name)

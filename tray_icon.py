@@ -13,7 +13,7 @@ class TrayIcon(QSystemTrayIcon):
         super().__init__(parent)
         
         self.setIcon(QIcon("icon.svg"))
-        self.setToolTip("KOverlay v0.1.8")
+        self.setToolTip("KOverlay v0.1.9")
         
         # Create menu
         self.menu = QMenu()
@@ -30,13 +30,12 @@ class TrayIcon(QSystemTrayIcon):
         self.menu.addSeparator()
         
         self.overlay_actions = {}
-        names = {"1": "Top Left", "2": "Top Right", "3": "Bottom Left", "4": "Bottom Right"}
         if overlays_config is None:
             overlays_config = {}
             
         for o_id in ["1", "2", "3", "4"]:
             cfg = overlays_config.get(o_id, {})
-            action = self.menu.addAction(f"Show {names[o_id]} Overlay")
+            action = self.menu.addAction(f"Show Overlay {o_id}")
             action.setCheckable(True)
             action.setChecked(cfg.get("enabled", False))
             action.toggled.connect(lambda checked, oid=o_id: self.overlay_toggled.emit(oid, checked))
@@ -59,10 +58,3 @@ class TrayIcon(QSystemTrayIcon):
             self.overlay_actions[overlay_id].blockSignals(True)
             self.overlay_actions[overlay_id].setChecked(is_enabled)
             self.overlay_actions[overlay_id].blockSignals(False)
-        
-        self.menu.addSeparator()
-        
-        self.quit_action = self.menu.addAction("Quit")
-        self.quit_action.triggered.connect(self.quit_requested.emit)
-        
-        self.setContextMenu(self.menu)

@@ -7,8 +7,8 @@ if not TOKEN:
     print("GITHUB_TOKEN is not set")
     exit(1)
 REPO = "Arkanista/koverlay"
-TAG = "v0.1.8"
-FILE_PATH = "koverlay-0.1.8-1-any.pkg.tar.zst"
+TAG = "v0.1.9"
+FILE_PATH = "koverlay-0.1.9-1-any.pkg.tar.zst"
 
 headers = {
     "Authorization": f"Bearer {TOKEN}",
@@ -24,7 +24,7 @@ response = requests.post(
     json={
         "tag_name": TAG,
         "name": f"Release {TAG}",
-        "body": "Update includes:\n- Quick 'Mute TTS' toggle added directly to the system tray context menu.\n- TTS Volume control slider added to Settings.\n- Minor bug fixes.",
+        "body": "Update includes:\n- Added dynamic Overlay visibility toggles to the System Tray menu.\n- Prevented duplicate TTS overlapping issues when multiple overlays are active.\n- Enhanced Linux process isolation (process renamed natively to `koverlay`).\n- Added process cleanup logic during uninstall.",
         "draft": False,
         "prerelease": False
     }
