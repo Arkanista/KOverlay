@@ -1,4 +1,4 @@
-# <img src="icon.svg" width="48" align="center"> KOVERLAY User Manual
+# <img src="icon.svg" width="48" align="center"> KOverlay User Manual
 > ✨ *Entirely vibecoded by Gemini 3.1 Pro AI agent* ✨
 
 Welcome to **KOverlay** – a powerful, modern overlay for Linux (X11 and Wayland) that integrates directly with TeamSpeak 3. This step-by-step guide will explain how to configure the connection and what each option in the program menu does.
