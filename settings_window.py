@@ -126,7 +126,7 @@ class SettingsWindow(QDialog):
         layout.addWidget(self.header_checkbox)
         
         # Show Three Dots Checkbox
-        self.three_dots_checkbox = QCheckBox("Show Dots Indicator (Compact Mode)")
+        self.three_dots_checkbox = QCheckBox("Show Dots Indicator (number of dots indicates ID number of overlay)")
         self.three_dots_checkbox.setChecked(self.config.get("show_three_dots", False))
         self.three_dots_checkbox.toggled.connect(self._on_change)
         layout.addWidget(self.three_dots_checkbox)
