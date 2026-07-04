@@ -46,6 +46,7 @@ class MainApp:
             if is_enabled:
                 overlay = OverlayWindow(self.cfg, s_name, screen.geometry())
                 overlay.save_callback = self.save_config
+                overlay.setScreen(screen)
                 overlay.show()
                 self.overlays[s_name] = overlay
         
@@ -130,6 +131,7 @@ class MainApp:
                 if hasattr(self, 'settings_dialog') and self.settings_dialog is not None:
                     overlay.set_move_mode(True)
                 
+                overlay.setScreen(screen)
                 overlay.show()
                 self.overlays[s_name] = overlay
         

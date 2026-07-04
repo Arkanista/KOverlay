@@ -19,11 +19,12 @@ class OverlayWindow(QWidget):
         self.setObjectName("OverlayWindowMain")
         
         # Setup window properties
-        # With X11 bypass, Tool correctly prevents taskbar entry and maps perfectly
+        # With X11 bypass, ToolTip correctly prevents taskbar entry and maps perfectly
         self.setWindowFlags(
-            Qt.WindowType.Tool |
+            Qt.WindowType.ToolTip |
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.BypassWindowManagerHint |
             Qt.WindowType.WindowTransparentForInput
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
@@ -45,6 +46,13 @@ class OverlayWindow(QWidget):
         self.icon_label.setStyleSheet("color: rgba(255, 255, 255, 180); font-weight: bold; font-size: 14px;")
         self.icon_label.setVisible(self.config.get("show_three_dots", False))
         
+        self.logo_label = QLabel()
+        from PyQt6.QtGui import QPixmap
+        import os
+        icon_path = os.path.join(os.path.dirname(__file__), "icon.svg")
+        pixmap = QPixmap(icon_path).scaled(20, 20, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self.logo_label.setPixmap(pixmap)
+        
         self.title_label = QLabel("TS3 Overlay")
         title_font = self.title_label.font()
         title_font.setBold(True)
@@ -52,6 +60,7 @@ class OverlayWindow(QWidget):
         self.title_label.setStyleSheet("color: white;")
         
         header_layout.addWidget(self.icon_label)
+        header_layout.addWidget(self.logo_label)
         header_layout.addWidget(self.title_label)
         header_layout.addStretch()
         self.header_widget.setLayout(header_layout)
@@ -133,7 +142,7 @@ class OverlayWindow(QWidget):
     def set_move_mode(self, enabled):
         self.move_mode = enabled
         
-        flags = Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
+        flags = Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.BypassWindowManagerHint
         if not self.move_mode:
             flags |= Qt.WindowType.WindowTransparentForInput
             self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -164,9 +173,11 @@ class OverlayWindow(QWidget):
         if show_header:
             if show_three_dots:
                 self.icon_label.setVisible(True)
+                self.logo_label.setVisible(False)
                 self.title_label.setVisible(False)
             else:
                 self.icon_label.setVisible(False)
+                self.logo_label.setVisible(True)
                 self.title_label.setVisible(True)
         
         # Trigger a repaint
