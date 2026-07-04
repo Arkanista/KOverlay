@@ -23,14 +23,14 @@ class SettingsWindow(QDialog):
         layout.addWidget(self.api_key_input)
         
         # Show Only in Game
-        self.game_only_checkbox = QCheckBox("Show ONLY when EVE is active")
+        self.game_only_checkbox = QCheckBox("Show ONLY when game is active")
         self.game_only_checkbox.setChecked(self.config.get("game_only", True))
         self.game_only_checkbox.toggled.connect(self._on_change)
         layout.addWidget(self.game_only_checkbox)
 
         # Hide Delay
         delay_layout = QHBoxLayout()
-        self.hide_delay_checkbox = QCheckBox("Delay hiding when EVE loses focus")
+        self.hide_delay_checkbox = QCheckBox("Delay hiding when game loses focus")
         self.hide_delay_checkbox.setChecked(self.config.get("hide_delay_enabled", False))
         self.hide_delay_checkbox.toggled.connect(self._on_change)
         

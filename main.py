@@ -1,9 +1,19 @@
 import sys
 import os
+import fcntl
+import tempfile
 
 # Force X11 backend (XWayland) to bypass strict Wayland limitations
 # on absolute window positioning and transparent click-through inputs.
 os.environ["QT_QPA_PLATFORM"] = "xcb"
+
+lock_file_path = os.path.join(tempfile.gettempdir(), 'koverlay.lock')
+lock_file = open(lock_file_path, 'w')
+try:
+    fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except IOError:
+    print("KOverlay is already running. Exiting.")
+    sys.exit(0)
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QTimer
