@@ -38,9 +38,17 @@ class MainApp:
         self.tracker.active_window_changed.connect(self.on_active_window_changed)
         self.tracker.start()
         
+        self.overlay.blink_finished.connect(self.on_blink_finished)
+        
         # Check if API key is missing
         if not self.cfg.get("api_key"):
             self.show_settings()
+            
+        # Start the blink effect requested by the user
+        self.overlay.start_blink()
+
+    def on_blink_finished(self):
+        self.on_active_window_changed(self.tracker.last_state)
 
     def show_settings(self):
         dialog = SettingsWindow(self.cfg)
