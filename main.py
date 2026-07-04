@@ -17,6 +17,7 @@ class MainApp:
         
         # Setup UI
         self.overlay = OverlayWindow(self.cfg)
+        self.overlay.save_callback = self.save_config
         self.overlay.show()
         
         self.tray = TrayIcon()

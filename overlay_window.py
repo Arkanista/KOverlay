@@ -69,6 +69,9 @@ class OverlayWindow(QWidget):
         self.blink_timer.timeout.connect(self._on_blink_tick)
         
         self.resize(200, 300)
+        if "pos_x" in self.config and "pos_y" in self.config:
+            self.move(self.config["pos_x"], self.config["pos_y"])
+            
         self.update_style()
         
     def start_blink(self):
@@ -98,6 +101,12 @@ class OverlayWindow(QWidget):
             self.setWindowFlag(Qt.WindowType.WindowTransparentForInput, False)
         else:
             self.setWindowFlag(Qt.WindowType.WindowTransparentForInput, True)
+            
+            # Save position when exiting move mode
+            self.config["pos_x"] = self.pos().x()
+            self.config["pos_y"] = self.pos().y()
+            if hasattr(self, 'save_callback'):
+                self.save_callback()
             
         self.update_style()
         self.show()
