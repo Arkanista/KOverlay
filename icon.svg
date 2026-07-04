@@ -15,21 +15,25 @@
   </defs>
 
   <!-- Outer ring glow -->
-  <circle cx="50" cy="50" r="46" fill="none" stroke="url(#grad1)" stroke-width="4" filter="url(#glow)" opacity="0.4" />
+  <circle cx="50" cy="50" r="46" fill="none" stroke="url(#grad1)" stroke-width="3" filter="url(#glow)" opacity="0.3" />
   
-  <!-- Headband -->
-  <path d="M 24 55 L 24 45 A 26 26 0 0 1 76 45 L 76 55" fill="none" stroke="url(#grad1)" stroke-width="8" stroke-linecap="round" />
+  <!-- Background screen (Game) -->
+  <rect x="18" y="22" width="55" height="40" rx="4" fill="none" stroke="url(#grad1)" stroke-width="3" opacity="0.6" />
   
-  <!-- Ear cups -->
-  <rect x="18" y="48" width="12" height="24" rx="6" fill="url(#grad1)" />
-  <rect x="70" y="48" width="12" height="24" rx="6" fill="url(#grad1)" />
+  <!-- Foreground screen (Overlay window) -->
+  <!-- Dark background to obscure the line behind it -->
+  <rect x="38" y="42" width="46" height="38" rx="4" fill="#181818" />
+  <rect x="38" y="42" width="46" height="38" rx="4" fill="none" stroke="url(#grad2)" stroke-width="4" filter="url(#glow)" />
   
-  <!-- Microphone -->
-  <path d="M 24 68 Q 24 82 42 84" fill="none" stroke="url(#grad1)" stroke-width="4" stroke-linecap="round" />
-  <circle cx="46" cy="84" r="5" fill="url(#grad2)" filter="url(#glow)" />
+  <!-- Window title bar -->
+  <line x1="38" y1="52" x2="84" y2="52" stroke="url(#grad2)" stroke-width="3" />
+  <!-- Three dots -->
+  <circle cx="44" cy="47" r="1.5" fill="url(#grad1)" />
+  <circle cx="49" cy="47" r="1.5" fill="url(#grad1)" />
+  <circle cx="54" cy="47" r="1.5" fill="url(#grad1)" />
   
-  <!-- Center sound waves -->
-  <rect x="38" y="38" width="4" height="12" rx="2" fill="url(#grad2)" />
-  <rect x="48" y="30" width="4" height="20" rx="2" fill="url(#grad2)" />
-  <rect x="58" y="34" width="4" height="16" rx="2" fill="url(#grad2)" />
+  <!-- Center sound waves inside overlay -->
+  <rect x="48" y="62" width="4" height="10" rx="2" fill="url(#grad1)" />
+  <rect x="58" y="56" width="4" height="20" rx="2" fill="url(#grad1)" />
+  <rect x="68" y="60" width="4" height="14" rx="2" fill="url(#grad1)" />
 </svg>
