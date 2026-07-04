@@ -5,10 +5,8 @@ pkgdesc="A modern, universal Wayland/X11 TeamSpeak 3 overlay."
 arch=('any')
 url="https://github.com/arkanis/koverlay" # Replace with actual URL if known
 license=('GPL')
-depends=('python' 'python-pyqt6')
+depends=('python' 'python-pyqt6' 'kdotool' 'xdotool')
 makedepends=('python-pip')
-optdepends=('kdotool: for active window tracking on Wayland'
-            'xdotool: for active window tracking on X11')
 source=()
 
 package() {

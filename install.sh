@@ -23,6 +23,22 @@ else
     echo "Unsupported package manager. Please install python3, python3-venv, and pip manually."
 fi
 
+echo "Checking for required window tracking tools..."
+if ! command -v kdotool &> /dev/null && ! command -v xdotool &> /dev/null; then
+    echo "CRITICAL ERROR: 'kdotool' (Wayland) or 'xdotool' (X11) is strictly required."
+    
+    if command -v yay &> /dev/null; then
+        echo "Attempting to install kdotool from AUR using yay..."
+        yay -Sy --needed kdotool || exit 1
+    elif command -v paru &> /dev/null; then
+        echo "Attempting to install kdotool from AUR using paru..."
+        paru -Sy --needed kdotool || exit 1
+    else
+        echo "Please install 'kdotool' (from AUR) or 'xdotool' manually to continue."
+        exit 1
+    fi
+fi
+
 # 2. Setup Python Virtual Environment
 echo "Setting up Python virtual environment..."
 if [ ! -d "venv" ]; then

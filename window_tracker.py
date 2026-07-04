@@ -12,20 +12,32 @@ class WindowTracker(QThread):
         self.running = True
         self.last_state = True
         self.kdotool_missing = False
+        self.xdotool_missing = False
+        self.active_tool = None
 
-    def check_kdotool(self):
+    def check_tools(self):
         try:
             subprocess.run(["kdotool", "--help"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.active_tool = "kdotool"
             return True
         except FileNotFoundError:
-            print("Warning: kdotool not found. Active window tracking will be disabled (overlay always visible).")
-            return False
+            self.kdotool_missing = True
+            
+        try:
+            subprocess.run(["xdotool", "--help"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.active_tool = "xdotool"
+            return True
+        except FileNotFoundError:
+            self.xdotool_missing = True
+            
+        print("Warning: Neither kdotool nor xdotool found. Active window tracking will be disabled (overlay always visible).")
+        return False
 
     def run(self):
-        self.kdotool_missing = not self.check_kdotool()
+        tools_available = self.check_tools()
         
         while self.running:
-            if self.kdotool_missing:
+            if not tools_available:
                 # Fallback: always show
                 if not self.last_state:
                     self.active_window_changed.emit(True)
@@ -35,9 +47,8 @@ class WindowTracker(QThread):
                 
             try:
                 # getactivewindow returns the window ID, getwindowname gets the title of that ID
-                # Actually, "kdotool getactivewindow getwindowname" works in sequence
                 result = subprocess.run(
-                    ["kdotool", "getactivewindow", "getwindowname"],
+                    [self.active_tool, "getactivewindow", "getwindowname"],
                     capture_output=True, text=True, timeout=1.0
                 )
                 window_name = result.stdout.strip()
