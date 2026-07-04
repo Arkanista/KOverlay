@@ -133,7 +133,7 @@ class SettingsWindow(QDialog):
     def _update_color_btn(self):
         c = QColor(self.current_bg_color)
         text_col = 'white' if c.lightness() < 128 else 'black'
-        self.bg_color_btn.setStyleSheet(f"background-color: {self.current_bg_color}; color: {text_col};")
+        self.color_btn.setStyleSheet(f"background-color: {self.current_bg_color}; color: {text_col};")
 
     def _choose_color(self):
         color = QColorDialog.getColor(QColor(self.current_bg_color), self, "Select Background Color")
