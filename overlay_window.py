@@ -178,14 +178,18 @@ class OverlayWindow(QWidget):
                 self.icon_label.setVisible(True)
                 self.logo_label.setVisible(False)
                 self.title_label.setVisible(False)
+                self.header_widget.layout().setContentsMargins(0, 0, 0, 0)
+                self.icon_label.setStyleSheet("color: rgba(255, 255, 255, 180); font-weight: bold; font-size: 14px; padding: 0px; margin: 0px; line-height: 10px;")
             elif show_header and not show_three_dots:
                 self.icon_label.setVisible(False)
                 self.logo_label.setVisible(True)
                 self.title_label.setVisible(True)
+                self.header_widget.layout().setContentsMargins(0, 0, 0, 10)
             else:
                 self.icon_label.setVisible(True)
                 self.logo_label.setVisible(True)
                 self.title_label.setVisible(True)
+                self.header_widget.layout().setContentsMargins(0, 0, 0, 10)
         else:
             self.header_widget.setVisible(False)
         
