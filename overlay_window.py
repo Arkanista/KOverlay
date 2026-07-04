@@ -21,11 +21,12 @@ class OverlayWindow(QWidget):
         # Setup window properties
         # With X11 bypass, ToolTip correctly prevents taskbar entry and maps perfectly
         self.setWindowFlags(
-            Qt.WindowType.ToolTip |
+            Qt.WindowType.SplashScreen |
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
             Qt.WindowType.BypassWindowManagerHint |
-            Qt.WindowType.WindowTransparentForInput
+            Qt.WindowType.WindowTransparentForInput |
+            Qt.WindowType.NoDropShadowWindowHint
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)

@@ -49,7 +49,7 @@ class WindowTracker(QThread):
                 # getactivewindow returns the window ID, getwindowname gets the title of that ID
                 result = subprocess.run(
                     [self.active_tool, "getactivewindow", "getwindowname"],
-                    capture_output=True, text=True, timeout=1.0
+                    capture_output=True, text=True, timeout=0.2
                 )
                 window_name = result.stdout.strip()
                 
@@ -68,7 +68,7 @@ class WindowTracker(QThread):
             except Exception as e:
                 print(f"Error tracking window: {e}")
                 
-            time.sleep(1.0) # Check every 1 second
+            time.sleep(0.05) # Check every 50ms for MAXIMUM snappiness
 
     def stop(self):
         self.running = False
