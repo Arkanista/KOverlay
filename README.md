@@ -80,6 +80,7 @@ The *Settings* window offers highly advanced overlay customization. All options 
 ### Authorization and Game Section
 *   **TS3 API Key:** The unique authorization token from the ClientQuery plugin, described above. Essential for the program to function.
 *   **Show ONLY when EVE is active:** The overlay was designed for *EVE Online* pilots. If this option is checked, KOverlay will automatically monitor the system. The overlay will only appear when the *EVE Online* game window is on top and has focus. If you switch to a web browser or minimize the game, the window will discreetly disappear.
+*   **Delay hiding when EVE loses focus:** Extends the above feature. If you alt-tab to a second monitor or another app, the overlay will stay visible for a configurable number of seconds (1 to 60) before fading away. If you return to the game within this time, the overlay remains visible continuously.
 
 ### Overlays Section
 *   **Enable Overlay 1 - 4:** KOverlay's architecture allows you to launch up to **four clones** of the overlay. This feature is dedicated to players operating on multiple monitors simultaneously. By checking the respective boxes, you "wake up" the corresponding display identifiers (IDs). For each awakened "ID", the system independently remembers its screen coordinates, allowing you to precisely assign Overlay 2 to the second monitor and Overlay 3 to the third.
