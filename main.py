@@ -1,4 +1,10 @@
 import sys
+import os
+
+# Force X11 backend (XWayland) to bypass strict Wayland limitations
+# on absolute window positioning and transparent click-through inputs.
+os.environ["QT_QPA_PLATFORM"] = "xcb"
+
 from PyQt6.QtWidgets import QApplication
 import config
 from settings_window import SettingsWindow

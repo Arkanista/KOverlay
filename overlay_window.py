@@ -17,9 +17,9 @@ class OverlayWindow(QWidget):
         self.setObjectName("OverlayWindowMain")
         
         # Setup window properties
-        # On Wayland, Tool without parent can prevent the window from mapping
+        # With X11 bypass, Tool correctly prevents taskbar entry and maps perfectly
         self.setWindowFlags(
-            Qt.WindowType.Window |
+            Qt.WindowType.Tool |
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
             Qt.WindowType.WindowTransparentForInput
@@ -29,6 +29,7 @@ class OverlayWindow(QWidget):
         self.layout = QVBoxLayout()
         self.layout.setContentsMargins(10, 10, 10, 10)
         self.layout.setSpacing(2)
+        self.layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.setLayout(self.layout)
         
         # Build Header Widget
@@ -61,6 +62,7 @@ class OverlayWindow(QWidget):
         
         # Container for users to separate them from the header
         self.users_container = QVBoxLayout()
+        self.users_container.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.layout.addLayout(self.users_container)
         
         self.labels = {}
