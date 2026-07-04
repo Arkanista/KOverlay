@@ -39,8 +39,20 @@ if ! command -v kdotool &> /dev/null && ! command -v xdotool &> /dev/null; then
     fi
 fi
 
-# 2. Setup Python Virtual Environment
+# 2. Setup Application Directory
+INSTALL_DIR="$HOME/.local/share/koverlay"
+echo "Installing KOverlay to $INSTALL_DIR..."
+mkdir -p "$INSTALL_DIR"
+
+# Copy necessary files
+cp *.py "$INSTALL_DIR/"
+cp requirements.txt "$INSTALL_DIR/"
+cp icon.svg "$INSTALL_DIR/"
+# Note: start.sh is no longer needed as we use the venv directly in the desktop file
+
+# 3. Setup Python Virtual Environment
 echo "Setting up Python virtual environment..."
+cd "$INSTALL_DIR"
 if [ ! -d "venv" ]; then
     python3 -m venv venv
 fi
@@ -50,25 +62,20 @@ source venv/bin/activate
 pip install -r requirements.txt
 deactivate
 
-# 3. Setup Desktop Integration
+# 4. Setup Desktop Integration
 echo "Setting up Desktop Shortcut..."
-mkdir -p ~/.local/share/icons/hicolor/scalable/apps/
 mkdir -p ~/.local/share/applications/
 
-# Copy icon
-cp icon.svg ~/.local/share/icons/hicolor/scalable/apps/koverlay.svg
-
 # Generate desktop file dynamically with absolute path
-CURRENT_DIR=$(pwd)
 cat > ~/.local/share/applications/koverlay.desktop << EOL
 [Desktop Entry]
 Version=0.1.0
 Type=Application
 Name=KOverlay
 Comment=KOverlay TeamSpeak 3 Overlay
-Exec="$CURRENT_DIR/start.sh"
-Path=$CURRENT_DIR
-Icon=koverlay
+Exec="$INSTALL_DIR/venv/bin/python" "$INSTALL_DIR/main.py"
+Path=$INSTALL_DIR
+Icon=$INSTALL_DIR/icon.svg
 Terminal=false
 Categories=Utility;Network;
 EOL
