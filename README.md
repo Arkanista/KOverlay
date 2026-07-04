@@ -27,7 +27,7 @@ For other distributions, a robust, universal installer script is provided:
 
 > [!WARNING]
 > **Active Window Tracking Limit (Wayland on Ubuntu/Debian):** 
-> The feature "Show ONLY when EVE is active" requires either `xdotool` (for X11 displays) or `kdotool` (specifically for KDE Plasma Wayland). 
+> The feature "Show ONLY when game is active" requires either `xdotool` (for X11 displays) or `kdotool` (specifically for KDE Plasma Wayland). 
 > 
 > If you are using standard **Ubuntu with GNOME Wayland**, the display server strictly prevents apps from reading the active window. To use tracking on GNOME, you must log out and select **"Ubuntu on Xorg" (X11)**.
 > 
@@ -81,9 +81,9 @@ The *Settings* window offers highly advanced overlay customization. All options 
 
 ### Authorization and Game Section
 *   **TS3 API Key:** The unique authorization token from the ClientQuery plugin, described above. Essential for the program to function.
-*   **Show ONLY when EVE is active:** The overlay was designed for *EVE Online* pilots. If this option is checked, KOverlay will automatically monitor the system. The overlay will only appear when the *EVE Online* game window is on top and has focus. If you switch to a web browser or minimize the game, the window will discreetly disappear.
-*   **Target Window Keywords:** Allows you to define exactly what window names KOverlay should look for when deciding if the game is active. By default, it looks for `EVE - ` or `exefile.exe`. You can enter a comma-separated list of keywords. This prevents the overlay from activating when you browse an "EVE Online" forum in your browser.
-*   **Delay hiding when EVE loses focus:** Extends the above feature. If you alt-tab to a second monitor or another app, the overlay will stay visible for a configurable number of seconds (1 to 60) before fading away. If you return to the game within this time, the overlay remains visible continuously.
+*   **Show ONLY when game is active:** If this option is checked, KOverlay will automatically monitor the system. The overlay will only appear when your target game/application window is on top and has focus. If you switch to a web browser or minimize the game, the window will discreetly disappear.
+*   **Target Window Keywords:** Allows you to define exactly what window names KOverlay should look for when deciding if the target game/application is active. By default, it looks for `EVE - ` or `exefile.exe`, but you can enter a comma-separated list of any keywords. This prevents the overlay from incorrectly activating when you browse a forum in your web browser.
+*   **Delay hiding when game loses focus:** Extends the above feature. If you alt-tab to a second monitor or another app, the overlay will stay visible for a configurable number of seconds (1 to 60) before fading away. If you return to the game within this time, the overlay remains visible continuously.
 
 ### Overlays Section
 *   **Enable Overlay 1 - 4:** KOverlay's architecture allows you to launch up to **four clones** of the overlay. This feature is dedicated to players operating on multiple monitors simultaneously. By checking the respective boxes, you "wake up" the corresponding display identifiers (IDs). For each awakened "ID", the system independently remembers its screen coordinates, allowing you to precisely assign Overlay 2 to the second monitor and Overlay 3 to the third.
@@ -115,7 +115,7 @@ The *Settings* window offers highly advanced overlay customization. All options 
 
 1. **Move Overlays:** 
    * Launches "Rearrangement" mode.
-   * Normally, the overlay ignores all clicks (the cursor passes through it to the game below) so you don't accidentally click it during a fierce battle in EVE Online!
+   * Normally, the overlay ignores all clicks (the cursor passes through it to the game below) so you don't accidentally click it during gameplay!
    * Activating this option freezes mouse communication with the game beneath the window frame, colors the KOverlay frame into a visible dashed line, and applies the "Move Mode" opacity.
    * In this mode, simply grab any of the enabled windows with the Left Mouse Button and move it freely to any corner of the monitor. **Releasing the left mouse button immediately hard-saves the new coordinate.**
 
