@@ -105,19 +105,20 @@ class OverlayWindow(QWidget):
     def update_style(self):
         self.header_widget.setVisible(self.config.get("show_header", True))
         
-        opacity = self.config.get("opacity", 0.8)
-        
-        bg_color = "rgba(0, 0, 0, 0)"
-        border = "border: none;"
+        opacity_normal = self.config.get("opacity_normal", 0.0)
+        opacity_move = self.config.get("opacity_move", self.config.get("opacity", 0.8))
         
         if self.move_mode:
-            bg_color = f"rgba(20, 20, 20, {opacity})"
+            bg_color = f"rgba(20, 20, 20, {opacity_move})"
             border = "border: 2px dashed #666;"
+        else:
+            bg_color = f"rgba(20, 20, 20, {opacity_normal})"
+            border = "border: none;"
             
         if self.is_blinking and self.blink_state:
             border = "border: 3px solid red;"
             if not self.move_mode:
-                 bg_color = f"rgba(20, 20, 20, {opacity / 2.0})"
+                 bg_color = f"rgba(20, 20, 20, {max(opacity_normal, 0.4)})"
                  
         self.setStyleSheet(f"""
             QWidget#OverlayWindowMain {{
