@@ -42,7 +42,8 @@ EOF
     cat > "$pkgdir/usr/bin/koverlay" << EOF
 #!/bin/bash
 export PYTHONPATH="/opt/koverlay/lib:\$PYTHONPATH"
-exec python3 /opt/koverlay/main.py "\$@"
+cd /opt/koverlay || exit 1
+exec python3 main.py "\$@"
 EOF
     chmod +x "$pkgdir/usr/bin/koverlay"
 }
