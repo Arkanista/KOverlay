@@ -79,12 +79,11 @@ class OverlayWindow(QWidget):
                 self.labels[name] = lbl
                 
             # Style based on talking status
-            # Bright cyan/green for talking, dimmed white for not
             lbl = self.labels[name]
             if talking:
-                lbl.setStyleSheet("color: #00FFCC; background-color: transparent; border: none; text-shadow: 1px 1px 2px #000;")
+                lbl.setStyleSheet("color: #00FFCC; background-color: transparent; border: none;")
             else:
-                lbl.setStyleSheet("color: rgba(255, 255, 255, 150); background-color: transparent; border: none; text-shadow: 1px 1px 2px #000;")
+                lbl.setStyleSheet("color: rgba(255, 255, 255, 150); background-color: transparent; border: none;")
                 
         # Remove old clients
         to_remove = []
@@ -100,12 +99,11 @@ class OverlayWindow(QWidget):
     # Mouse events for dragging when in move mode
     def mousePressEvent(self, event):
         if self.move_mode and event.button() == Qt.MouseButton.LeftButton:
-            self.drag_pos = event.globalPosition().toPoint()
+            window = self.windowHandle()
+            if window:
+                window.startSystemMove()
             event.accept()
 
     def mouseMoveEvent(self, event):
-        if self.move_mode and event.buttons() == Qt.MouseButton.LeftButton:
-            diff = event.globalPosition().toPoint() - self.drag_pos
-            self.move(self.pos() + diff)
-            self.drag_pos = event.globalPosition().toPoint()
-            event.accept()
+        # Native Wayland move handles this, so we do nothing here.
+        pass

@@ -54,7 +54,7 @@ class TS3ClientThread(QThread):
                 return "\n".join(lines)
         return "\n".join(lines)
 
-    def _parse_clientlist(self, data):
+    def _parse_clientlist(self, data, filter_cid=None):
         clients = []
         for line in data.split('\n'):
             if line.startswith("error id="):
@@ -76,6 +76,9 @@ class TS3ClientThread(QThread):
                 if client_dict.get('client_type') == '1':
                     continue # ServerQuery client
                     
+                if filter_cid and client_dict.get('cid') != filter_cid:
+                    continue
+                    
                 name = client_dict.get('client_nickname', 'Unknown')
                 talking = client_dict.get('client_flag_talking') == '1'
                 
@@ -89,6 +92,16 @@ class TS3ClientThread(QThread):
                 if not self.sock:
                     self.connect_ts3()
 
+                self._send_cmd("whoami")
+                resp_whoami = self._read_until("error id=")
+                
+                my_cid = None
+                if "error id=0" in resp_whoami:
+                    for part in resp_whoami.replace('|', ' ').split(' '):
+                        if part.startswith("cid="):
+                            my_cid = part.split('=', 1)[1]
+                            break
+
                 self._send_cmd("clientlist -voice")
                 resp = self._read_until("error id=")
                 
@@ -96,7 +109,7 @@ class TS3ClientThread(QThread):
                     # Not connected to a server or empty response
                     self.clients_updated.emit([])
                 else:
-                    clients = self._parse_clientlist(resp)
+                    clients = self._parse_clientlist(resp, filter_cid=my_cid)
                     self.clients_updated.emit(clients)
                 
                 time.sleep(0.5)
