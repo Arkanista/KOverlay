@@ -129,12 +129,9 @@ class OverlayWindow(QWidget):
     def set_move_mode(self, enabled):
         self.move_mode = enabled
         
-        self.hide()
-        if self.move_mode:
-            self.setWindowFlag(Qt.WindowType.WindowTransparentForInput, False)
-            self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
-        else:
-            self.setWindowFlag(Qt.WindowType.WindowTransparentForInput, True)
+        flags = Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
+        if not self.move_mode:
+            flags |= Qt.WindowType.WindowTransparentForInput
             self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             
             # Save position when exiting move mode
@@ -142,7 +139,10 @@ class OverlayWindow(QWidget):
             self.config["pos_y"] = self.pos().y()
             if hasattr(self, 'save_callback'):
                 self.save_callback()
+        else:
+            self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
             
+        self.setWindowFlags(flags)
         self.update_style()
         self.show()
         
@@ -205,11 +205,13 @@ class OverlayWindow(QWidget):
     # Mouse events for dragging when in move mode
     def mousePressEvent(self, event):
         if self.move_mode and event.button() == Qt.MouseButton.LeftButton:
-            self.drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            self.drag_start_pos = event.globalPosition().toPoint()
+            self.window_start_pos = self.pos()
             event.accept()
 
     def mouseMoveEvent(self, event):
         if self.move_mode and event.buttons() == Qt.MouseButton.LeftButton:
-            if hasattr(self, 'drag_pos'):
-                self.move(event.globalPosition().toPoint() - self.drag_pos)
+            if hasattr(self, 'drag_start_pos') and hasattr(self, 'window_start_pos'):
+                delta = event.globalPosition().toPoint() - self.drag_start_pos
+                self.move(self.window_start_pos + delta)
             event.accept()

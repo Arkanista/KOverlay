@@ -95,6 +95,10 @@ class MainApp:
             self.overlay.show()
             return
             
+        if hasattr(self, 'settings_dialog') and self.settings_dialog is not None:
+            self.overlay.show()
+            return
+            
         game_only = self.cfg.get("game_only", True)
         if not game_only or is_target_active:
             self.overlay.show()

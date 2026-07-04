@@ -115,6 +115,8 @@ class TS3ClientThread(QThread):
                 time.sleep(0.05)
 
             except Exception as e:
+                if not self.running:
+                    break
                 self.error_occurred.emit(f"Connection error: {e}")
                 self.sock = None
                 time.sleep(2) # Backoff
