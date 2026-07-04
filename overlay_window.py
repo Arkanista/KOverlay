@@ -201,6 +201,18 @@ class OverlayWindow(QWidget):
             font.setFamily(font_family)
             font.setPointSize(font_size)
             lbl.setFont(font)
+            
+        # Update width settings
+        dynamic_width = self.config.get("dynamic_width", True)
+        fixed_width = self.config.get("fixed_width", 200)
+        
+        if dynamic_width:
+            self.setMinimumWidth(50)
+            self.setMaximumWidth(16777215)
+            self.adjustSize()
+        else:
+            self.setFixedWidth(fixed_width)
+            self.adjustSize()
         
     def update_clients(self, clients):
         # Update existing or add new

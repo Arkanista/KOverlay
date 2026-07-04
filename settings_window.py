@@ -59,6 +59,28 @@ class SettingsWindow(QDialog):
         normal_layout.addWidget(self.opacity_normal_val_label)
         layout.addLayout(normal_layout)
         
+        # Width Settings
+        width_layout = QHBoxLayout()
+        self.dynamic_width_checkbox = QCheckBox("Dynamic Width (fit to text)")
+        self.dynamic_width_checkbox.setChecked(self.config.get("dynamic_width", True))
+        self.dynamic_width_checkbox.toggled.connect(self._on_change)
+        
+        self.fixed_width_slider = QSlider(Qt.Orientation.Horizontal)
+        self.fixed_width_slider.setRange(50, 1000)
+        self.fixed_width_slider.setValue(self.config.get("fixed_width", 200))
+        self.fixed_width_val_label = QLabel(f"{self.fixed_width_slider.value()}px")
+        self.fixed_width_slider.valueChanged.connect(lambda v: self.fixed_width_val_label.setText(f"{v}px"))
+        self.fixed_width_slider.valueChanged.connect(self._on_change)
+        
+        self.fixed_width_slider.setEnabled(not self.dynamic_width_checkbox.isChecked())
+        self.dynamic_width_checkbox.toggled.connect(lambda checked: self.fixed_width_slider.setEnabled(not checked))
+        
+        width_layout.addWidget(self.dynamic_width_checkbox)
+        width_layout.addWidget(QLabel("Fixed Width:"))
+        width_layout.addWidget(self.fixed_width_slider)
+        width_layout.addWidget(self.fixed_width_val_label)
+        layout.addLayout(width_layout)
+
         # Opacity Slider (Move Mode)
         move_layout = QHBoxLayout()
         self.opacity_move_label = QLabel("Background Opacity (Move Mode):")
@@ -155,6 +177,8 @@ class SettingsWindow(QDialog):
         self.config["game_only"] = self.game_only_checkbox.isChecked()
         self.config["opacity_normal"] = self.opacity_normal_slider.value() / 100.0
         self.config["opacity_move"] = self.opacity_move_slider.value() / 100.0
+        self.config["dynamic_width"] = self.dynamic_width_checkbox.isChecked()
+        self.config["fixed_width"] = self.fixed_width_slider.value()
         if "opacity" in self.config:
             del self.config["opacity"]
         self.config["font_family"] = self.font_combo.currentFont().family()
