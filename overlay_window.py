@@ -205,14 +205,27 @@ class OverlayWindow(QWidget):
         # Trigger a repaint
         self.update()
         
-        # Update fonts on style change
+        # Update fonts and colors on style change
         font_family = self.config.get("font_family", "Sans Serif")
         font_size = self.config.get("font_size", 11)
+        col_normal = self.config.get('text_color_normal', '#96ffffff')
+        if col_normal.startswith('rgba'): col_normal = '#96ffffff'
+        
         for lbl in self.labels.values():
             font = lbl.font()
             font.setFamily(font_family)
             font.setPointSize(font_size)
             lbl.setFont(font)
+            
+            # If we don't know talking state here, we just apply normal color or preserve talking color
+            # Actually, we can check its current color, but it's better to just wait for next tick or apply normal
+            # For immediate feedback on normal color:
+            if "#00FFCC" not in lbl.styleSheet() and col_normal not in lbl.styleSheet():
+                # We can't perfectly know talking state without clients list, but we can guess based on current stylesheet
+                # If it currently has the old talking color or new talking color:
+                if "transparent" in lbl.styleSheet():
+                    pass # We will let update_clients handle the color toggle
+
             
         # Update width settings
         dynamic_width = self.config.get("dynamic_width", True)
@@ -251,12 +264,18 @@ class OverlayWindow(QWidget):
                 self.users_container.addWidget(lbl)
                 self.labels[name] = lbl
                 
-            # Style based on talking status
-            lbl = self.labels[name]
+        # Style based on talking status
+        col_normal = self.config.get('text_color_normal', '#96ffffff')
+        if col_normal.startswith('rgba'): col_normal = '#96ffffff'
+        col_talking = self.config.get('text_color_talking', '#00FFCC')
+        if col_talking.startswith('rgba'): col_talking = '#00FFCC'
+        
+        for name, lbl in self.labels.items():
+            talking = next((c["talking"] for c in clients if c["name"] == name), False)
             if talking:
-                lbl.setStyleSheet("color: #00FFCC; background-color: transparent; border: none;")
+                lbl.setStyleSheet(f"color: {col_talking}; background-color: transparent; border: none;")
             else:
-                lbl.setStyleSheet("color: rgba(255, 255, 255, 150); background-color: transparent; border: none;")
+                lbl.setStyleSheet(f"color: {col_normal}; background-color: transparent; border: none;")
                 
         # Remove old clients
         to_remove = []

@@ -110,13 +110,30 @@ class SettingsWindow(QDialog):
         font_layout.addWidget(self.font_size)
         layout.addLayout(font_layout)
 
-        # Background Color Button
+        # Color Buttons
         color_layout = QHBoxLayout()
         self.color_btn = QPushButton("Choose Background Color")
         self.current_bg_color = self.config.get("bg_color", "#000000")
         self._update_color_btn()
         self.color_btn.clicked.connect(self._choose_color)
         color_layout.addWidget(self.color_btn)
+        
+        self.text_color_normal_btn = QPushButton("Choose Text Color (Normal)")
+        val_normal = self.config.get("text_color_normal", "#96ffffff")
+        if val_normal.startswith("rgba"): val_normal = "#96ffffff"
+        self.current_text_color_normal = val_normal
+        self._update_text_color_normal_btn()
+        self.text_color_normal_btn.clicked.connect(self._choose_text_color_normal)
+        color_layout.addWidget(self.text_color_normal_btn)
+        
+        self.text_color_talking_btn = QPushButton("Choose Text Color (Talking)")
+        val_talking = self.config.get("text_color_talking", "#00ffcc")
+        if val_talking.startswith("rgba"): val_talking = "#00ffcc"
+        self.current_text_color_talking = val_talking
+        self._update_text_color_talking_btn()
+        self.text_color_talking_btn.clicked.connect(self._choose_text_color_talking)
+        color_layout.addWidget(self.text_color_talking_btn)
+        
         layout.addLayout(color_layout)
 
         # Show Header Checkbox
@@ -157,11 +174,36 @@ class SettingsWindow(QDialog):
         text_col = 'white' if c.lightness() < 128 else 'black'
         self.color_btn.setStyleSheet(f"background-color: {self.current_bg_color}; color: {text_col};")
 
+    def _update_text_color_normal_btn(self):
+        c = QColor(self.current_text_color_normal)
+        text_col = 'white' if c.lightness() < 128 else 'black'
+        # Need to strip rgba/alpha for background if it has it, but it's fine
+        self.text_color_normal_btn.setStyleSheet(f"background-color: {self.current_text_color_normal}; color: {text_col};")
+
+    def _update_text_color_talking_btn(self):
+        c = QColor(self.current_text_color_talking)
+        text_col = 'white' if c.lightness() < 128 else 'black'
+        self.text_color_talking_btn.setStyleSheet(f"background-color: {self.current_text_color_talking}; color: {text_col};")
+
     def _choose_color(self):
-        color = QColorDialog.getColor(QColor(self.current_bg_color), self, "Select Background Color")
+        color = QColorDialog.getColor(QColor(self.current_bg_color), self, "Select Background Color", QColorDialog.ColorDialogOption.ShowAlphaChannel)
         if color.isValid():
-            self.current_bg_color = color.name()
+            self.current_bg_color = color.name(QColor.NameFormat.HexArgb)
             self._update_color_btn()
+            self._on_change()
+            
+    def _choose_text_color_normal(self):
+        color = QColorDialog.getColor(QColor(self.current_text_color_normal), self, "Select Text Color (Normal)", QColorDialog.ColorDialogOption.ShowAlphaChannel)
+        if color.isValid():
+            self.current_text_color_normal = color.name(QColor.NameFormat.HexArgb)
+            self._update_text_color_normal_btn()
+            self._on_change()
+            
+    def _choose_text_color_talking(self):
+        color = QColorDialog.getColor(QColor(self.current_text_color_talking), self, "Select Text Color (Talking)", QColorDialog.ColorDialogOption.ShowAlphaChannel)
+        if color.isValid():
+            self.current_text_color_talking = color.name(QColor.NameFormat.HexArgb)
+            self._update_text_color_talking_btn()
             self._on_change()
             
     def _on_change(self):
@@ -184,6 +226,8 @@ class SettingsWindow(QDialog):
         self.config["font_family"] = self.font_combo.currentFont().family()
         self.config["font_size"] = self.font_size.value()
         self.config["bg_color"] = self.current_bg_color
+        self.config["text_color_normal"] = self.current_text_color_normal
+        self.config["text_color_talking"] = self.current_text_color_talking
         self.config["show_header"] = self.header_checkbox.isChecked()
         self.config["show_three_dots"] = self.three_dots_checkbox.isChecked()
         self.config["disable_blink"] = self.disable_blink_checkbox.isChecked()
