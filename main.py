@@ -103,9 +103,9 @@ class MainApp:
             for overlay in self.overlays.values():
                 overlay.start_blink()
 
-    def on_clients_updated(self, clients):
+    def on_clients_updated(self, clients, my_cid=None):
         for overlay in self.overlays.values():
-            overlay.update_clients(clients)
+            overlay.update_clients(clients, my_cid)
 
     def on_move_toggled(self, enabled):
         for overlay in self.overlays.values():

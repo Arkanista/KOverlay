@@ -58,6 +58,35 @@ class SettingsWindow(QDialog):
         layout.addWidget(QLabel("Target Window Keywords (comma separated):"))
         layout.addWidget(self.keywords_input)
         
+        # History
+        self.history_group = QGroupBox("Join/Leave History")
+        history_layout = QVBoxLayout()
+        
+        self.history_checkbox = QCheckBox("Enable Join/Leave History (+ / ✝ indicators)")
+        self.history_checkbox.setChecked(self.config.get("history_enabled", False))
+        self.history_checkbox.toggled.connect(self._on_change)
+        history_layout.addWidget(self.history_checkbox)
+        
+        history_dur_layout = QHBoxLayout()
+        self.history_dur_slider = QSlider(Qt.Orientation.Horizontal)
+        self.history_dur_slider.setRange(1, 300)
+        self.history_dur_slider.setValue(self.config.get("history_duration", 60))
+        self.history_dur_val_label = QLabel(f"{self.history_dur_slider.value()}s")
+        self.history_dur_slider.valueChanged.connect(lambda v: self.history_dur_val_label.setText(f"{v}s"))
+        self.history_dur_slider.valueChanged.connect(self._on_change)
+        
+        self.history_dur_slider.setEnabled(self.history_checkbox.isChecked())
+        self.history_checkbox.toggled.connect(self.history_dur_slider.setEnabled)
+        
+        history_dur_layout.addWidget(QLabel("Duration:"))
+        history_dur_layout.addWidget(self.history_dur_slider)
+        history_dur_layout.addWidget(self.history_dur_val_label)
+        history_layout.addLayout(history_dur_layout)
+        
+        self.history_group.setLayout(history_layout)
+        layout.addWidget(self.history_group)
+
+        
         # Polling Interval Slider
         poll_layout = QHBoxLayout()
         self.poll_label = QLabel("Active Window Check Interval:")
@@ -91,6 +120,74 @@ class SettingsWindow(QDialog):
         poll_layout.addWidget(self.poll_slider)
         poll_layout.addWidget(self.poll_val_label)
         layout.addLayout(poll_layout)
+        
+        # TTS Settings
+        import importlib.util
+        import shutil
+        edge_tts_installed = importlib.util.find_spec("edge_tts") is not None
+        mpv_installed = shutil.which("mpv") is not None
+        tts_available = edge_tts_installed and mpv_installed
+        
+        self.tts_group = QGroupBox("Text-to-Speech (TTS)")
+        tts_layout = QVBoxLayout()
+        
+        self.tts_checkbox = QCheckBox("Enable TTS Voice Announcements (English)")
+        self.tts_checkbox.setChecked(self.config.get("tts_enabled", False))
+        
+        if not tts_available:
+            self.tts_checkbox.setChecked(False)
+            self.tts_checkbox.setEnabled(False)
+            self.config["tts_enabled"] = False
+            self.tts_checkbox.setText("Enable TTS Announcements (Unavailable)")
+            
+        self.tts_checkbox.toggled.connect(self._on_change)
+        tts_layout.addWidget(self.tts_checkbox)
+        
+        info_label = QLabel("Note: Uses the internet for high-quality voices. Requires 'edge-tts' Python module and 'mpv' player.")
+        font = info_label.font()
+        font.setPointSize(font.pointSize() - 2)
+        info_label.setFont(font)
+        info_label.setStyleSheet("color: gray;")
+        info_label.setWordWrap(True)
+        tts_layout.addWidget(info_label)
+        
+        tts_delay_layout = QHBoxLayout()
+        self.tts_delay_label = QLabel("Read Delay:")
+        self.tts_delay_slider = QSlider(Qt.Orientation.Horizontal)
+        self.tts_delay_slider.setMinimum(0)
+        self.tts_delay_slider.setMaximum(3000)
+        self.tts_delay_slider.setSingleStep(250)
+        self.tts_delay_slider.setTickInterval(250)
+        self.tts_delay_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        
+        def on_tts_slider_changed(val):
+            snapped = round(val / 250) * 250
+            if snapped != val:
+                self.tts_delay_slider.blockSignals(True)
+                self.tts_delay_slider.setValue(snapped)
+                self.tts_delay_slider.blockSignals(False)
+            self.tts_delay_val_label.setText(f"{snapped} ms")
+            self._on_change()
+            
+        self.tts_delay_slider.valueChanged.connect(on_tts_slider_changed)
+        
+        current_tts_delay = self.config.get("tts_delay_ms", 0)
+        self.tts_delay_val_label = QLabel(f"{current_tts_delay} ms")
+        self.tts_delay_val_label.setMinimumWidth(60)
+        self.tts_delay_slider.blockSignals(True)
+        self.tts_delay_slider.setValue(current_tts_delay)
+        self.tts_delay_slider.blockSignals(False)
+        
+        self.tts_delay_slider.setEnabled(self.tts_checkbox.isChecked())
+        self.tts_checkbox.toggled.connect(self.tts_delay_slider.setEnabled)
+        
+        tts_delay_layout.addWidget(self.tts_delay_label)
+        tts_delay_layout.addWidget(self.tts_delay_slider)
+        tts_delay_layout.addWidget(self.tts_delay_val_label)
+        tts_layout.addLayout(tts_delay_layout)
+        
+        self.tts_group.setLayout(tts_layout)
+        layout.addWidget(self.tts_group)
         
         # Overlays
         self.monitors_group = QGroupBox("Overlays")
@@ -198,6 +295,14 @@ class SettingsWindow(QDialog):
         self.text_color_talking_btn.clicked.connect(self._choose_text_color_talking)
         color_layout.addWidget(self.text_color_talking_btn)
         
+        self.text_color_left_btn = QPushButton("Choose Text Color (Left)")
+        val_left = self.config.get("text_color_left", "#808080")
+        if val_left.startswith("rgba"): val_left = "#808080"
+        self.current_text_color_left = val_left
+        self._update_text_color_left_btn()
+        self.text_color_left_btn.clicked.connect(self._choose_text_color_left)
+        color_layout.addWidget(self.text_color_left_btn)
+        
         layout.addLayout(color_layout)
 
         # Show Header Checkbox
@@ -249,6 +354,11 @@ class SettingsWindow(QDialog):
         text_col = 'white' if c.lightness() < 128 else 'black'
         self.text_color_talking_btn.setStyleSheet(f"background-color: {self.current_text_color_talking}; color: {text_col};")
 
+    def _update_text_color_left_btn(self):
+        c = QColor(self.current_text_color_left)
+        text_col = 'white' if c.lightness() < 128 else 'black'
+        self.text_color_left_btn.setStyleSheet(f"background-color: {self.current_text_color_left}; color: {text_col};")
+
     def _choose_color(self):
         color = QColorDialog.getColor(QColor(self.current_bg_color), self, "Select Background Color", QColorDialog.ColorDialogOption.ShowAlphaChannel)
         if color.isValid():
@@ -268,6 +378,13 @@ class SettingsWindow(QDialog):
         if color.isValid():
             self.current_text_color_talking = color.name(QColor.NameFormat.HexArgb)
             self._update_text_color_talking_btn()
+            self._on_change()
+            
+    def _choose_text_color_left(self):
+        color = QColorDialog.getColor(QColor(self.current_text_color_left), self, "Select Text Color (Left)", QColorDialog.ColorDialogOption.ShowAlphaChannel)
+        if color.isValid():
+            self.current_text_color_left = color.name(QColor.NameFormat.HexArgb)
+            self._update_text_color_left_btn()
             self._on_change()
             
     def _on_change(self):
@@ -299,9 +416,14 @@ class SettingsWindow(QDialog):
         self.config["bg_color"] = self.current_bg_color
         self.config["text_color_normal"] = self.current_text_color_normal
         self.config["text_color_talking"] = self.current_text_color_talking
+        self.config["text_color_left"] = self.current_text_color_left
         self.config["show_header"] = self.header_checkbox.isChecked()
         self.config["show_three_dots"] = self.three_dots_checkbox.isChecked()
         self.config["disable_blink"] = self.disable_blink_checkbox.isChecked()
+        self.config["history_enabled"] = self.history_checkbox.isChecked()
+        self.config["tts_enabled"] = self.tts_checkbox.isChecked()
+        self.config["tts_delay_ms"] = self.tts_delay_slider.value()
+        self.config["history_duration"] = self.history_dur_slider.value()
         
         # Emit signal to inform main app to apply changes
         self.config_changed.emit()

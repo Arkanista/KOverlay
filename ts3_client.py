@@ -3,7 +3,7 @@ import socket
 from PyQt6.QtCore import QThread, pyqtSignal
 
 class TS3ClientThread(QThread):
-    clients_updated = pyqtSignal(list)
+    clients_updated = pyqtSignal(list, object)
     error_occurred = pyqtSignal(str)
 
     def __init__(self, api_key, parent=None):
@@ -107,10 +107,10 @@ class TS3ClientThread(QThread):
                 
                 if "error id=0" not in resp:
                     # Not connected to a server or empty response
-                    self.clients_updated.emit([])
+                    self.clients_updated.emit([], None)
                 else:
                     clients = self._parse_clientlist(resp, filter_cid=my_cid)
-                    self.clients_updated.emit(clients)
+                    self.clients_updated.emit(clients, my_cid)
                 
                 time.sleep(0.05)
 

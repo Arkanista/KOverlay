@@ -15,9 +15,9 @@ For Arch-based systems, an official `PKGBUILD` and a compiled package are provid
 2. Build the package: `makepkg -si`
    *(This will automatically fetch required dependencies like `python-pyqt6` and the AUR package `kdotool`).*
 3. Or download and install the pre-compiled package directly via terminal: 
-   `sudo pacman -U https://github.com/Arkanista/koverlay/releases/download/v0.1.6/koverlay-0.1.6-1-any.pkg.tar.zst`
+   `sudo pacman -U https://github.com/Arkanista/koverlay/releases/download/v0.1.7/koverlay-0.1.7-1-any.pkg.tar.zst`
 4. **[Direct Download Link]** You can also download the package manually through your browser: 
-   👉 **[Download KOverlay v0.1.6 (.pkg.tar.zst)](https://github.com/Arkanista/koverlay/releases/download/v0.1.6/koverlay-0.1.6-1-any.pkg.tar.zst)**
+   👉 **[Download KOverlay v0.1.7 (.pkg.tar.zst)](https://github.com/Arkanista/koverlay/releases/download/v0.1.7/koverlay-0.1.7-1-any.pkg.tar.zst)**
 
 ### Ubuntu / Debian / Linux Mint / Fedora / openSUSE
 For other distributions, a robust, universal installer script is provided:
@@ -106,6 +106,14 @@ The *Settings* window offers highly advanced overlay customization. All options 
 *   **Show Title Header (Logo + Text):** Official overlay header. Adds a distinct visual program logo and a text identifier (e.g., "KOverlay - ID 1") to the frame. Keeps the window looking like a classic software block.
 *   **Show Dots Indicator:** Highly compact mode. If you disable the *Title Header*, you can enable the "Dots Indicator". This makes the text header disappear, leaving only tiny, LED-like dots (`•••`) at the very top of the frame. The number of dots displayed corresponds to the identification number of that display clone (1 dot = Overlay ID 1). The footprint is minimized to physical zero, and the dotted line is small enough not to interfere with the game, while serving as the only available drag-handle for the mouse when arranging the element on the screen!
 *   **Disable border blinking on startup:** By default, KOverlay "blinks" its outer border in an aggressive red color upon invocation (for a 5-second cycle). This functionality was implemented so that the player, amidst cluttered screens, can instantly visually locate where the hidden transparent window spawned. This option permanently disables the blinking signal – maximizing minimalism.
+
+### Join/Leave History & TTS Voice
+*   **Enable Join/Leave History (+ / ✝ indicators):** When enabled, KOverlay tracks the presence of users. New users joining the channel will be prefixed with a bold `+ ` for a specified duration. Users who leave the channel will stay on the list for the specified duration but will be pushed to the bottom, prefixed with a `✝ ` symbol, and colored gray (or a custom color of your choice). This allows you to know who just entered or left without looking at the TS3 window!
+*   **History Duration:** Defines how long (in seconds) the new/left users keep their visual indicators before fading away (left users) or turning into regular users (new users).
+*   **Enable TTS Voice Announcements (English):** Text-to-Speech integration! When enabled, whenever someone joins the channel, a natural AI voice (AriaNeural from Microsoft Azure) will announce their arrival out loud (e.g., "Arkanis joined"). 
+    * *Requires active internet connection for the high-quality voice.*
+    * *Requires the `edge-tts` python module and the `mpv` video player to be installed on your Linux system. (These are installed automatically via our universal installers).*
+*   **Read Delay:** Defines a delay (up to 3 seconds) before the TTS voice speaks, preventing overlaps with standard TS3 joining sounds.
 
 ---
 

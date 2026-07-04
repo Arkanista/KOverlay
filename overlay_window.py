@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPoint
 from PyQt6.QtGui import QColor, QPixmap, QPainter, QPen
+import time
 
 class OverlayWindow(QWidget):
     blink_finished = pyqtSignal()
@@ -14,6 +15,7 @@ class OverlayWindow(QWidget):
         self.is_blinking = False
         self.blink_count = 0
         self.blink_state = False
+        self.user_history = {}
         
         # Give this widget an object name to apply styles exclusively
         self.setObjectName("OverlayWindowMain")
@@ -242,53 +244,142 @@ class OverlayWindow(QWidget):
             self.setMaximumWidth(16777215)
             self.setFixedWidth(fixed_width)
         
-    def update_clients(self, clients):
-        # Update existing or add new
-        current_names = set()
+    def update_clients(self, clients, my_cid=None):
+        import time
+        current_time = time.time()
         
+        history_enabled = self.config.get("history_enabled", False)
+        history_duration = self.config.get("history_duration", 60)
+        
+        # Determine who is active right now
+        active_names = {c["name"] for c in clients}
+        
+        changed_channel = False
+        if hasattr(self, 'current_cid') and self.current_cid != my_cid:
+            self.user_history.clear()
+            changed_channel = True
+        self.current_cid = my_cid
+        
+        was_empty = len(self.user_history) == 0
+        
+        # Update user history
+        if history_enabled:
+            # Mark new users
+            for c in clients:
+                name = c["name"]
+                if name not in self.user_history:
+                    # User wasn't seen before, they joined now
+                    join_time = 0 if (was_empty or changed_channel) else current_time
+                    self.user_history[name] = {"join_time": join_time, "leave_time": None}
+                    
+                    if not (was_empty or changed_channel) and self.config.get("tts_enabled", False):
+                        delay = self.config.get("tts_delay_ms", 0)
+                        if delay == 0:
+                            self._play_tts(name)
+                        else:
+                            QTimer.singleShot(delay, lambda n=name: self._play_tts(n))
+                else:
+                    # User is known, if they previously left, they are back
+                    if self.user_history[name]["leave_time"] is not None:
+                        # Re-joined! We update join_time and clear leave_time
+                        self.user_history[name] = {"join_time": current_time, "leave_time": None}
+                        
+                        if self.config.get("tts_enabled", False):
+                            delay = self.config.get("tts_delay_ms", 0)
+                            if delay == 0:
+                                self._play_tts(name)
+                            else:
+                                QTimer.singleShot(delay, lambda n=name: self._play_tts(n))
+            
+            # Mark users who left
+            for name, data in list(self.user_history.items()):
+                if name not in active_names:
+                    if data["leave_time"] is None:
+                        # User just left
+                        data["leave_time"] = current_time
+                    elif current_time - data["leave_time"] > history_duration:
+                        # User left longer than history_duration, remove from history
+                        del self.user_history[name]
+        else:
+            # History disabled, just match active clients directly
+            self.user_history = {}
+            for c in clients:
+                self.user_history[c["name"]] = {"join_time": 0, "leave_time": None}
+
         font_family = self.config.get("font_family", "Sans Serif")
         font_size = self.config.get("font_size", 11)
         
-        for client in clients:
-            name = client["name"]
-            talking = client["talking"]
-            current_names.add(name)
-            
-            if name not in self.labels:
-                lbl = QLabel(name)
-                lbl.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-                font = lbl.font()
-                font.setFamily(font_family)
-                font.setPointSize(font_size)
-                font.setBold(True)
-                lbl.setFont(font)
-                self.users_container.addWidget(lbl)
-                self.labels[name] = lbl
-                
-        # Style based on talking status
         col_normal = self.config.get('text_color_normal', '#96ffffff')
         if col_normal.startswith('rgba'): col_normal = '#96ffffff'
         col_talking = self.config.get('text_color_talking', '#00FFCC')
         if col_talking.startswith('rgba'): col_talking = '#00FFCC'
+        col_left = self.config.get('text_color_left', '#808080')
+        if col_left.startswith('rgba'): col_left = '#808080'
+
+        # Build ordered list of names to display
+        display_names = list(self.user_history.keys())
+            
+        # We need to sort: active first, then left users
+        def sort_key(name):
+            data = self.user_history[name]
+            is_left = data["leave_time"] is not None
+            return (1 if is_left else 0, name.lower())
+            
+        display_names.sort(key=sort_key)
         
-        for name, lbl in self.labels.items():
-            talking = next((c["talking"] for c in clients if c["name"] == name), False)
-            if talking:
-                lbl.setStyleSheet(f"color: {col_talking}; background-color: transparent; border: none;")
-            else:
-                lbl.setStyleSheet(f"color: {col_normal}; background-color: transparent; border: none;")
-                
-        # Remove old clients
+        # Remove old labels not in display_names
         to_remove = []
         for name, lbl in self.labels.items():
-            if name not in current_names:
+            if name not in display_names:
                 self.users_container.removeWidget(lbl)
                 lbl.deleteLater()
                 to_remove.append(name)
                 
         for name in to_remove:
             del self.labels[name]
-        
+            
+        # Rebuild/update labels
+        for name in display_names:
+            data = self.user_history[name]
+            is_left = data["leave_time"] is not None
+            is_new = history_enabled and not is_left and (current_time - data["join_time"] < history_duration)
+            
+            # Format text
+            display_text = name
+            if is_left:
+                display_text = "✝ " + name
+            elif is_new:
+                display_text = "+ " + name
+                
+            # Get talking state
+            talking = next((c["talking"] for c in clients if c["name"] == name), False)
+            
+            # Create or update label
+            if name not in self.labels:
+                lbl = QLabel(display_text)
+                lbl.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+                font = lbl.font()
+                font.setFamily(font_family)
+                font.setPointSize(font_size)
+                font.setBold(True)
+                lbl.setFont(font)
+                self.labels[name] = lbl
+            else:
+                lbl = self.labels[name]
+                lbl.setText(display_text)
+                
+            # Remove from layout and re-add to enforce order
+            self.users_container.removeWidget(lbl)
+            self.users_container.addWidget(lbl)
+            
+            # Apply style
+            if is_left:
+                lbl.setStyleSheet(f"color: {col_left}; background-color: transparent; border: none;")
+            elif talking:
+                lbl.setStyleSheet(f"color: {col_talking}; background-color: transparent; border: none;")
+            else:
+                lbl.setStyleSheet(f"color: {col_normal}; background-color: transparent; border: none;")
+                
         if self.config.get("dynamic_width", True):
             # Layout constraint will automatically resize the window
             pass
@@ -321,3 +412,38 @@ class OverlayWindow(QWidget):
             if hasattr(self, 'save_callback'):
                 self.save_callback()
             event.accept()
+
+    def _play_tts(self, name):
+        import subprocess
+        import shutil
+        import tempfile
+        import os
+        import threading
+        import hashlib
+        
+        if self.config.get("tts_enabled", False):
+            # Safe filename for cache
+            safe_name = "".join(c for c in name if c.isalnum() or c in " _-")
+            filename = hashlib.md5(safe_name.encode()).hexdigest() + ".mp3"
+            tmp_file = os.path.join(tempfile.gettempdir(), f"koverlay_{filename}")
+
+            import importlib.util
+            import sys
+            edge_tts_installed = importlib.util.find_spec("edge_tts") is not None
+
+            if edge_tts_installed and shutil.which("mpv"):
+                def run_edge_tts():
+                    try:
+                        # Cache the generated voice per user to save network requests & time
+                        if not os.path.exists(tmp_file):
+                            subprocess.run([sys.executable, "-m", "edge_tts", "--voice", "en-US-AriaNeural", "--text", f"{safe_name} joined", "--write-media", tmp_file], check=True)
+                        subprocess.Popen(["mpv", "--no-video", "--really-quiet", tmp_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    except Exception as e:
+                        pass
+                # Run network request in background to prevent overlay freeze
+                threading.Thread(target=run_edge_tts, daemon=True).start()
+                
+            elif shutil.which("espeak"):
+                subprocess.Popen(["espeak", "-v", "en", f"{name} joined"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            elif shutil.which("spd-say"):
+                subprocess.Popen(["spd-say", "-l", "en", f"{name} joined"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

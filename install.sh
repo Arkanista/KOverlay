@@ -9,18 +9,18 @@ echo "Starting KOverlay installation..."
 if command -v apt &> /dev/null; then
     echo "Detected apt (Debian/Ubuntu/Mint)..."
     sudo apt update
-    sudo apt install -y python3 python3-venv python3-pip
+    sudo apt install -y python3 python3-venv python3-pip mpv
 elif command -v pacman &> /dev/null; then
     echo "Detected pacman (Arch/Manjaro/CachyOS)..."
-    sudo pacman -Sy --needed python python-pip
+    sudo pacman -Sy --needed python python-pip mpv
 elif command -v dnf &> /dev/null; then
     echo "Detected dnf (Fedora)..."
-    sudo dnf install -y python3 python3-pip
+    sudo dnf install -y python3 python3-pip mpv
 elif command -v zypper &> /dev/null; then
     echo "Detected zypper (openSUSE)..."
-    sudo zypper install -y python3 python3-pip
+    sudo zypper install -y python3 python3-pip mpv
 else
-    echo "Unsupported package manager. Please install python3, python3-venv, and pip manually."
+    echo "Unsupported package manager. Please install python3, python3-venv, pip, and mpv manually."
 fi
 
 echo "Checking for required window tracking tools..."
@@ -69,10 +69,10 @@ mkdir -p ~/.local/share/applications/
 # Generate desktop file dynamically with absolute path
 cat > ~/.local/share/applications/koverlay.desktop << EOL
 [Desktop Entry]
-Version=0.1.0
+Version=0.1.7
 Type=Application
 Name=KOverlay
-Comment=KOverlay TeamSpeak 3 Overlay
+Comment=KOverlay - TS3 Overlay
 Exec="$INSTALL_DIR/venv/bin/python" "$INSTALL_DIR/main.py"
 Path=$INSTALL_DIR
 Icon=$INSTALL_DIR/icon.svg

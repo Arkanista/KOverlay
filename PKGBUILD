@@ -1,11 +1,11 @@
 pkgname=koverlay
-pkgver=0.1.6
+pkgver=0.1.7
 pkgrel=1
 pkgdesc="A modern, universal Wayland/X11 TeamSpeak 3 overlay."
 arch=('any')
 url="https://github.com/arkanis/koverlay" # Replace with actual URL if known
 license=('GPL')
-depends=('python' 'python-pyqt6' 'qt6-svg' 'kdotool' 'xdotool')
+depends=('python' 'python-pyqt6' 'qt6-svg' 'kdotool' 'xdotool' 'mpv')
 makedepends=('python-pip')
 source=()
 
@@ -23,7 +23,7 @@ package() {
     cp "$startdir/icon.svg" "$pkgdir/opt/koverlay/icon.svg"
 
     # Install pip dependencies locally using --target
-    pip install --target="$pkgdir/opt/koverlay/lib" ts3
+    pip install --target="$pkgdir/opt/koverlay/lib" ts3 edge-tts
 
     # Generate desktop file
     cat > "$pkgdir/usr/share/applications/koverlay.desktop" << EOF
