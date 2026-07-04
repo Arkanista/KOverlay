@@ -186,6 +186,32 @@ class SettingsWindow(QDialog):
         tts_delay_layout.addWidget(self.tts_delay_val_label)
         tts_layout.addLayout(tts_delay_layout)
         
+        tts_vol_layout = QHBoxLayout()
+        self.tts_vol_label = QLabel("Volume:")
+        self.tts_vol_slider = QSlider(Qt.Orientation.Horizontal)
+        self.tts_vol_slider.setMinimum(0)
+        self.tts_vol_slider.setMaximum(100)
+        self.tts_vol_slider.setSingleStep(5)
+        self.tts_vol_slider.setTickInterval(10)
+        self.tts_vol_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        
+        current_tts_vol = self.config.get("tts_volume", 80)
+        self.tts_vol_val_label = QLabel(f"{current_tts_vol}%")
+        self.tts_vol_val_label.setMinimumWidth(60)
+        self.tts_vol_slider.blockSignals(True)
+        self.tts_vol_slider.setValue(current_tts_vol)
+        self.tts_vol_slider.blockSignals(False)
+        self.tts_vol_slider.valueChanged.connect(lambda v: self.tts_vol_val_label.setText(f"{v}%"))
+        self.tts_vol_slider.valueChanged.connect(self._on_change)
+        
+        self.tts_vol_slider.setEnabled(self.tts_checkbox.isChecked())
+        self.tts_checkbox.toggled.connect(self.tts_vol_slider.setEnabled)
+        
+        tts_vol_layout.addWidget(self.tts_vol_label)
+        tts_vol_layout.addWidget(self.tts_vol_slider)
+        tts_vol_layout.addWidget(self.tts_vol_val_label)
+        tts_layout.addLayout(tts_vol_layout)
+        
         self.tts_group.setLayout(tts_layout)
         layout.addWidget(self.tts_group)
         
@@ -423,6 +449,7 @@ class SettingsWindow(QDialog):
         self.config["history_enabled"] = self.history_checkbox.isChecked()
         self.config["tts_enabled"] = self.tts_checkbox.isChecked()
         self.config["tts_delay_ms"] = self.tts_delay_slider.value()
+        self.config["tts_volume"] = self.tts_vol_slider.value()
         self.config["history_duration"] = self.history_dur_slider.value()
         
         # Emit signal to inform main app to apply changes

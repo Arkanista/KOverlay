@@ -4,21 +4,27 @@ from PyQt6.QtCore import pyqtSignal
 
 class TrayIcon(QSystemTrayIcon):
     move_toggled = pyqtSignal(bool)
+    mute_toggled = pyqtSignal(bool)
     settings_requested = pyqtSignal()
     quit_requested = pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, initial_mute=False):
         super().__init__(parent)
         
         self.setIcon(QIcon("icon.svg"))
-        self.setToolTip("KOverlay v0.1.0")
+        self.setToolTip("KOverlay v0.1.7")
         
         # Create menu
         self.menu = QMenu()
         
-        self.move_action = self.menu.addAction("Move")
+        self.move_action = self.menu.addAction("Move Overlays")
         self.move_action.setCheckable(True)
         self.move_action.toggled.connect(self.move_toggled.emit)
+        
+        self.mute_action = self.menu.addAction("Mute TTS Voice")
+        self.mute_action.setCheckable(True)
+        self.mute_action.setChecked(initial_mute)
+        self.mute_action.toggled.connect(self.mute_toggled.emit)
         
         self.settings_action = self.menu.addAction("Settings")
         self.settings_action.triggered.connect(self.settings_requested.emit)

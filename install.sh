@@ -69,7 +69,7 @@ mkdir -p ~/.local/share/applications/
 # Generate desktop file dynamically with absolute path
 cat > ~/.local/share/applications/koverlay.desktop << EOL
 [Desktop Entry]
-Version=0.1.7
+Version=0.1.8
 Type=Application
 Name=KOverlay
 Comment=KOverlay - TS3 Overlay

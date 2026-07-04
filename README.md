@@ -15,9 +15,9 @@ For Arch-based systems, an official `PKGBUILD` and a compiled package are provid
 2. Build the package: `makepkg -si`
    *(This will automatically fetch required dependencies like `python-pyqt6` and the AUR package `kdotool`).*
 3. Or download and install the pre-compiled package directly via terminal: 
-   `sudo pacman -U https://github.com/Arkanista/koverlay/releases/download/v0.1.7/koverlay-0.1.7-1-any.pkg.tar.zst`
+   `sudo pacman -U https://github.com/Arkanista/koverlay/releases/download/v0.1.8/koverlay-0.1.8-1-any.pkg.tar.zst`
 4. **[Direct Download Link]** You can also download the package manually through your browser: 
-   👉 **[Download KOverlay v0.1.7 (.pkg.tar.zst)](https://github.com/Arkanista/koverlay/releases/download/v0.1.7/koverlay-0.1.7-1-any.pkg.tar.zst)**
+   👉 **[Download KOverlay v0.1.8 (.pkg.tar.zst)](https://github.com/Arkanista/koverlay/releases/download/v0.1.8/koverlay-0.1.8-1-any.pkg.tar.zst)**
 
 ### Ubuntu / Debian / Linux Mint / Fedora / openSUSE
 For other distributions, a robust, universal installer script is provided:
@@ -114,6 +114,7 @@ The *Settings* window offers highly advanced overlay customization. All options 
     * *Requires active internet connection for the high-quality voice.*
     * *Requires the `edge-tts` python module and the `mpv` video player to be installed on your Linux system. (These are installed automatically via our universal installers).*
 *   **Read Delay:** Defines a delay (up to 3 seconds) before the TTS voice speaks, preventing overlaps with standard TS3 joining sounds.
+*   **Volume:** Slider to independently control the loudness of the TTS announcements (0% to 100%).
 
 ---
 
@@ -127,6 +128,9 @@ The *Settings* window offers highly advanced overlay customization. All options 
    * Activating this option freezes mouse communication with the game beneath the window frame, colors the KOverlay frame into a visible dashed line, and applies the "Move Mode" opacity.
    * In this mode, simply grab any of the enabled windows with the Left Mouse Button and move it freely to any corner of the monitor. **Releasing the left mouse button immediately hard-saves the new coordinate.**
 
-2. **Lock Positions:**
+2. **Mute TTS Voice:**
+   * A quick toggle switch. Checking this option will instantly mute all voice announcements without changing your master settings. Perfect for temporarily silencing the bot without having to open the full Settings panel!
+
+3. **Lock Positions:**
    * Exits "Rearrangement" mode.
    * The `Move Overlays` button automatically changes its label to `Lock Positions` while moving. Click it once you've finished arranging the frame, and the overlays will instantly freeze, hide the auxiliary dashed edges, and resume ignoring mouse strikes, passing control directly back to the game client!

@@ -272,7 +272,7 @@ class OverlayWindow(QWidget):
                     join_time = 0 if (was_empty or changed_channel) else current_time
                     self.user_history[name] = {"join_time": join_time, "leave_time": None}
                     
-                    if not (was_empty or changed_channel) and self.config.get("tts_enabled", False):
+                    if not (was_empty or changed_channel) and self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False):
                         delay = self.config.get("tts_delay_ms", 0)
                         if delay == 0:
                             self._play_tts(name)
@@ -284,7 +284,7 @@ class OverlayWindow(QWidget):
                         # Re-joined! We update join_time and clear leave_time
                         self.user_history[name] = {"join_time": current_time, "leave_time": None}
                         
-                        if self.config.get("tts_enabled", False):
+                        if self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False):
                             delay = self.config.get("tts_delay_ms", 0)
                             if delay == 0:
                                 self._play_tts(name)
@@ -437,13 +437,16 @@ class OverlayWindow(QWidget):
                         # Cache the generated voice per user to save network requests & time
                         if not os.path.exists(tmp_file):
                             subprocess.run([sys.executable, "-m", "edge_tts", "--voice", "en-US-AriaNeural", "--text", f"{safe_name} joined", "--write-media", tmp_file], check=True)
-                        subprocess.Popen(["mpv", "--no-video", "--really-quiet", tmp_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        vol = self.config.get("tts_volume", 80)
+                        subprocess.Popen(["mpv", "--no-video", "--really-quiet", f"--volume={vol}", tmp_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     except Exception as e:
                         pass
                 # Run network request in background to prevent overlay freeze
                 threading.Thread(target=run_edge_tts, daemon=True).start()
                 
             elif shutil.which("espeak"):
-                subprocess.Popen(["espeak", "-v", "en", f"{name} joined"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                vol = int(self.config.get("tts_volume", 80) * 2) # espeak scale is 0 to 200, default 100
+                subprocess.Popen(["espeak", "-a", str(vol), "-v", "en", f"{name} joined"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             elif shutil.which("spd-say"):
-                subprocess.Popen(["spd-say", "-l", "en", f"{name} joined"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                vol = int((self.config.get("tts_volume", 80) - 50) * 2) # spd-say is -100 to +100
+                subprocess.Popen(["spd-say", "-y", str(vol), "-l", "en", f"{name} joined"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

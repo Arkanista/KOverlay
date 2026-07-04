@@ -69,11 +69,12 @@ class MainApp:
                 overlay.show()
                 self.overlays[overlay_id] = overlay
         
-        self.tray = TrayIcon()
+        self.tray = TrayIcon(initial_mute=self.cfg.get("tts_muted", False))
         self.tray.show()
         
         # Connections
         self.tray.move_toggled.connect(self.on_move_toggled)
+        self.tray.mute_toggled.connect(self.on_mute_toggled)
         self.tray.settings_requested.connect(self.show_settings)
         self.tray.quit_requested.connect(self.quit)
         
@@ -110,6 +111,10 @@ class MainApp:
     def on_move_toggled(self, enabled):
         for overlay in self.overlays.values():
             overlay.set_move_mode(enabled)
+
+    def on_mute_toggled(self, is_muted):
+        self.cfg["tts_muted"] = is_muted
+        self.save_config()
 
     def on_blink_finished(self):
         self.on_active_window_changed(self.tracker.last_state)

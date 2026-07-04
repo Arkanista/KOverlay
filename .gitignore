@@ -6,3 +6,4 @@ config.json
 *.pkg.tar.zst
 pkg/
 src/
+scratch/
