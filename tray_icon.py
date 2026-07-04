@@ -5,14 +5,15 @@ from PyQt6.QtCore import pyqtSignal
 class TrayIcon(QSystemTrayIcon):
     move_toggled = pyqtSignal(bool)
     mute_toggled = pyqtSignal(bool)
+    overlay_toggled = pyqtSignal(str, bool)
     settings_requested = pyqtSignal()
     quit_requested = pyqtSignal()
 
-    def __init__(self, parent=None, initial_mute=False):
+    def __init__(self, parent=None, initial_mute=False, overlays_config=None):
         super().__init__(parent)
         
         self.setIcon(QIcon("icon.svg"))
-        self.setToolTip("KOverlay v0.1.7")
+        self.setToolTip("KOverlay v0.1.8")
         
         # Create menu
         self.menu = QMenu()
@@ -26,8 +27,38 @@ class TrayIcon(QSystemTrayIcon):
         self.mute_action.setChecked(initial_mute)
         self.mute_action.toggled.connect(self.mute_toggled.emit)
         
+        self.menu.addSeparator()
+        
+        self.overlay_actions = {}
+        names = {"1": "Top Left", "2": "Top Right", "3": "Bottom Left", "4": "Bottom Right"}
+        if overlays_config is None:
+            overlays_config = {}
+            
+        for o_id in ["1", "2", "3", "4"]:
+            cfg = overlays_config.get(o_id, {})
+            action = self.menu.addAction(f"Show {names[o_id]} Overlay")
+            action.setCheckable(True)
+            action.setChecked(cfg.get("enabled", False))
+            action.toggled.connect(lambda checked, oid=o_id: self.overlay_toggled.emit(oid, checked))
+            self.overlay_actions[o_id] = action
+
+        self.menu.addSeparator()
+        
         self.settings_action = self.menu.addAction("Settings")
         self.settings_action.triggered.connect(self.settings_requested.emit)
+        
+        self.menu.addSeparator()
+        
+        self.quit_action = self.menu.addAction("Quit")
+        self.quit_action.triggered.connect(self.quit_requested.emit)
+        
+        self.setContextMenu(self.menu)
+
+    def update_overlay_state(self, overlay_id, is_enabled):
+        if overlay_id in self.overlay_actions:
+            self.overlay_actions[overlay_id].blockSignals(True)
+            self.overlay_actions[overlay_id].setChecked(is_enabled)
+            self.overlay_actions[overlay_id].blockSignals(False)
         
         self.menu.addSeparator()
         

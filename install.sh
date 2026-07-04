@@ -57,6 +57,19 @@ if [ ! -d "venv" ]; then
     python3 -m venv venv
 fi
 
+# Generate start script
+cat > start.sh << EOL
+#!/bin/bash
+cd $INSTALL_DIR
+# Use venv python if exists
+if [ -d "venv" ]; then
+    exec ./venv/bin/python koverlay.py
+else
+    exec python3 koverlay.py
+fi
+EOL
+chmod +x start.sh
+
 echo "Activating virtual environment and installing requirements..."
 source venv/bin/activate
 pip install -r requirements.txt
@@ -73,7 +86,7 @@ Version=0.1.8
 Type=Application
 Name=KOverlay
 Comment=KOverlay - TS3 Overlay
-Exec="$INSTALL_DIR/venv/bin/python" "$INSTALL_DIR/main.py"
+Exec="$INSTALL_DIR/venv/bin/python" "$INSTALL_DIR/koverlay.py"
 Path=$INSTALL_DIR
 Icon=$INSTALL_DIR/icon.svg
 Terminal=false

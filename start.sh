@@ -4,4 +4,4 @@ cd "$(dirname "$0")"
 
 # Aktywuje wirtualne środowisko i uruchamia aplikację
 source venv/bin/activate
-python3 main.py
+exec python3 koverlay.py

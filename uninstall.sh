@@ -5,6 +5,9 @@ set -e
 
 echo "Starting KOverlay uninstallation..."
 
+echo "Stopping KOverlay if running..."
+killall koverlay &> /dev/null || true
+
 # 1. Remove Desktop Integration
 echo "Removing Desktop Shortcut..."
 rm -f ~/.local/share/applications/koverlay.desktop

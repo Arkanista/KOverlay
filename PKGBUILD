@@ -43,7 +43,7 @@ EOF
 #!/bin/bash
 export PYTHONPATH="/opt/koverlay/lib:\$PYTHONPATH"
 cd /opt/koverlay || exit 1
-exec python3 main.py "\$@"
+exec python3 koverlay.py "\$@"
 EOF
     chmod +x "$pkgdir/usr/bin/koverlay"
 }
