@@ -61,21 +61,33 @@ class MainApp:
         config.save_config(self.cfg)
 
     def show_settings(self):
-        dialog = SettingsWindow(self.cfg)
-        if dialog.exec():
-            new_cfg = dialog.get_updated_config()
-            config.save_config(new_cfg)
-            self.cfg = new_cfg
-            
-            # Restart TS3 thread with new key
-            self.ts3_thread.stop()
-            self.ts3_thread = TS3ClientThread(self.cfg.get("api_key", ""))
-            self.ts3_thread.clients_updated.connect(self.overlay.update_clients)
-            self.ts3_thread.error_occurred.connect(self.on_ts3_error)
-            self.ts3_thread.start()
-            
-            self.overlay.config = self.cfg
-            self.overlay.update_style()
+        if hasattr(self, 'settings_dialog') and self.settings_dialog is not None:
+            self.settings_dialog.activateWindow()
+            return
+
+        self.settings_dialog = SettingsWindow(self.cfg)
+        self.settings_dialog.accepted.connect(self.on_settings_saved)
+        self.settings_dialog.finished.connect(self.on_settings_closed)
+        self.settings_dialog.setModal(False)
+        self.settings_dialog.show()
+
+    def on_settings_saved(self):
+        new_cfg = self.settings_dialog.get_updated_config()
+        config.save_config(new_cfg)
+        self.cfg = new_cfg
+        
+        # Restart TS3 thread with new key
+        self.ts3_thread.stop()
+        self.ts3_thread = TS3ClientThread(self.cfg.get("api_key", ""))
+        self.ts3_thread.clients_updated.connect(self.overlay.update_clients)
+        self.ts3_thread.error_occurred.connect(self.on_ts3_error)
+        self.ts3_thread.start()
+        
+        self.overlay.config = self.cfg
+        self.overlay.update_style()
+        
+    def on_settings_closed(self):
+        self.settings_dialog = None
 
     def on_active_window_changed(self, is_target_active):
         # If moving, always show.
