@@ -17,6 +17,8 @@ class MainApp:
     def __init__(self):
         self.app = QApplication(sys.argv)
         self.app.setQuitOnLastWindowClosed(False)
+        from PyQt6.QtGui import QIcon
+        self.app.setWindowIcon(QIcon("icon.svg"))
         
         # Load config
         self.cfg = config.load_config()

@@ -67,6 +67,7 @@ class OverlayWindow(QWidget):
         self.blink_timer = QTimer(self)
         self.blink_timer.timeout.connect(self._on_blink_tick)
         
+        self.setMinimumSize(50, 20)
         self.resize(200, 300)
         
         mon_cfg = self.config.get("monitors", {}).get(self.screen_name, {})
@@ -150,8 +151,18 @@ class OverlayWindow(QWidget):
         self.show()
         
     def update_style(self):
-        self.header_widget.setVisible(self.config.get("show_header", True))
-        self.icon_label.setVisible(self.config.get("show_three_dots", False))
+        show_header = self.config.get("show_header", True)
+        show_three_dots = self.config.get("show_three_dots", False)
+        
+        self.header_widget.setVisible(show_header)
+        
+        if show_header:
+            if show_three_dots:
+                self.icon_label.setVisible(True)
+                self.title_label.setVisible(False)
+            else:
+                self.icon_label.setVisible(False)
+                self.title_label.setVisible(True)
         
         # Trigger a repaint
         self.update()

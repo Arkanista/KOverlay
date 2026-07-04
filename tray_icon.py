@@ -10,18 +10,7 @@ class TrayIcon(QSystemTrayIcon):
     def __init__(self, parent=None):
         super().__init__(parent)
         
-        # Create a simple icon (a blue circle for now, can be replaced with an image)
-        pixmap = QPixmap(64, 64)
-        pixmap.fill(QColor("transparent"))
-        import PyQt6.QtGui as QtGui
-        from PyQt6.QtCore import Qt
-        painter = QtGui.QPainter(pixmap)
-        painter.setBrush(QColor("#3498db"))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(0, 0, 64, 64)
-        painter.end()
-        
-        self.setIcon(QIcon(pixmap))
+        self.setIcon(QIcon("icon.svg"))
         self.setToolTip("TS3 Overlay")
         
         # Create menu

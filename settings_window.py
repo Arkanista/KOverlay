@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QSlider, QCheckBox, QFontComboBox, QSpinBox, QColorDialog, QGroupBox
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont, QGuiApplication
+import copy
 
 class SettingsWindow(QDialog):
     def __init__(self, current_config, parent=None):
@@ -138,7 +139,7 @@ class SettingsWindow(QDialog):
             self._update_color_btn()
         
     def get_updated_config(self):
-        new_config = dict(self.config)
+        new_config = copy.deepcopy(self.config)
         
         # Save monitors
         if "monitors" not in new_config:
