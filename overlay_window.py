@@ -5,9 +5,10 @@ from PyQt6.QtGui import QColor, QPixmap, QPainter, QPen
 class OverlayWindow(QWidget):
     blink_finished = pyqtSignal()
 
-    def __init__(self, config, parent=None):
+    def __init__(self, config, screen_name, parent=None):
         super().__init__(parent)
         self.config = config
+        self.screen_name = screen_name
         self.move_mode = False
         self.is_blinking = False
         self.blink_count = 0
@@ -39,15 +40,9 @@ class OverlayWindow(QWidget):
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(0, 0, 0, 10)
         
-        self.icon_label = QLabel()
-        pixmap = QPixmap(16, 16)
-        pixmap.fill(QColor("transparent"))
-        painter = QPainter(pixmap)
-        painter.setBrush(QColor("#3498db"))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(0, 0, 16, 16)
-        painter.end()
-        self.icon_label.setPixmap(pixmap)
+        self.icon_label = QLabel("•••")
+        self.icon_label.setStyleSheet("color: rgba(255, 255, 255, 180); font-weight: bold; font-size: 14px;")
+        self.icon_label.setVisible(self.config.get("show_three_dots", False))
         
         self.title_label = QLabel("TS3 Overlay")
         title_font = self.title_label.font()
@@ -73,15 +68,18 @@ class OverlayWindow(QWidget):
         self.blink_timer.timeout.connect(self._on_blink_tick)
         
         self.resize(200, 300)
-        if "pos_x" in self.config and "pos_y" in self.config:
-            self.move(self.config["pos_x"], self.config["pos_y"])
+        
+        mon_cfg = self.config.get("monitors", {}).get(self.screen_name, {})
+        if "pos_x" in mon_cfg and "pos_y" in mon_cfg:
+            self.move(mon_cfg["pos_x"], mon_cfg["pos_y"])
             
         self.update_style()
         
     def showEvent(self, event):
         super().showEvent(event)
-        if "pos_x" in self.config and "pos_y" in self.config:
-            self.move(self.config["pos_x"], self.config["pos_y"])
+        mon_cfg = self.config.get("monitors", {}).get(self.screen_name, {})
+        if "pos_x" in mon_cfg and "pos_y" in mon_cfg:
+            self.move(mon_cfg["pos_x"], mon_cfg["pos_y"])
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -135,8 +133,13 @@ class OverlayWindow(QWidget):
             self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             
             # Save position when exiting move mode
-            self.config["pos_x"] = self.pos().x()
-            self.config["pos_y"] = self.pos().y()
+            if "monitors" not in self.config:
+                self.config["monitors"] = {}
+            if self.screen_name not in self.config["monitors"]:
+                self.config["monitors"][self.screen_name] = {}
+                
+            self.config["monitors"][self.screen_name]["pos_x"] = self.pos().x()
+            self.config["monitors"][self.screen_name]["pos_y"] = self.pos().y()
             if hasattr(self, 'save_callback'):
                 self.save_callback()
         else:
@@ -148,6 +151,7 @@ class OverlayWindow(QWidget):
         
     def update_style(self):
         self.header_widget.setVisible(self.config.get("show_header", True))
+        self.icon_label.setVisible(self.config.get("show_three_dots", False))
         
         # Trigger a repaint
         self.update()

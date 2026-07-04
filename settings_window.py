@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QSlider, QCheckBox, QFontComboBox, QSpinBox, QColorDialog
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QSlider, QCheckBox, QFontComboBox, QSpinBox, QColorDialog, QGroupBox
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtGui import QColor, QFont, QGuiApplication
 
 class SettingsWindow(QDialog):
     def __init__(self, current_config, parent=None):
@@ -24,6 +24,23 @@ class SettingsWindow(QDialog):
         self.game_only_checkbox = QCheckBox("Show ONLY when EVE is active")
         self.game_only_checkbox.setChecked(self.config.get("game_only", True))
         layout.addWidget(self.game_only_checkbox)
+
+        # Monitors
+        self.monitors_group = QGroupBox("Monitor Layout & Overlays")
+        monitors_layout = QVBoxLayout()
+        self.monitor_checkboxes = {}
+        for screen in QGuiApplication.screens():
+            s_name = screen.name()
+            s_geom = screen.geometry()
+            mon_cfg = self.config.get("monitors", {}).get(s_name, {})
+            
+            cb = QCheckBox(f"{s_name} ({s_geom.width()}x{s_geom.height()})")
+            cb.setChecked(mon_cfg.get("enabled", False))
+            self.monitor_checkboxes[s_name] = cb
+            monitors_layout.addWidget(cb)
+            
+        self.monitors_group.setLayout(monitors_layout)
+        layout.addWidget(self.monitors_group)
 
         # Opacity Slider (Normal)
         normal_layout = QHBoxLayout()
@@ -81,6 +98,20 @@ class SettingsWindow(QDialog):
         self.header_checkbox.setChecked(self.config.get("show_header", True))
         layout.addWidget(self.header_checkbox)
         
+        # Show Three Dots Checkbox
+        self.three_dots_checkbox = QCheckBox("Show '•••' in header")
+        self.three_dots_checkbox.setChecked(self.config.get("show_three_dots", False))
+        layout.addWidget(self.three_dots_checkbox)
+        
+        # Connect to parent checkbox
+        self.header_checkbox.toggled.connect(self.three_dots_checkbox.setEnabled)
+        self.three_dots_checkbox.setEnabled(self.header_checkbox.isChecked())
+        
+        # Disable Blink
+        self.disable_blink_checkbox = QCheckBox("Disable border blinking on startup")
+        self.disable_blink_checkbox.setChecked(self.config.get("disable_blink", False))
+        layout.addWidget(self.disable_blink_checkbox)
+        
         button_layout = QHBoxLayout()
         self.save_btn = QPushButton("Save")
         self.cancel_btn = QPushButton("Cancel")
@@ -108,6 +139,15 @@ class SettingsWindow(QDialog):
         
     def get_updated_config(self):
         new_config = dict(self.config)
+        
+        # Save monitors
+        if "monitors" not in new_config:
+            new_config["monitors"] = {}
+        for s_name, cb in self.monitor_checkboxes.items():
+            if s_name not in new_config["monitors"]:
+                new_config["monitors"][s_name] = {}
+            new_config["monitors"][s_name]["enabled"] = cb.isChecked()
+            
         new_config["api_key"] = self.api_key_input.text().strip()
         new_config["game_only"] = self.game_only_checkbox.isChecked()
         new_config["opacity_normal"] = self.opacity_normal_slider.value() / 100.0
@@ -118,4 +158,6 @@ class SettingsWindow(QDialog):
         new_config["font_size"] = self.font_size.value()
         new_config["bg_color"] = self.current_bg_color
         new_config["show_header"] = self.header_checkbox.isChecked()
+        new_config["show_three_dots"] = self.three_dots_checkbox.isChecked()
+        new_config["disable_blink"] = self.disable_blink_checkbox.isChecked()
         return new_config
