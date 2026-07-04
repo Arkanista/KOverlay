@@ -97,10 +97,10 @@ class TS3ClientThread(QThread):
                 
                 my_cid = None
                 if "error id=0" in resp_whoami:
-                    for part in resp_whoami.replace('|', ' ').split(' '):
-                        if part.startswith("cid="):
-                            my_cid = part.split('=', 1)[1]
-                            break
+                    import re
+                    match = re.search(r'\bcid=(\d+)', resp_whoami)
+                    if match:
+                        my_cid = match.group(1)
 
                 self._send_cmd("clientlist -voice")
                 resp = self._read_until("error id=")

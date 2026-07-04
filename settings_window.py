@@ -53,6 +53,7 @@ class SettingsWindow(QDialog):
         button_layout.addWidget(self.save_btn)
         button_layout.addWidget(self.cancel_btn)
         
+        layout.addStretch()
         layout.addLayout(button_layout)
         self.setLayout(layout)
         
