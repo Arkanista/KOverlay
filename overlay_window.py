@@ -146,7 +146,7 @@ class OverlayWindow(QWidget):
     def set_move_mode(self, enabled):
         self.move_mode = enabled
         
-        flags = Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.BypassWindowManagerHint
+        flags = Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.BypassWindowManagerHint | Qt.WindowType.NoDropShadowWindowHint
         if not self.move_mode:
             flags |= Qt.WindowType.WindowTransparentForInput
             self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)

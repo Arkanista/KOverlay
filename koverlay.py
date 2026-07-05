@@ -181,7 +181,9 @@ class MainApp:
                 overlay = OverlayWindow(self.cfg, overlay_id, index)
                 overlay.save_callback = self.save_config
                 overlay.blink_finished.connect(self.on_blink_finished)
-                overlay.set_move_mode(True) # since settings is open
+                is_settings_open = hasattr(self, 'settings_dialog') and self.settings_dialog is not None
+                is_move_toggled = self.tray.move_action.isChecked()
+                overlay.set_move_mode(is_settings_open or is_move_toggled)
                 self.overlays[overlay_id] = overlay
                 
             elif not is_enabled and overlay_id in self.overlays:
