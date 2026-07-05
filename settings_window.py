@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QSlider, QCheckBox, QFontComboBox, QSpinBox, QColorDialog, QGroupBox
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QSlider, QCheckBox, QFontComboBox, QSpinBox, QColorDialog, QGroupBox, QComboBox
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont
 
@@ -185,6 +185,37 @@ class SettingsWindow(QDialog):
         tts_delay_layout.addWidget(self.tts_delay_slider)
         tts_delay_layout.addWidget(self.tts_delay_val_label)
         tts_layout.addLayout(tts_delay_layout)
+        
+        # Voice selection
+        tts_voice_layout = QHBoxLayout()
+        tts_voice_layout.addWidget(QLabel("Voice:"))
+        self.tts_voice_combo = QComboBox()
+        self.tts_voices = [
+            ("English (US, Female) - Aria", "en-US-AriaNeural"),
+            ("English (US, Male) - Guy", "en-US-GuyNeural"),
+            ("English (UK, Female) - Sonia", "en-GB-SoniaNeural"),
+            ("English (UK, Male) - Ryan", "en-GB-RyanNeural"),
+            ("Polish (Female) - Agnieszka", "pl-PL-AgnieszkaNeural"),
+            ("Polish (Male) - Marek", "pl-PL-MarekNeural"),
+            ("German (Female) - Katja", "de-DE-KatjaNeural"),
+            ("German (Male) - Conrad", "de-DE-ConradNeural"),
+            ("French (Female) - Denise", "fr-FR-DeniseNeural"),
+            ("French (Male) - Henri", "fr-FR-HenriNeural")
+        ]
+        for label, val in self.tts_voices:
+            self.tts_voice_combo.addItem(label, val)
+        
+        current_voice = self.config.get("tts_voice", "en-US-AriaNeural")
+        idx = self.tts_voice_combo.findData(current_voice)
+        if idx >= 0:
+            self.tts_voice_combo.setCurrentIndex(idx)
+            
+        self.tts_voice_combo.currentIndexChanged.connect(self._on_change)
+        self.tts_voice_combo.setEnabled(self.tts_checkbox.isChecked())
+        self.tts_checkbox.toggled.connect(self.tts_voice_combo.setEnabled)
+        
+        tts_voice_layout.addWidget(self.tts_voice_combo)
+        tts_layout.addLayout(tts_voice_layout)
         
         tts_vol_layout = QHBoxLayout()
         self.tts_vol_label = QLabel("Volume:")
@@ -448,6 +479,7 @@ class SettingsWindow(QDialog):
         self.config["disable_blink"] = self.disable_blink_checkbox.isChecked()
         self.config["history_enabled"] = self.history_checkbox.isChecked()
         self.config["tts_enabled"] = self.tts_checkbox.isChecked()
+        self.config["tts_voice"] = self.tts_voice_combo.currentData()
         self.config["tts_delay_ms"] = self.tts_delay_slider.value()
         self.config["tts_volume"] = self.tts_vol_slider.value()
         self.config["history_duration"] = self.history_dur_slider.value()

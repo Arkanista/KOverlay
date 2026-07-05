@@ -434,9 +434,13 @@ class OverlayWindow(QWidget):
             if edge_tts_installed and shutil.which("mpv"):
                 def run_edge_tts():
                     try:
-                        # Cache the generated voice per user to save network requests & time
+                        voice = self.config.get("tts_voice", "en-US-AriaNeural")
+                        # Cache the generated voice per user and voice to save network requests & time
+                        cache_key = safe_name + "_" + voice
+                        filename = hashlib.md5(cache_key.encode()).hexdigest() + ".mp3"
+                        tmp_file = os.path.join(tempfile.gettempdir(), f"koverlay_{filename}")
                         if not os.path.exists(tmp_file):
-                            subprocess.run([sys.executable, "-m", "edge_tts", "--voice", "en-US-AriaNeural", "--text", f"{safe_name} joined", "--write-media", tmp_file], check=True)
+                            subprocess.run([sys.executable, "-m", "edge_tts", "--voice", voice, "--text", f"{safe_name} joined", "--write-media", tmp_file], check=True)
                         vol = self.config.get("tts_volume", 80)
                         subprocess.Popen(["mpv", "--no-video", "--really-quiet", f"--volume={vol}", tmp_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     except Exception as e:
@@ -445,8 +449,12 @@ class OverlayWindow(QWidget):
                 threading.Thread(target=run_edge_tts, daemon=True).start()
                 
             elif shutil.which("espeak"):
+                voice = self.config.get("tts_voice", "en-US-AriaNeural")
+                lang = voice.split("-")[0] # e.g. en, pl, de
                 vol = int(self.config.get("tts_volume", 80) * 2) # espeak scale is 0 to 200, default 100
-                subprocess.Popen(["espeak", "-a", str(vol), "-v", "en", f"{name} joined"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.Popen(["espeak", "-a", str(vol), "-v", lang, f"{name} joined"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             elif shutil.which("spd-say"):
+                voice = self.config.get("tts_voice", "en-US-AriaNeural")
+                lang = voice.split("-")[0] # e.g. en, pl, de
                 vol = int((self.config.get("tts_volume", 80) - 50) * 2) # spd-say is -100 to +100
-                subprocess.Popen(["spd-say", "-y", str(vol), "-l", "en", f"{name} joined"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.Popen(["spd-say", "-y", str(vol), "-l", lang, f"{name} joined"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
