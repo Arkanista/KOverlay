@@ -215,6 +215,13 @@ class SettingsWindow(QDialog):
         self.tts_checkbox.toggled.connect(self.tts_voice_combo.setEnabled)
         
         tts_voice_layout.addWidget(self.tts_voice_combo)
+        
+        self.tts_test_btn = QPushButton("Test")
+        self.tts_test_btn.clicked.connect(self._test_voice)
+        self.tts_test_btn.setEnabled(self.tts_checkbox.isChecked())
+        self.tts_checkbox.toggled.connect(self.tts_test_btn.setEnabled)
+        tts_voice_layout.addWidget(self.tts_test_btn)
+        
         tts_layout.addLayout(tts_voice_layout)
         
         tts_vol_layout = QHBoxLayout()
@@ -486,3 +493,42 @@ class SettingsWindow(QDialog):
         
         # Emit signal to inform main app to apply changes
         self.config_changed.emit()
+        
+    def _test_voice(self):
+        import subprocess
+        import shutil
+        import tempfile
+        import os
+        import threading
+        import hashlib
+        import sys
+        
+        voice = self.tts_voice_combo.currentData()
+        vol = self.tts_vol_slider.value()
+        
+        import importlib.util
+        edge_tts_installed = importlib.util.find_spec("edge_tts") is not None
+        
+        if edge_tts_installed and shutil.which("mpv"):
+            def run_edge_tts():
+                try:
+                    text = "Test komunikatu głosowego" if "pl-PL" in voice else "Voice test message"
+                    cache_key = "test_msg_" + voice
+                    filename = hashlib.md5(cache_key.encode()).hexdigest() + ".mp3"
+                    tmp_file = os.path.join(tempfile.gettempdir(), f"koverlay_{filename}")
+                    if not os.path.exists(tmp_file):
+                        subprocess.run([sys.executable, "-m", "edge_tts", "--voice", voice, "--text", text, "--write-media", tmp_file], check=True)
+                    subprocess.Popen(["mpv", "--no-video", "--really-quiet", f"--volume={vol}", tmp_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except Exception as e:
+                    pass
+            threading.Thread(target=run_edge_tts, daemon=True).start()
+        elif shutil.which("espeak"):
+            lang = voice.split("-")[0]
+            text = "Test komunikatu głosowego" if lang == "pl" else "Voice test message"
+            vol_val = int(vol * 2)
+            subprocess.Popen(["espeak", "-a", str(vol_val), "-v", lang, text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif shutil.which("spd-say"):
+            lang = voice.split("-")[0]
+            text = "Test komunikatu głosowego" if lang == "pl" else "Voice test message"
+            vol_val = int((vol - 50) * 2)
+            subprocess.Popen(["spd-say", "-y", str(vol_val), "-l", lang, text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
