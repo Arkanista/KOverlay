@@ -97,7 +97,7 @@ The *Settings* window offers highly advanced overlay customization. All options 
 - Shows a list of users who are currently speaking (along with a 10-second history of joins/leaves).
 - Configurable opacity and a hotkey (default `Shift+Tab`) to show/hide the window containing the event history, including join and leave notifications.
 - Integration with the system TTS engine (Edge TTS) to read out join and leave notifications.
-- **TTS Aliases (Replacement List)**: Ability to replace hard-to-pronounce nicknames or remove clan tags so the TTS engine reads them correctly.
+- **TTS Aliases (Substitution List)**: Ability to substitute hard-to-pronounce nicknames or remove clan tags so the TTS engine reads them correctly.
 - GUI for settings (sliders for TTS volume, window opacity) - accessible from the tray icon.
 
 ### Width Settings Section
