@@ -16,6 +16,7 @@ class SettingsWindow(QDialog):
     def __init__(self, current_config, parent=None):
         super().__init__(parent)
         self.setWindowTitle("KOverlay Settings")
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.setFixedWidth(1000)
         self.setMaximumHeight(768)
         self.setStyleSheet("""
