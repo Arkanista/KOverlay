@@ -35,7 +35,7 @@ class OverlayWindow(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         
         self.layout = QVBoxLayout()
-        self.layout.setContentsMargins(10, 10, 10, 10)
+        self.layout.setContentsMargins(22, 22, 22, 22)
         self.layout.setSpacing(2)
         self.layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.setLayout(self.layout)
@@ -109,6 +109,8 @@ class OverlayWindow(QWidget):
         hex_color = self.config.get("bg_color", "#000000")
         
         c = QColor(hex_color)
+        margin = 8
+        bg_rect = self.rect().adjusted(margin, margin, -margin, -margin)
         
         if self.move_mode:
             c.setAlphaF(opacity_move)
@@ -116,13 +118,21 @@ class OverlayWindow(QWidget):
         else:
             if getattr(self, 'is_blinking', False) and getattr(self, 'blink_state', False):
                 c.setAlphaF(max(opacity_normal, 0.4))
-                painter.setPen(QPen(QColor("red"), 3, Qt.PenStyle.SolidLine))
+                
+                # Draw pulsating outer glow
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                for i in range(1, margin + 1):
+                    alpha = int(180 * (margin + 1 - i) / margin)
+                    painter.setPen(QPen(QColor(255, 0, 0, alpha), 2))
+                    painter.drawRoundedRect(bg_rect.adjusted(-i, -i, i, i), 6 + i/2, 6 + i/2)
+                
+                painter.setPen(QPen(QColor(255, 50, 50, 255), 2, Qt.PenStyle.SolidLine))
             else:
                 c.setAlphaF(opacity_normal)
                 painter.setPen(Qt.PenStyle.NoPen)
                 
         painter.setBrush(c)
-        painter.drawRoundedRect(self.rect().adjusted(1, 1, -2, -2), 5, 5)
+        painter.drawRoundedRect(bg_rect, 5, 5)
         
     def start_blink(self):
         self.is_blinking = True
@@ -184,7 +194,7 @@ class OverlayWindow(QWidget):
                 self.header_widget.layout().setContentsMargins(0, 0, 0, 0)
                 self.icon_label.setStyleSheet("color: rgba(255, 255, 255, 180); font-weight: bold; font-size: 16px; padding: 0px; margin: 0px;")
                 self.icon_label.setFixedHeight(12)
-                self.layout.setContentsMargins(10, 2, 10, 10)
+                self.layout.setContentsMargins(22, 10, 22, 22)
             elif show_header and not show_three_dots:
                 self.icon_label.setVisible(False)
                 self.logo_label.setVisible(True)
@@ -192,7 +202,7 @@ class OverlayWindow(QWidget):
                 self.icon_label.setMinimumHeight(0)
                 self.icon_label.setMaximumHeight(16777215)
                 self.header_widget.layout().setContentsMargins(0, 0, 0, 10)
-                self.layout.setContentsMargins(10, 10, 10, 10)
+                self.layout.setContentsMargins(22, 22, 22, 22)
             else:
                 self.icon_label.setVisible(True)
                 self.logo_label.setVisible(True)
@@ -200,10 +210,10 @@ class OverlayWindow(QWidget):
                 self.icon_label.setMinimumHeight(0)
                 self.icon_label.setMaximumHeight(16777215)
                 self.header_widget.layout().setContentsMargins(0, 0, 0, 10)
-                self.layout.setContentsMargins(10, 10, 10, 10)
+                self.layout.setContentsMargins(22, 22, 22, 22)
         else:
             self.header_widget.setVisible(False)
-            self.layout.setContentsMargins(10, 10, 10, 10)
+            self.layout.setContentsMargins(22, 22, 22, 22)
         
         # Trigger a repaint
         self.update()
@@ -273,11 +283,14 @@ class OverlayWindow(QWidget):
                     self.user_history[name] = {"join_time": join_time, "leave_time": None}
                     
                     if not (was_empty or changed_channel) and self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
-                        delay = self.config.get("tts_delay_ms", 0)
-                        if delay == 0:
-                            self._play_tts(name)
-                        else:
-                            QTimer.singleShot(delay, lambda n=name: self._play_tts(n))
+                        if self.config.get("tts_join_enabled", True):
+                            template = self.config.get("tts_join_text", "%NICK joined")
+                            text = template.replace("%NICK", name)
+                            delay = self.config.get("tts_delay_ms", 0)
+                            if delay == 0:
+                                self._play_tts(text)
+                            else:
+                                QTimer.singleShot(delay, lambda t=text: self._play_tts(t))
                 else:
                     # User is known, if they previously left, they are back
                     if self.user_history[name]["leave_time"] is not None:
@@ -285,11 +298,14 @@ class OverlayWindow(QWidget):
                         self.user_history[name] = {"join_time": current_time, "leave_time": None}
                         
                         if self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
-                            delay = self.config.get("tts_delay_ms", 0)
-                            if delay == 0:
-                                self._play_tts(name)
-                            else:
-                                QTimer.singleShot(delay, lambda n=name: self._play_tts(n))
+                            if self.config.get("tts_join_enabled", True):
+                                template = self.config.get("tts_join_text", "%NICK joined")
+                                text = template.replace("%NICK", name)
+                                delay = self.config.get("tts_delay_ms", 0)
+                                if delay == 0:
+                                    self._play_tts(text)
+                                else:
+                                    QTimer.singleShot(delay, lambda t=text: self._play_tts(t))
             
             # Mark users who left
             for name, data in list(self.user_history.items()):
@@ -297,6 +313,16 @@ class OverlayWindow(QWidget):
                     if data["leave_time"] is None:
                         # User just left
                         data["leave_time"] = current_time
+                        
+                        if self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
+                            if self.config.get("tts_leave_enabled", False):
+                                template = self.config.get("tts_leave_text", "%NICK left")
+                                text = template.replace("%NICK", name)
+                                delay = self.config.get("tts_delay_ms", 0)
+                                if delay == 0:
+                                    self._play_tts(text)
+                                else:
+                                    QTimer.singleShot(delay, lambda t=text: self._play_tts(t))
                     elif current_time - data["leave_time"] > history_duration:
                         # User left longer than history_duration, remove from history
                         del self.user_history[name]
@@ -413,7 +439,7 @@ class OverlayWindow(QWidget):
                 self.save_callback()
             event.accept()
 
-    def _play_tts(self, name):
+    def _play_tts(self, text):
         import subprocess
         import shutil
         import tempfile
@@ -422,9 +448,9 @@ class OverlayWindow(QWidget):
         import hashlib
         
         if self.config.get("tts_enabled", False):
-            # Safe filename for cache
-            safe_name = "".join(c for c in name if c.isalnum() or c in " _-")
-            filename = hashlib.md5(safe_name.encode()).hexdigest() + ".mp3"
+            # Safe text for caching and TTS pronunciation
+            safe_text = "".join(c for c in text if c.isalnum() or c in " _-.")
+            filename = hashlib.md5(safe_text.encode()).hexdigest() + ".mp3"
             tmp_file = os.path.join(tempfile.gettempdir(), f"koverlay_{filename}")
 
             import importlib.util
@@ -435,15 +461,15 @@ class OverlayWindow(QWidget):
                 def run_edge_tts():
                     try:
                         voice = self.config.get("tts_voice", "en-US-AriaNeural")
-                        # Cache the generated voice per user and voice to save network requests & time
-                        cache_key = safe_name + "_" + voice
+                        # Cache the generated voice per text and voice to save network requests & time
+                        cache_key = safe_text + "_" + voice
                         filename = hashlib.md5(cache_key.encode()).hexdigest() + ".mp3"
                         tmp_file = os.path.join(tempfile.gettempdir(), f"koverlay_{filename}")
                         
                         if not os.path.exists(tmp_file):
                             import edge_tts
                             import asyncio
-                            communicate = edge_tts.Communicate(f"{safe_name} joined", voice)
+                            communicate = edge_tts.Communicate(safe_text, voice)
                             asyncio.run(communicate.save(tmp_file))
                             
                         vol = self.config.get("tts_volume", 80)
@@ -457,9 +483,9 @@ class OverlayWindow(QWidget):
                 voice = self.config.get("tts_voice", "en-US-AriaNeural")
                 lang = voice.split("-")[0] # e.g. en, pl, de
                 vol = int(self.config.get("tts_volume", 80) * 2) # espeak scale is 0 to 200, default 100
-                subprocess.Popen(["espeak", "-a", str(vol), "-v", lang, f"{name} joined"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.Popen(["espeak", "-a", str(vol), "-v", lang, safe_text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             elif shutil.which("spd-say"):
                 voice = self.config.get("tts_voice", "en-US-AriaNeural")
                 lang = voice.split("-")[0] # e.g. en, pl, de
                 vol = int((self.config.get("tts_volume", 80) - 50) * 2) # spd-say is -100 to +100
-                subprocess.Popen(["spd-say", "-y", str(vol), "-l", lang, f"{name} joined"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.Popen(["spd-say", "-y", str(vol), "-l", lang, safe_text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QSlider, QCheckBox, QFontComboBox, QSpinBox, QColorDialog, QGroupBox, QComboBox, QScrollArea, QWidget
-from PyQt6.QtCore import Qt, pyqtSignal, QObject, QEvent
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtCore import Qt, pyqtSignal, QObject, QEvent, QRegularExpression
+from PyQt6.QtGui import QColor, QFont, QRegularExpressionValidator
 
 class ScrollFilter(QObject):
     def eventFilter(self, obj, event):
@@ -18,6 +18,21 @@ class SettingsWindow(QDialog):
         self.setWindowTitle("KOverlay Settings")
         self.setFixedWidth(1000)
         self.setMaximumHeight(768)
+        self.setStyleSheet("""
+            QGroupBox {
+                border: 1px solid rgba(130, 130, 130, 0.4);
+                border-radius: 4px;
+                margin-top: 12px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 10px;
+                padding: 0 4px;
+                font-weight: bold;
+                font-size: 12pt;
+            }
+        """)
         
         self.config = current_config
         
@@ -31,13 +46,31 @@ class SettingsWindow(QDialog):
         self.container_widget = QWidget()
         layout = QVBoxLayout(self.container_widget)
         
-        # API Key
+        # General Settings Group
+        self.general_group = QGroupBox("General settings")
+        general_group_layout = QVBoxLayout()
+        
+        # API Key and Target Keywords
+        general_layout = QHBoxLayout()
+        
         self.api_key_input = QLineEdit()
         self.api_key_input.setText(self.config.get("api_key", ""))
-        self.api_key_input.setPlaceholderText("Enter TS3 Client API Key here")
+        self.api_key_input.setPlaceholderText("Enter TS3 API Key here")
         self.api_key_input.editingFinished.connect(self._on_change)
-        layout.addWidget(QLabel("TS3 API Key:"))
-        layout.addWidget(self.api_key_input)
+        general_layout.addWidget(QLabel("TS3 API Key:"))
+        general_layout.addWidget(self.api_key_input)
+        
+        general_layout.addSpacing(20)
+        
+        self.keywords_input = QLineEdit()
+        current_keywords = self.config.get("target_keywords", ["EVE - ", "exefile.exe"])
+        self.keywords_input.setText(", ".join(current_keywords))
+        self.keywords_input.setPlaceholderText("e.g. EVE - , exefile.exe")
+        self.keywords_input.editingFinished.connect(self._on_change)
+        general_layout.addWidget(QLabel("Target Window Keywords (comma separated):"))
+        general_layout.addWidget(self.keywords_input)
+        
+        general_group_layout.addLayout(general_layout)
         
         # Show Only in Game & Hide Delay
         delay_layout = QHBoxLayout()
@@ -63,17 +96,12 @@ class SettingsWindow(QDialog):
         delay_layout.addWidget(self.hide_delay_checkbox)
         delay_layout.addWidget(self.hide_delay_slider)
         delay_layout.addWidget(self.hide_delay_val_label)
-        layout.addLayout(delay_layout)
-
-        # Target Keywords
-        self.keywords_input = QLineEdit()
-        current_keywords = self.config.get("target_keywords", ["EVE - ", "exefile.exe"])
-        self.keywords_input.setText(", ".join(current_keywords))
-        self.keywords_input.setPlaceholderText("e.g. EVE - , exefile.exe")
-        self.keywords_input.editingFinished.connect(self._on_change)
-        layout.addWidget(QLabel("Target Window Keywords (comma separated):"))
-        layout.addWidget(self.keywords_input)
+        general_group_layout.addLayout(delay_layout)
         
+        self.general_group.setLayout(general_group_layout)
+        layout.addWidget(self.general_group)
+
+
         # History
         self.history_group = QGroupBox("Join/Leave History")
         history_layout = QVBoxLayout()
@@ -97,14 +125,9 @@ class SettingsWindow(QDialog):
         history_dur_layout.addWidget(QLabel("Duration:"))
         history_dur_layout.addWidget(self.history_dur_slider)
         history_dur_layout.addWidget(self.history_dur_val_label)
-        history_layout.addLayout(history_dur_layout)
         
-        self.history_group.setLayout(history_layout)
-        layout.addWidget(self.history_group)
-
+        history_dur_layout.addSpacing(20)
         
-        # Polling Interval Slider
-        poll_layout = QHBoxLayout()
         self.poll_label = QLabel("Active Window Check Interval:")
         self.poll_slider = QSlider(Qt.Orientation.Horizontal)
         self.poll_slider.setMinimum(50)
@@ -132,10 +155,14 @@ class SettingsWindow(QDialog):
         self.poll_slider.setValue(current_poll)
         self.poll_slider.blockSignals(False)
         
-        poll_layout.addWidget(self.poll_label)
-        poll_layout.addWidget(self.poll_slider)
-        poll_layout.addWidget(self.poll_val_label)
-        layout.addLayout(poll_layout)
+        history_dur_layout.addWidget(self.poll_label)
+        history_dur_layout.addWidget(self.poll_slider)
+        history_dur_layout.addWidget(self.poll_val_label)
+        
+        history_layout.addLayout(history_dur_layout)
+        
+        self.history_group.setLayout(history_layout)
+        layout.addWidget(self.history_group)
         
         # TTS Settings
         import importlib.util
@@ -147,7 +174,7 @@ class SettingsWindow(QDialog):
         self.tts_group = QGroupBox("Text-to-Speech (TTS)")
         tts_layout = QVBoxLayout()
         
-        self.tts_checkbox = QCheckBox("Enable TTS Voice Announcements (English)")
+        self.tts_checkbox = QCheckBox("Enable TTS Voice Announcements")
         self.tts_checkbox.setChecked(self.config.get("tts_enabled", False))
         
         if not tts_available:
@@ -166,6 +193,57 @@ class SettingsWindow(QDialog):
         info_label.setStyleSheet("color: gray;")
         info_label.setWordWrap(True)
         tts_layout.addWidget(info_label)
+        
+        # Join & Leave Event TTS
+        events_layout = QHBoxLayout()
+        
+        self.tts_join_checkbox = QCheckBox("Announce Join:")
+        self.tts_join_checkbox.setChecked(self.config.get("tts_join_enabled", True))
+        self.tts_join_checkbox.toggled.connect(self._on_change)
+        events_layout.addWidget(self.tts_join_checkbox)
+        
+        self.tts_join_text = QLineEdit()
+        self.tts_join_text.setMaxLength(40)
+        self.tts_join_text.setValidator(QRegularExpressionValidator(QRegularExpression(r"^[A-Za-z %]{0,40}$")))
+        self.tts_join_text.setText(self.config.get("tts_join_text", "%NICK joined"))
+        self.tts_join_text.textChanged.connect(self._on_change)
+        events_layout.addWidget(self.tts_join_text)
+        
+        events_layout.addSpacing(20)
+        
+        self.tts_leave_checkbox = QCheckBox("Announce Leave:")
+        self.tts_leave_checkbox.setChecked(self.config.get("tts_leave_enabled", False))
+        self.tts_leave_checkbox.toggled.connect(self._on_change)
+        events_layout.addWidget(self.tts_leave_checkbox)
+        
+        self.tts_leave_text = QLineEdit()
+        self.tts_leave_text.setMaxLength(40)
+        self.tts_leave_text.setValidator(QRegularExpressionValidator(QRegularExpression(r"^[A-Za-z %]{0,40}$")))
+        self.tts_leave_text.setText(self.config.get("tts_leave_text", "%NICK left"))
+        self.tts_leave_text.textChanged.connect(self._on_change)
+        events_layout.addWidget(self.tts_leave_text)
+        
+        tts_layout.addLayout(events_layout)
+        
+        # Variable Info Label
+        var_info_label = QLabel("Use %NICK in the text above to insert the user's name.")
+        var_font = var_info_label.font()
+        var_font.setPointSize(var_font.pointSize() - 2)
+        var_info_label.setFont(var_font)
+        var_info_label.setStyleSheet("color: gray;")
+        tts_layout.addWidget(var_info_label)
+        
+        # Enable/disable sub-options based on master checkbox
+        def update_tts_children(enabled):
+            self.tts_join_checkbox.setEnabled(enabled)
+            self.tts_join_text.setEnabled(enabled and self.tts_join_checkbox.isChecked())
+            self.tts_leave_checkbox.setEnabled(enabled)
+            self.tts_leave_text.setEnabled(enabled and self.tts_leave_checkbox.isChecked())
+            
+        self.tts_checkbox.toggled.connect(update_tts_children)
+        self.tts_join_checkbox.toggled.connect(lambda e: self.tts_join_text.setEnabled(e and self.tts_checkbox.isChecked()))
+        self.tts_leave_checkbox.toggled.connect(lambda e: self.tts_leave_text.setEnabled(e and self.tts_checkbox.isChecked()))
+        update_tts_children(self.tts_checkbox.isChecked())
         
         tts_sliders_layout = QHBoxLayout()
         self.tts_delay_label = QLabel("Read Delay:")
@@ -210,7 +288,7 @@ class SettingsWindow(QDialog):
             ("English (US, Male) - Guy", "en-US-GuyNeural"),
             ("English (UK, Female) - Sonia", "en-GB-SoniaNeural"),
             ("English (UK, Male) - Ryan", "en-GB-RyanNeural"),
-            ("Polish (Female) - Agnieszka", "pl-PL-AgnieszkaNeural"),
+            ("Polish (Female) - Zofia", "pl-PL-ZofiaNeural"),
             ("Polish (Male) - Marek", "pl-PL-MarekNeural"),
             ("German (Female) - Katja", "de-DE-KatjaNeural"),
             ("German (Male) - Conrad", "de-DE-ConradNeural"),
@@ -221,6 +299,9 @@ class SettingsWindow(QDialog):
             self.tts_voice_combo.addItem(label, val)
         
         current_voice = self.config.get("tts_voice", "en-US-AriaNeural")
+        if current_voice == "pl-PL-AgnieszkaNeural":
+            current_voice = "pl-PL-ZofiaNeural"
+            self.config["tts_voice"] = current_voice
         idx = self.tts_voice_combo.findData(current_voice)
         if idx >= 0:
             self.tts_voice_combo.setCurrentIndex(idx)
@@ -232,10 +313,12 @@ class SettingsWindow(QDialog):
         tts_voice_layout.addWidget(self.tts_voice_combo)
         
         self.tts_test_btn = QPushButton("Test")
+        self.tts_test_btn.setFixedWidth(60)
         self.tts_test_btn.clicked.connect(self._test_voice)
         self.tts_test_btn.setEnabled(self.tts_checkbox.isChecked())
         self.tts_checkbox.toggled.connect(self.tts_test_btn.setEnabled)
         tts_voice_layout.addWidget(self.tts_test_btn)
+        tts_voice_layout.addStretch()
         
         tts_layout.addLayout(tts_voice_layout)
         
@@ -269,6 +352,8 @@ class SettingsWindow(QDialog):
         
         # Overlays
         self.monitors_group = QGroupBox("Overlays")
+        monitors_group_layout = QVBoxLayout()
+        
         monitors_layout = QHBoxLayout()
         self.monitor_checkboxes = {}
         for index in range(1, 5):
@@ -281,8 +366,7 @@ class SettingsWindow(QDialog):
             self.monitor_checkboxes[overlay_id] = cb
             monitors_layout.addWidget(cb)
             
-        self.monitors_group.setLayout(monitors_layout)
-        layout.addWidget(self.monitors_group)
+        monitors_group_layout.addLayout(monitors_layout)
 
         # Width Settings
         width_layout = QHBoxLayout()
@@ -304,10 +388,10 @@ class SettingsWindow(QDialog):
         width_layout.addWidget(QLabel("Fixed Width:"))
         width_layout.addWidget(self.fixed_width_slider)
         width_layout.addWidget(self.fixed_width_val_label)
-        layout.addLayout(width_layout)
+        monitors_group_layout.addLayout(width_layout)
 
-        # Opacity Slider (Normal)
-        normal_layout = QHBoxLayout()
+        # Opacity Sliders (Combined)
+        opacity_layout = QHBoxLayout()
         self.opacity_normal_label = QLabel("Background Opacity (Normal Mode):")
         self.opacity_normal_slider = QSlider(Qt.Orientation.Horizontal)
         self.opacity_normal_slider.setRange(0, 100)
@@ -315,24 +399,23 @@ class SettingsWindow(QDialog):
         self.opacity_normal_slider.valueChanged.connect(self._update_opacity_normal_label)
         self.opacity_normal_slider.valueChanged.connect(self._on_change)
         self.opacity_normal_val_label = QLabel(f"{self.opacity_normal_slider.value()}%")
-        normal_layout.addWidget(self.opacity_normal_label)
-        normal_layout.addWidget(self.opacity_normal_slider)
-        normal_layout.addWidget(self.opacity_normal_val_label)
-        layout.addLayout(normal_layout)
         
-        # Opacity Slider (Move Mode)
-        move_layout = QHBoxLayout()
-        self.opacity_move_label = QLabel("Background Opacity (Move Mode):")
+        self.opacity_move_label = QLabel("Opacity (Move Mode):")
         self.opacity_move_slider = QSlider(Qt.Orientation.Horizontal)
         self.opacity_move_slider.setRange(0, 100)
         self.opacity_move_slider.setValue(int(self.config.get("opacity_move", self.config.get("opacity", 0.8)) * 100))
         self.opacity_move_slider.valueChanged.connect(self._update_opacity_move_label)
         self.opacity_move_slider.valueChanged.connect(self._on_change)
         self.opacity_move_val_label = QLabel(f"{self.opacity_move_slider.value()}%")
-        move_layout.addWidget(self.opacity_move_label)
-        move_layout.addWidget(self.opacity_move_slider)
-        move_layout.addWidget(self.opacity_move_val_label)
-        layout.addLayout(move_layout)
+        
+        opacity_layout.addWidget(self.opacity_normal_label)
+        opacity_layout.addWidget(self.opacity_normal_slider)
+        opacity_layout.addWidget(self.opacity_normal_val_label)
+        opacity_layout.addSpacing(20)
+        opacity_layout.addWidget(self.opacity_move_label)
+        opacity_layout.addWidget(self.opacity_move_slider)
+        opacity_layout.addWidget(self.opacity_move_val_label)
+        monitors_group_layout.addLayout(opacity_layout)
 
         # Font settings
         font_layout = QHBoxLayout()
@@ -347,7 +430,8 @@ class SettingsWindow(QDialog):
         font_layout.addWidget(self.font_combo)
         font_layout.addWidget(QLabel("Size:"))
         font_layout.addWidget(self.font_size)
-        layout.addLayout(font_layout)
+        font_layout.addStretch()
+        monitors_group_layout.addLayout(font_layout)
 
         # Color Buttons
         color_layout = QHBoxLayout()
@@ -381,7 +465,7 @@ class SettingsWindow(QDialog):
         self.text_color_left_btn.clicked.connect(self._choose_text_color_left)
         color_layout.addWidget(self.text_color_left_btn)
         
-        layout.addLayout(color_layout)
+        monitors_group_layout.addLayout(color_layout)
 
         # Misc Settings
         misc_layout = QHBoxLayout()
@@ -400,7 +484,10 @@ class SettingsWindow(QDialog):
         self.disable_blink_checkbox.toggled.connect(self._on_change)
         misc_layout.addWidget(self.disable_blink_checkbox)
         
-        layout.addLayout(misc_layout)
+        monitors_group_layout.addLayout(misc_layout)
+        
+        self.monitors_group.setLayout(monitors_group_layout)
+        layout.addWidget(self.monitors_group)
         
         button_layout = QHBoxLayout()
         self.save_btn = QPushButton("Close")
@@ -422,6 +509,7 @@ class SettingsWindow(QDialog):
                 child.installEventFilter(self.scroll_filter)
                 # Only allow wheel scroll when the user specifically clicks and focuses on the widget
                 child.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
         
     def _update_opacity_normal_label(self, val):
         self.opacity_normal_val_label.setText(f"{val}%")
@@ -513,6 +601,11 @@ class SettingsWindow(QDialog):
         self.config["disable_blink"] = self.disable_blink_checkbox.isChecked()
         self.config["history_enabled"] = self.history_checkbox.isChecked()
         self.config["tts_enabled"] = self.tts_checkbox.isChecked()
+        if hasattr(self, 'tts_join_checkbox'):
+            self.config["tts_join_enabled"] = self.tts_join_checkbox.isChecked()
+            self.config["tts_join_text"] = self.tts_join_text.text()
+            self.config["tts_leave_enabled"] = self.tts_leave_checkbox.isChecked()
+            self.config["tts_leave_text"] = self.tts_leave_text.text()
         self.config["tts_voice"] = self.tts_voice_combo.currentData()
         self.config["tts_delay_ms"] = self.tts_delay_slider.value()
         self.config["tts_volume"] = self.tts_vol_slider.value()
@@ -536,11 +629,19 @@ class SettingsWindow(QDialog):
         import importlib.util
         edge_tts_installed = importlib.util.find_spec("edge_tts") is not None
         
+        join_txt = getattr(self, "tts_join_text", None)
+        leave_txt = getattr(self, "tts_leave_text", None)
+        j_t = join_txt.text() if join_txt else "%NICK joined"
+        l_t = leave_txt.text() if leave_txt else "%NICK left"
+        test_name = "Arkanis"
+        custom_text = f"{j_t.replace('%NICK', test_name)}. {l_t.replace('%NICK', test_name)}."
+        
         if edge_tts_installed and shutil.which("mpv"):
             def run_edge_tts():
                 try:
-                    text = "Test komunikatu głosowego" if "pl-PL" in voice else "Voice test message"
-                    cache_key = "test_msg_" + voice
+                    text = custom_text
+                    safe_text = "".join(c for c in text if c.isalnum() or c in " _-.")
+                    cache_key = "test_msg_" + safe_text + "_" + voice
                     filename = hashlib.md5(cache_key.encode()).hexdigest() + ".mp3"
                     tmp_file = os.path.join(tempfile.gettempdir(), f"koverlay_{filename}")
                     
@@ -556,11 +657,11 @@ class SettingsWindow(QDialog):
             threading.Thread(target=run_edge_tts, daemon=True).start()
         elif shutil.which("espeak"):
             lang = voice.split("-")[0]
-            text = "Test komunikatu głosowego" if lang == "pl" else "Voice test message"
+            text = custom_text
             vol_val = int(vol * 2)
             subprocess.Popen(["espeak", "-a", str(vol_val), "-v", lang, text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         elif shutil.which("spd-say"):
             lang = voice.split("-")[0]
-            text = "Test komunikatu głosowego" if lang == "pl" else "Voice test message"
+            text = custom_text
             vol_val = int((vol - 50) * 2)
             subprocess.Popen(["spd-say", "-y", str(vol_val), "-l", lang, text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
