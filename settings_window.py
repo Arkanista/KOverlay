@@ -335,6 +335,13 @@ class SettingsWindow(QDialog):
         
         tts_voice_layout.addWidget(self.tts_rate_combo)
         
+        self.tts_test_nick = QLineEdit("Arkanis")
+        self.tts_test_nick.setFixedWidth(80)
+        self.tts_test_nick.setToolTip("Nick do testowania wymowy")
+        self.tts_test_nick.setEnabled(self.tts_checkbox.isChecked())
+        self.tts_checkbox.toggled.connect(self.tts_test_nick.setEnabled)
+        tts_voice_layout.addWidget(self.tts_test_nick)
+        
         self.tts_test_btn = QPushButton("Test")
         self.tts_test_btn.setFixedWidth(60)
         self.tts_test_btn.clicked.connect(self._test_voice)
@@ -342,6 +349,10 @@ class SettingsWindow(QDialog):
         self.tts_checkbox.toggled.connect(self.tts_test_btn.setEnabled)
         tts_voice_layout.addWidget(self.tts_test_btn)
         tts_voice_layout.addStretch()
+        
+        self.tts_alias_btn = QPushButton("Lista Zastąpień")
+        self.tts_alias_btn.clicked.connect(self._open_alias_window)
+        tts_voice_layout.addWidget(self.tts_alias_btn)
         
         tts_layout.addLayout(tts_voice_layout)
         
@@ -687,6 +698,14 @@ class SettingsWindow(QDialog):
         # Emit signal to inform main app to apply changes
         self.config_changed.emit()
         
+    def _open_alias_window(self):
+        from alias_window import AliasWindow
+        dlg = AliasWindow(self.config.get("tts_aliases", {}), self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.config["tts_aliases"] = dlg.get_aliases()
+            self._on_change()
+        dlg.deleteLater()
+
     def _test_voice(self):
         import subprocess
         import shutil
@@ -698,17 +717,26 @@ class SettingsWindow(QDialog):
         
         voice = self.tts_voice_combo.currentData()
         vol = self.tts_vol_slider.value()
-        rate = self.tts_rate_combo.currentData()
-        
         join_txt = getattr(self, "tts_join_text", None)
         leave_txt = getattr(self, "tts_leave_text", None)
         j_t = join_txt.text() if join_txt else "%NICK joined"
         l_t = leave_txt.text() if leave_txt else "%NICK left"
-        test_name = "Arkanis"
-        custom_text = f"{j_t.replace('%NICK', test_name)}. {l_t.replace('%NICK', test_name)}."
         
-        from tts_manager import get_tts_manager
-        get_tts_manager().enqueue(custom_text, voice=voice, volume=vol, delay=0, rate=rate)
+        test_name = self.tts_test_nick.text() or "Arkanis"
+        from tts_manager import get_tts_manager, apply_tts_aliases
+        aliases = self.config.get("tts_aliases", {})
+        spoken_name = apply_tts_aliases(test_name, aliases)
+        
+        custom_text = f"{j_t.replace('%NICK', spoken_name)}. {l_t.replace('%NICK', spoken_name)}."
+        
+        delay = self.config.get("tts_delay_ms", 0) / 1000.0
+        get_tts_manager(self.config).enqueue(
+            text=custom_text,
+            voice=self.tts_voice_combo.currentData(),
+            volume=self.tts_vol_slider.value(),
+            delay=0, # No delay for test button
+            rate=self.tts_rate_combo.currentData()
+        )
         
         # Update cache size label after test (give worker time to download)
         from PyQt6.QtCore import QTimer

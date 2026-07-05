@@ -92,6 +92,14 @@ The *Settings* window offers highly advanced overlay customization. All options 
 ### Overlays Section
 *   **Enable Overlay 1 - 4:** KOverlay's architecture allows you to launch up to **four clones** of the overlay. This feature is dedicated to players operating on multiple monitors simultaneously. By checking the respective boxes, you "wake up" the corresponding display identifiers (IDs). For each awakened "ID", the system independently remembers its screen coordinates, allowing you to precisely assign Overlay 2 to the second monitor and Overlay 3 to the third.
 
+### Funkcje
+- Wyświetlanie aktualnego kanału z TeamSpeak 3.
+- Pokazywanie listy użytkowników, którzy mówią (wraz z historią 10-sekundową wejść/wyjść).
+- Konfigurowalna przezroczystość i skrót klawiszowy (domyślnie `Shift+Tab`) do pokazywania/ukrywania okna z historią zdarzeń, w tym informacją o dołączeniu i wyjściu.
+- Integracja z systemowym silnikiem TTS (Edge TTS) w celu odczytywania powiadomień o wejściu i wyjściu z kanału.
+- **Lista zastąpień (TTS Aliases)**: Możliwość podmiany trudnych do wymówienia nicków lub wycinania tagów klanowych, by lektor czytał je poprawnie.
+- GUI do ustawień (suwaki dla głośności TTS, przezroczystości okna) - dostępny z ikony w zasobniku (TRAY).
+
 ### Width Settings Section
 *   **Dynamic Width (fit to text):** Automatic corset. The window naturally reacts to what's happening inside it. If you have people with short nicknames on the channel, the window stays extremely narrow. It only expands wider when a person with a long nickname enters.
 *   **Fixed Width:** Manual frame. If you uncheck *Dynamic Width*, the *Fixed* slider activates. It allows you to impose an absolute, rock-solid width in pixels on the program (from 50px to 1000px). Regardless of the length of the players' nicknames, the frame will strictly stick to this dimension. This prevents the UI layout from "jumping" around.

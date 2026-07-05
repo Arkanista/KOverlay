@@ -8,6 +8,17 @@ import threading
 import queue
 import time
 import importlib.util
+import re
+
+def apply_tts_aliases(name, aliases):
+    if not aliases:
+        return name
+    spoken_name = name
+    for src, dst in aliases.items():
+        if src:
+            # Case insensitive substring replacement
+            spoken_name = re.sub(re.escape(src), dst, spoken_name, flags=re.IGNORECASE)
+    return spoken_name
 
 class TTSManager:
     _instance = None

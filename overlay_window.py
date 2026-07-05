@@ -285,7 +285,9 @@ class OverlayWindow(QWidget):
                     if not (was_empty or changed_channel) and self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
                         if self.config.get("tts_join_enabled", True):
                             template = self.config.get("tts_join_text", "%NICK joined")
-                            text = template.replace("%NICK", name)
+                            from tts_manager import get_tts_manager, apply_tts_aliases
+                            spoken_name = apply_tts_aliases(name, self.config.get("tts_aliases", {}))
+                            text = template.replace("%NICK", spoken_name)
                             delay = self.config.get("tts_delay_ms", 0) / 1000.0
                             voice = self.config.get("tts_voice", "en-US-AriaNeural")
                             rate = self.config.get("tts_rate", "+0%")
@@ -301,7 +303,9 @@ class OverlayWindow(QWidget):
                         if self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
                             if self.config.get("tts_join_enabled", True):
                                 template = self.config.get("tts_join_text", "%NICK joined")
-                                text = template.replace("%NICK", name)
+                                from tts_manager import get_tts_manager, apply_tts_aliases
+                                spoken_name = apply_tts_aliases(name, self.config.get("tts_aliases", {}))
+                                text = template.replace("%NICK", spoken_name)
                                 delay = self.config.get("tts_delay_ms", 0) / 1000.0
                                 voice = self.config.get("tts_voice", "en-US-AriaNeural")
                                 rate = self.config.get("tts_rate", "+0%")
@@ -319,7 +323,9 @@ class OverlayWindow(QWidget):
                         if self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
                             if self.config.get("tts_leave_enabled", False):
                                 template = self.config.get("tts_leave_text", "%NICK left")
-                                text = template.replace("%NICK", name)
+                                from tts_manager import get_tts_manager, apply_tts_aliases
+                                spoken_name = apply_tts_aliases(name, self.config.get("tts_aliases", {}))
+                                text = template.replace("%NICK", spoken_name)
                                 delay = self.config.get("tts_delay_ms", 0) / 1000.0
                                 voice = self.config.get("tts_voice", "en-US-AriaNeural")
                                 rate = self.config.get("tts_rate", "+0%")
