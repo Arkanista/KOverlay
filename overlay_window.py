@@ -52,7 +52,7 @@ class OverlayWindow(QWidget):
         self.logo_label = QLabel()
         from PyQt6.QtGui import QPixmap
         import os
-        icon_path = os.path.join(os.path.dirname(__file__), "icon.svg")
+        icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
         pixmap = QPixmap(icon_path).scaled(20, 20, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self.logo_label.setPixmap(pixmap)
         

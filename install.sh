@@ -44,9 +44,16 @@ INSTALL_DIR="$HOME/.local/share/koverlay"
 echo "Installing KOverlay to $INSTALL_DIR..."
 mkdir -p "$INSTALL_DIR"
 
-# Copy necessary files
-cp *.py "$INSTALL_DIR/"
-cp requirements.txt "$INSTALL_DIR/"
+# Copy Python files and app icon
+sudo cp *.py "$INSTALL_DIR/"
+sudo cp icon.png "$INSTALL_DIR/"
+
+echo "Installing icon sizes to /usr/share/icons/hicolor..."
+for size in 16 32 48 64 128 256 512; do
+    sudo mkdir -p "/usr/share/icons/hicolor/${size}x${size}/apps"
+    sudo cp "icons/koverlay-${size}.png" "/usr/share/icons/hicolor/${size}x${size}/apps/koverlay.png"
+done
+sudo gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
 cp icon.svg "$INSTALL_DIR/"
 # Note: start.sh is no longer needed as we use the venv directly in the desktop file
 
@@ -82,13 +89,13 @@ mkdir -p ~/.local/share/applications/
 # Generate desktop file dynamically with absolute path
 cat > ~/.local/share/applications/koverlay.desktop << EOL
 [Desktop Entry]
-Version=0.1.9
+Version=0.1.10
 Type=Application
 Name=KOverlay
 Comment=KOverlay - TS3 Overlay
 Exec="$INSTALL_DIR/venv/bin/python" "$INSTALL_DIR/koverlay.py"
 Path=$INSTALL_DIR
-Icon=$INSTALL_DIR/icon.svg
+Icon=koverlay
 Terminal=false
 Categories=Utility;Network;
 EOL

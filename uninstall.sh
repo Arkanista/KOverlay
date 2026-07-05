@@ -9,8 +9,13 @@ echo "Stopping KOverlay if running..."
 killall koverlay &> /dev/null || true
 
 # 1. Remove Desktop Integration
-echo "Removing Desktop Shortcut..."
+echo "Removing Desktop Shortcut and Icons..."
 rm -f ~/.local/share/applications/koverlay.desktop
+
+for size in 16 32 48 64 128 256 512; do
+    sudo rm -f "/usr/share/icons/hicolor/${size}x${size}/apps/koverlay.png"
+done
+sudo gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
 
 # Update desktop database
 if command -v update-desktop-database &> /dev/null; then

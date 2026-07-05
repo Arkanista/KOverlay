@@ -12,8 +12,10 @@ class TrayIcon(QSystemTrayIcon):
     def __init__(self, parent=None, initial_mute=False, overlays_config=None):
         super().__init__(parent)
         
-        self.setIcon(QIcon("icon.svg"))
-        self.setToolTip("KOverlay v0.1.9")
+        import os
+        icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
+        self.setIcon(QIcon(icon_path))
+        self.setToolTip("KOverlay v0.1.10")
         
         # Create menu
         self.menu = QMenu()

@@ -1,6 +1,6 @@
 pkgname=koverlay
-pkgver=0.1.9
-pkgrel=1
+pkgver=0.1.10
+pkgrel=3
 pkgdesc="A modern, universal Wayland/X11 TeamSpeak 3 overlay."
 arch=('any')
 url="https://github.com/arkanis/koverlay" # Replace with actual URL if known
@@ -14,13 +14,14 @@ package() {
     mkdir -p "$pkgdir/opt/koverlay"
     mkdir -p "$pkgdir/usr/bin"
     mkdir -p "$pkgdir/usr/share/applications"
-    mkdir -p "$pkgdir/usr/share/icons/hicolor/scalable/apps"
-
-    # In a real PKGBUILD, we would copy from $srcdir. Since this is local, we copy from the current directory.
-    # Note: When building locally with makepkg, you might need to adjust paths if the source is not packaged.
+    # Install application files and icon
     cp -r "$startdir/"*.py "$pkgdir/opt/koverlay/"
-    cp "$startdir/icon.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/koverlay.svg"
-    cp "$startdir/icon.svg" "$pkgdir/opt/koverlay/icon.svg"
+    cp "$startdir/icon.png" "$pkgdir/opt/koverlay/icon.png"
+    
+    for size in 16 32 48 64 128 256 512; do
+        mkdir -p "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps"
+        cp "$startdir/icons/koverlay-${size}.png" "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps/koverlay.png"
+    done
 
     # Install pip dependencies locally using --target
     pip install --target="$pkgdir/opt/koverlay/lib" ts3 edge-tts
@@ -33,7 +34,7 @@ Type=Application
 Name=KOverlay
 Comment=KOverlay TeamSpeak 3 Overlay
 Exec=/usr/bin/koverlay
-Icon=/usr/share/icons/hicolor/scalable/apps/koverlay.svg
+Icon=/opt/koverlay/icon.png
 Terminal=false
 Categories=Utility;Network;
 EOF

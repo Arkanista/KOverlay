@@ -1,4 +1,4 @@
-# <img src="icon.svg" width="48" align="center"> KOverlay User Manual
+# <img src="icon.png" width="48" align="center"> KOverlay User Manual
 > ✨ *Entirely vibecoded by Gemini 3.1 Pro AI agent* ✨
 
 Welcome to **KOverlay** – a powerful, modern overlay for Linux (X11 and Wayland) that integrates directly with TeamSpeak 3. This step-by-step guide will explain how to configure the connection and what each option in the program menu does.
@@ -15,9 +15,9 @@ For Arch-based systems, an official `PKGBUILD` and a compiled package are provid
 2. Build the package: `makepkg -si`
    *(This will automatically fetch required dependencies like `python-pyqt6` and the AUR package `kdotool`).*
 3. Or download and install the pre-compiled package directly via terminal: 
-   `sudo pacman -U https://github.com/Arkanista/koverlay/releases/download/v0.1.9/koverlay-0.1.9-1-any.pkg.tar.zst`
+   `sudo pacman -U https://github.com/Arkanista/koverlay/releases/download/v0.1.10/koverlay-0.1.10-3-any.pkg.tar.zst`
 4. **[Direct Download Link]** You can also download the package manually through your browser: 
-   👉 **[Download KOverlay v0.1.9 (.pkg.tar.zst)](https://github.com/Arkanista/koverlay/releases/download/v0.1.9/koverlay-0.1.9-1-any.pkg.tar.zst)**
+   👉 **[Download KOverlay v0.1.10-3 (.pkg.tar.zst)](https://github.com/Arkanista/koverlay/releases/download/v0.1.10/koverlay-0.1.10-3-any.pkg.tar.zst)**
 
 ### Ubuntu / Debian / Linux Mint / Fedora / openSUSE
 For other distributions, a robust, universal installer script is provided:
