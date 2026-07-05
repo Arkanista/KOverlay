@@ -46,28 +46,26 @@ class WindowTracker(QThread):
                 time.sleep(2.0)
                 continue
                 
+            is_active = False
             try:
                 # getactivewindow returns the window ID, getwindowname gets the title of that ID
                 result = subprocess.run(
                     [self.active_tool, "getactivewindow", "getwindowname"],
-                    capture_output=True, text=True, timeout=0.2
+                    capture_output=True, text=True, timeout=0.5
                 )
-                window_name = result.stdout.strip()
-                
-                is_active = False
-                for kw in self.target_keywords:
-                    if kw.lower() in window_name.lower():
-                        is_active = True
-                        break
-                        
-                if is_active != self.last_state:
-                    self.active_window_changed.emit(is_active)
-                    self.last_state = is_active
-                    
-            except subprocess.TimeoutExpired:
-                pass
+                if result.returncode == 0:
+                    window_name = result.stdout.strip()
+                    for kw in self.target_keywords:
+                        if kw.lower() in window_name.lower():
+                            is_active = True
+                            break
             except Exception as e:
-                print(f"Error tracking window: {e}")
+                # On timeout or broken display server after suspend, assume not active
+                pass
+                
+            if is_active != self.last_state:
+                self.active_window_changed.emit(is_active)
+                self.last_state = is_active
                 
             # Safely get interval in seconds, fallback to 50ms if missing or invalid
             interval_sec = getattr(self, 'polling_interval_ms', 50) / 1000.0
