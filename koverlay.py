@@ -134,6 +134,10 @@ class MainApp:
     def on_move_toggled(self, enabled):
         for overlay in self.overlays.values():
             overlay.set_move_mode(enabled)
+            
+        # Force visibility sync after exiting move mode
+        if not enabled and hasattr(self, 'tracker') and hasattr(self.tracker, 'last_state'):
+            self.on_active_window_changed(self.tracker.last_state)
 
     def on_mute_toggled(self, is_muted):
         self.cfg["tts_muted"] = is_muted
@@ -212,11 +216,19 @@ class MainApp:
             self.ts3_thread.clients_updated.connect(self.on_clients_updated)
             self.ts3_thread.error_occurred.connect(self.on_ts3_error)
             self.ts3_thread.start()
+            
+        # Force visibility sync for newly added overlays
+        if hasattr(self, 'tracker') and hasattr(self.tracker, 'last_state'):
+            self.on_active_window_changed(self.tracker.last_state)
         
     def on_settings_closed(self):
         self.settings_dialog = None
         for overlay in self.overlays.values():
             overlay.set_move_mode(False)
+            
+        # Force visibility sync after settings close
+        if hasattr(self, 'tracker') and hasattr(self.tracker, 'last_state'):
+            self.on_active_window_changed(self.tracker.last_state)
 
     def on_active_window_changed(self, is_target_active):
         game_only = self.cfg.get("game_only", True)
