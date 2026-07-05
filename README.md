@@ -15,9 +15,9 @@ For Arch-based systems, an official `PKGBUILD` and a compiled package are provid
 2. Build the package: `makepkg -si`
    *(This will automatically fetch required dependencies like `python-pyqt6` and the AUR package `kdotool`).*
 3. Or download and install the pre-compiled package directly via terminal: 
-   `sudo pacman -U https://github.com/Arkanista/koverlay/releases/download/v0.1.10/koverlay-0.1.10-9-any.pkg.tar.zst`
+   `sudo pacman -U https://github.com/Arkanista/koverlay/releases/download/v0.1.10/koverlay-0.1.10-10-any.pkg.tar.zst`
 4. **[Direct Download Link]** You can also download the package manually through your browser: 
-   👉 **[Download KOverlay v0.1.10-9 (.pkg.tar.zst)](https://github.com/Arkanista/koverlay/releases/download/v0.1.10/koverlay-0.1.10-9-any.pkg.tar.zst)**
+   👉 **[Download KOverlay v0.1.10-10 (.pkg.tar.zst)](https://github.com/Arkanista/koverlay/releases/download/v0.1.10/koverlay-0.1.10-10-any.pkg.tar.zst)**
 
 ### Ubuntu / Debian / Linux Mint / Fedora / openSUSE
 For other distributions, a robust, universal installer script is provided:

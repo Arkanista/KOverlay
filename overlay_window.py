@@ -439,8 +439,13 @@ class OverlayWindow(QWidget):
                         cache_key = safe_name + "_" + voice
                         filename = hashlib.md5(cache_key.encode()).hexdigest() + ".mp3"
                         tmp_file = os.path.join(tempfile.gettempdir(), f"koverlay_{filename}")
+                        
                         if not os.path.exists(tmp_file):
-                            subprocess.run([sys.executable, "-m", "edge_tts", "--voice", voice, "--text", f"{safe_name} joined", "--write-media", tmp_file], check=True)
+                            import edge_tts
+                            import asyncio
+                            communicate = edge_tts.Communicate(f"{safe_name} joined", voice)
+                            asyncio.run(communicate.save(tmp_file))
+                            
                         vol = self.config.get("tts_volume", 80)
                         subprocess.Popen(["mpv", "--no-video", "--really-quiet", f"--volume={vol}", tmp_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     except Exception as e:

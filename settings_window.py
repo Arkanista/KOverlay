@@ -516,8 +516,13 @@ class SettingsWindow(QDialog):
                     cache_key = "test_msg_" + voice
                     filename = hashlib.md5(cache_key.encode()).hexdigest() + ".mp3"
                     tmp_file = os.path.join(tempfile.gettempdir(), f"koverlay_{filename}")
+                    
                     if not os.path.exists(tmp_file):
-                        subprocess.run([sys.executable, "-m", "edge_tts", "--voice", voice, "--text", text, "--write-media", tmp_file], check=True)
+                        import edge_tts
+                        import asyncio
+                        communicate = edge_tts.Communicate(text, voice)
+                        asyncio.run(communicate.save(tmp_file))
+                        
                     subprocess.Popen(["mpv", "--no-video", "--really-quiet", f"--volume={vol}", tmp_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 except Exception as e:
                     pass
