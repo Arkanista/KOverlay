@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt
 class AliasWindow(QDialog):
     def __init__(self, current_aliases, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Lista Zastąpień (TTS Aliases)")
+        self.setWindowTitle("TTS Aliases (Substitution List)")
         self.resize(400, 300)
         
         self.aliases = current_aliases.copy() if current_aliases else {}
@@ -16,15 +16,15 @@ class AliasWindow(QDialog):
         
         self.table = QTableWidget()
         self.table.setColumnCount(2)
-        self.table.setHorizontalHeaderLabels(["Zastąp (Źródło)", "Na (Docelowo)"])
+        self.table.setHorizontalHeaderLabels(["Substitute (Source)", "With (Target)"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
         
         btn_layout = QHBoxLayout()
-        self.add_btn = QPushButton("Dodaj")
+        self.add_btn = QPushButton("Add")
         self.add_btn.clicked.connect(self._add_row)
         
-        self.del_btn = QPushButton("Usuń")
+        self.del_btn = QPushButton("Delete")
         self.del_btn.clicked.connect(self._del_row)
         
         btn_layout.addWidget(self.add_btn)
@@ -32,9 +32,9 @@ class AliasWindow(QDialog):
         layout.addLayout(btn_layout)
         
         save_layout = QHBoxLayout()
-        self.save_btn = QPushButton("Zapisz")
+        self.save_btn = QPushButton("Save")
         self.save_btn.clicked.connect(self.accept)
-        self.cancel_btn = QPushButton("Anuluj")
+        self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.clicked.connect(self.reject)
         
         save_layout.addStretch()

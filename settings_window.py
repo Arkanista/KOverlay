@@ -337,7 +337,7 @@ class SettingsWindow(QDialog):
         
         self.tts_test_nick = QLineEdit("Arkanis")
         self.tts_test_nick.setFixedWidth(80)
-        self.tts_test_nick.setToolTip("Nick do testowania wymowy")
+        self.tts_test_nick.setToolTip("Nickname for pronunciation test")
         self.tts_test_nick.setEnabled(self.tts_checkbox.isChecked())
         self.tts_checkbox.toggled.connect(self.tts_test_nick.setEnabled)
         tts_voice_layout.addWidget(self.tts_test_nick)
@@ -350,7 +350,7 @@ class SettingsWindow(QDialog):
         tts_voice_layout.addWidget(self.tts_test_btn)
         tts_voice_layout.addStretch()
         
-        self.tts_alias_btn = QPushButton("Lista Zastąpień")
+        self.tts_alias_btn = QPushButton("TTS Aliases")
         self.tts_alias_btn.clicked.connect(self._open_alias_window)
         tts_voice_layout.addWidget(self.tts_alias_btn)
         
