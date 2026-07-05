@@ -129,36 +129,7 @@ class SettingsWindow(QDialog):
         
         history_dur_layout.addSpacing(20)
         
-        self.poll_label = QLabel("Active Window Check Interval:")
-        self.poll_slider = QSlider(Qt.Orientation.Horizontal)
-        self.poll_slider.setMinimum(50)
-        self.poll_slider.setMaximum(1000)
-        self.poll_slider.setSingleStep(50)
-        self.poll_slider.setTickInterval(50)
-        self.poll_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-        
-        # Enforce step of 50 manually using valueChanged
-        def on_poll_slider_changed(val):
-            snapped = round(val / 50) * 50
-            if snapped != val:
-                self.poll_slider.blockSignals(True)
-                self.poll_slider.setValue(snapped)
-                self.poll_slider.blockSignals(False)
-            self.poll_val_label.setText(f"{snapped} ms")
-            self._on_change()
-            
-        self.poll_slider.valueChanged.connect(on_poll_slider_changed)
-        
-        current_poll = self.config.get("polling_interval_ms", 50)
-        self.poll_val_label = QLabel(f"{current_poll} ms")
-        self.poll_val_label.setMinimumWidth(60)
-        self.poll_slider.blockSignals(True)
-        self.poll_slider.setValue(current_poll)
-        self.poll_slider.blockSignals(False)
-        
-        history_dur_layout.addWidget(self.poll_label)
-        history_dur_layout.addWidget(self.poll_slider)
-        history_dur_layout.addWidget(self.poll_val_label)
+        # History settings are self-contained now
         
         history_layout.addLayout(history_dur_layout)
         
@@ -445,8 +416,42 @@ class SettingsWindow(QDialog):
             
         monitors_group_layout.addLayout(monitors_layout)
 
-        # Width Settings
+        # Polling and Width Settings
         width_layout = QHBoxLayout()
+        
+        # Poll interval
+        self.poll_label = QLabel("Active Window Check Interval:")
+        self.poll_slider = QSlider(Qt.Orientation.Horizontal)
+        self.poll_slider.setMinimum(50)
+        self.poll_slider.setMaximum(1000)
+        self.poll_slider.setSingleStep(50)
+        self.poll_slider.setTickInterval(50)
+        self.poll_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        
+        def on_poll_slider_changed(val):
+            snapped = round(val / 50) * 50
+            if snapped != val:
+                self.poll_slider.blockSignals(True)
+                self.poll_slider.setValue(snapped)
+                self.poll_slider.blockSignals(False)
+            self.poll_val_label.setText(f"{snapped} ms")
+            self._on_change()
+            
+        self.poll_slider.valueChanged.connect(on_poll_slider_changed)
+        
+        current_poll = self.config.get("polling_interval_ms", 50)
+        self.poll_val_label = QLabel(f"{current_poll} ms")
+        self.poll_val_label.setMinimumWidth(60)
+        self.poll_slider.blockSignals(True)
+        self.poll_slider.setValue(current_poll)
+        self.poll_slider.blockSignals(False)
+        
+        width_layout.addWidget(self.poll_label)
+        width_layout.addWidget(self.poll_slider)
+        width_layout.addWidget(self.poll_val_label)
+        width_layout.addSpacing(20)
+        
+        # Dynamic width
         self.dynamic_width_checkbox = QCheckBox("Dynamic Width (fit to text)")
         self.dynamic_width_checkbox.setChecked(self.config.get("dynamic_width", True))
         self.dynamic_width_checkbox.toggled.connect(self._on_change)
@@ -465,6 +470,7 @@ class SettingsWindow(QDialog):
         width_layout.addWidget(QLabel("Fixed Width:"))
         width_layout.addWidget(self.fixed_width_slider)
         width_layout.addWidget(self.fixed_width_val_label)
+        
         monitors_group_layout.addLayout(width_layout)
 
         # Opacity Sliders (Combined)
