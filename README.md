@@ -79,10 +79,10 @@ The key is saved **automatically on the fly**. From now on, KOverlay is fully co
 
 The *Settings* window offers highly advanced overlay customization. All options are saved in real-time and updated immediately on the screen, without the need to click a "Save" button.
 
-### Authorization and Game Section
+### General Settings Section
 *   **TS3 API Key:** The unique authorization token from the ClientQuery plugin, described above. Essential for the program to function.
-*   **Show ONLY when game is active:** If this option is checked, KOverlay will automatically monitor the system. The overlay will only appear when your target game/application window is on top and has focus. If you switch to a web browser or minimize the game, the window will discreetly disappear.
 *   **Target Window Keywords:** Allows you to define exactly what window names KOverlay should look for when deciding if the target game/application is active. By default, it looks for `EVE - ` or `exefile.exe`, but you can enter a comma-separated list of any keywords. This prevents the overlay from incorrectly activating when you browse a forum in your web browser.
+*   **Show ONLY when game is active:** If this option is checked, KOverlay will automatically monitor the system. The overlay will only appear when your target game/application window is on top and has focus. If you switch to a web browser or minimize the game, the window will discreetly disappear.
 *   **Delay hiding when game loses focus:** Extends the above feature. If you alt-tab to a second monitor or another app, the overlay will stay visible for a configurable number of seconds (1 to 60) before fading away. If you return to the game within this time, the overlay remains visible continuously.
 
 ### Overlays Section
@@ -98,6 +98,7 @@ The *Settings* window offers highly advanced overlay customization. All options 
 *   **Choose Background Color:** The primary color of the frame/background window. Supports alpha transparency (you can choose the tint of the glass frame).
 *   **Choose Text Color (Normal):** Imposes the selected color on the letters identifying the nickname of a player who is currently on the channel with you, but is silent and not transmitting voice.
 *   **Choose Text Color (Talking):** Speaker highlight. This defines the intense color that a player's nickname entry will "flash" when they press their push-to-talk button or activate their microphone via voice activation in TS3.
+*   **Choose Text Color (Left):** Ghost highlight. Defines the color for users who have recently left the channel but are still displayed on the screen due to the "History Duration" setting.
 
 ### Typography Section
 *   **Font / Size:** Standard system font picker. Allows you to swap the overlay font and set its absolute size (e.g., 11, 14, or increase to 20 for 4K resolution monitors).
@@ -107,12 +108,16 @@ The *Settings* window offers highly advanced overlay customization. All options 
 *   **Show Dots Indicator:** Highly compact mode. If you disable the *Title Header*, you can enable the "Dots Indicator". This makes the text header disappear, leaving only tiny, LED-like dots (`•••`) at the very top of the frame. The number of dots displayed corresponds to the identification number of that display clone (1 dot = Overlay ID 1). The footprint is minimized to physical zero, and the dotted line is small enough not to interfere with the game, while serving as the only available drag-handle for the mouse when arranging the element on the screen!
 *   **Disable border blinking on startup:** By default, KOverlay "blinks" its outer border in an aggressive red color upon invocation (for a 5-second cycle). This functionality was implemented so that the player, amidst cluttered screens, can instantly visually locate where the hidden transparent window spawned. This option permanently disables the blinking signal – maximizing minimalism.
 
-### Join/Leave History & TTS Voice
+### Join/Leave History Section
 *   **Enable Join/Leave History (+ / ✝ indicators):** When enabled, KOverlay tracks the presence of users. New users joining the channel will be prefixed with a bold `+ ` for a specified duration. Users who leave the channel will stay on the list for the specified duration but will be pushed to the bottom, prefixed with a `✝ ` symbol, and colored gray (or a custom color of your choice). This allows you to know who just entered or left without looking at the TS3 window!
 *   **History Duration:** Defines how long (in seconds) the new/left users keep their visual indicators before fading away (left users) or turning into regular users (new users).
-*   **Enable TTS Voice Announcements (English):** Text-to-Speech integration! When enabled, whenever someone joins the channel, a natural AI voice (AriaNeural from Microsoft Azure) will announce their arrival out loud (e.g., "Arkanis joined"). 
+
+### Text-to-Speech (TTS) Section
+*   **Enable Text-to-Speech (TTS):** Text-to-Speech integration! When enabled, whenever someone joins or leaves the channel, a natural AI voice from Microsoft Azure will announce their arrival/departure out loud. 
     * *Requires active internet connection for the high-quality voice.*
     * *Requires the `edge-tts` python module and the `mpv` video player to be installed on your Linux system. (These are installed automatically via our universal installers).*
+*   **TTS Voice / Language:** Allows you to select the voice persona. Currently supports highly realistic voices: **English Female (Aria)** and **Polish Female (Zofia)**. You can easily test how they sound by clicking the "Test" button!
+*   **TTS Phrase for Join / Leave:** Allows you to completely customize what the voice says. Use the special variable `%NICK` to place the user's name in the sentence. For example, typing `%NICK arrived on the battlefield` will cause the bot to say exactly that!
 *   **Read Delay:** Defines a delay (up to 3 seconds) before the TTS voice speaks, preventing overlaps with standard TS3 joining sounds.
 *   **Volume:** Slider to independently control the loudness of the TTS announcements (0% to 100%).
 
