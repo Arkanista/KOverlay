@@ -71,7 +71,7 @@ For other distributions, a robust, universal installer script is provided:
 > wget https://github.com/jinliu/kdotool/releases/latest/download/kdotool-0.2.3-x86_64-unknown-linux-gnu.tar.gz
 > tar -xzf kdotool-0.2.3-x86_64-unknown-linux-gnu.tar.gz
 > sudo mv kdotool /usr/local/bin/
-> chmod +x /usr/local/bin/kdotool
+> sudo chmod +x /usr/local/bin/kdotool
 > ```
 
 ### Bazzite / SteamOS / ChimeraOS (Immutable Systems)
