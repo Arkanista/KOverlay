@@ -131,7 +131,11 @@ To establish this connection, follow these steps:
 ### Step 3: Launch KOverlay and Paste the Key
 1. Launch the KOverlay application (e.g., by running the `./start.sh` file in the program directory).
 2. You will see a new circular blue icon with sound waves in your **System Tray** (the taskbar area next to the clock).
-3. Right-click the KOverlay icon and select **Settings**.
+
+> [!NOTE]
+> **First-Time Launch:** If no TS3 API Key is configured yet, KOverlay will automatically open the Settings window on startup to allow you to easily paste the key. Once a valid API key is saved, future launches will run silently in the system tray.
+
+3. Right-click the KOverlay icon and select **Settings** (if not already opened automatically).
 4. At the very top of the window, you will find a field: `TS3 API Key:`.
 5. Paste the copied key from your clipboard (Ctrl+V) into this field.
 
