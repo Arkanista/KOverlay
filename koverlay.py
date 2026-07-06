@@ -74,11 +74,18 @@ class MainApp:
                     if s_name in self.cfg["monitors"]:
                         self.cfg["overlay_ids"][str(i)] = self.cfg["monitors"][s_name]
             else:
-                # Default for primary
+                # Default for primary - center on the primary screen
+                if primary_screen:
+                    geom = primary_screen.geometry()
+                    default_x = geom.x() + (geom.width() - 200) // 2
+                    default_y = geom.y() + (geom.height() - 100) // 2
+                else:
+                    default_x = 0
+                    default_y = 0
                 self.cfg["overlay_ids"]["1"] = {
                     "enabled": True,
-                    "pos_x": self.cfg.get("pos_x", 0),
-                    "pos_y": self.cfg.get("pos_y", 0)
+                    "pos_x": self.cfg.get("pos_x", default_x),
+                    "pos_y": self.cfg.get("pos_y", default_y)
                 }
             config.save_config(self.cfg)
         

@@ -86,8 +86,18 @@ class OverlayWindow(QWidget):
         if "pos_x" in mon_cfg and "pos_y" in mon_cfg:
             self.move(mon_cfg["pos_x"], mon_cfg["pos_y"])
         else:
-            offset = 50 * self.numeric_id
-            self.move(offset, offset)
+            # Fallback: center on primary screen
+            from PyQt6.QtWidgets import QApplication
+            primary_screen = QApplication.primaryScreen()
+            if primary_screen:
+                geom = primary_screen.geometry()
+                offset = 50 * self.numeric_id
+                x = geom.x() + (geom.width() - 200) // 2 + offset
+                y = geom.y() + (geom.height() - 100) // 2 + offset
+                self.move(x, y)
+            else:
+                offset = 50 * self.numeric_id
+                self.move(offset, offset)
             
         self.update_style()
         
