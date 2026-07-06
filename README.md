@@ -9,6 +9,7 @@
 > - **Ubuntu (clean test)**: Verified end-to-end installation (`ubuntu:latest` container) including virtualenv creation, requirements installation, and desktop integration.
 > - **Fedora (clean test)**: Verified automatic installation of dependencies (python3, pip, mpv, xdotool) and setup via DNF (`fedora:latest` container).
 > - **Linux Mint**: Verified package compatibility.
+> 
 > Detailed installation guides and dependency instructions (specifically explaining how to handle the AUR package `kdotool` on Arch systems) have been added to the manual below. Everything should now work flawlessly!
 
 Welcome to **KOverlay** – a powerful, modern overlay for Linux (X11 and Wayland) that integrates directly with TeamSpeak 3, featuring voice announcements (TTS) of nicknames joining your channel! This step-by-step guide will explain how to configure the connection and what each option in the program menu does.
