@@ -176,7 +176,7 @@ class SettingsWindow(QDialog):
         
         self.tts_join_text = QLineEdit()
         self.tts_join_text.setMaxLength(40)
-        self.tts_join_text.setValidator(QRegularExpressionValidator(QRegularExpression(r"^[A-Za-z %]{0,40}$")))
+        self.tts_join_text.setValidator(QRegularExpressionValidator(QRegularExpression(r"^[A-Za-z0-9.,!? %ąćęłńóśźżĄĆĘŁŃÓŚŹŻ-]{0,40}$")))
         self.tts_join_text.setText(self.config.get("tts_join_text", "%NICK joined"))
         self.tts_join_text.textChanged.connect(self._on_change)
         events_layout.addWidget(self.tts_join_text)
@@ -190,7 +190,7 @@ class SettingsWindow(QDialog):
         
         self.tts_leave_text = QLineEdit()
         self.tts_leave_text.setMaxLength(40)
-        self.tts_leave_text.setValidator(QRegularExpressionValidator(QRegularExpression(r"^[A-Za-z %]{0,40}$")))
+        self.tts_leave_text.setValidator(QRegularExpressionValidator(QRegularExpression(r"^[A-Za-z0-9.,!? %ąćęłńóśźżĄĆĘŁŃÓŚŹŻ-]{0,40}$")))
         self.tts_leave_text.setText(self.config.get("tts_leave_text", "%NICK left"))
         self.tts_leave_text.textChanged.connect(self._on_change)
         events_layout.addWidget(self.tts_leave_text)
@@ -749,7 +749,10 @@ class SettingsWindow(QDialog):
         def update_cache():
             size_mb = get_tts_manager().get_cache_size()
             self.cache_size_label.setText(f"Cache size: {size_mb:.2f} MB")
+        # Poll a few times since TTS generation time varies
         QTimer.singleShot(2000, update_cache)
+        QTimer.singleShot(5000, update_cache)
+        QTimer.singleShot(10000, update_cache)
 
     def _open_cache_folder(self):
         import os

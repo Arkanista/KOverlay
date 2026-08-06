@@ -42,6 +42,9 @@ class TS3ClientThread(QThread):
         lines = []
         for _ in range(max_lines):
             while '\n' not in self.buf:
+                if len(self.buf) > 1024 * 1024:  # 1MB buffer limit to prevent OOM
+                    self.buf = ""
+                    raise Exception("Buffer exceeded 1MB limit")
                 data = self.sock.recv(4096)
                 if not data:
                     raise Exception("Socket closed")
@@ -69,8 +72,8 @@ class TS3ClientThread(QThread):
                 for p in parts:
                     if '=' in p:
                         k, v = p.split('=', 1)
-                        # Basic unescape
-                        v = v.replace(r'\s', ' ').replace(r'\/', '/').replace(r'\p', '|')
+                        # Full TS3 unescape (backslash last to avoid double unescaping)
+                        v = v.replace(r'\s', ' ').replace(r'\/', '/').replace(r'\p', '|').replace(r'\n', '\n').replace(r'\r', '\r').replace(r'\t', '\t').replace(r'\\', '\\')
                         client_dict[k] = v
                 
                 if client_dict.get('client_type') == '1':
