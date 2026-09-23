@@ -2,12 +2,14 @@
 > ✨ *Entirely vibecoded by Gemini 3.1 Pro AI agent* ✨
 
 > [!TIP]
-> **What's New in v0.1.15-1:**
+> **What's New in v0.1.15-2:**
 > - 🎙️ **Full Mumble & TeamSpeak 3 Support**: Seamlessly switch between TS3 (ClientQuery) and Mumble (native C++ plugin with local IPC socket).
+> - 🛠️ **Mumble Connection & Ghost-Event Fix**: Fixed an issue where transient socket glitches or sync checks caused the client list to temporarily clear and trigger ghost join/leave TTS announcements.
+> - ⚡ **Robust Socket I/O**: Implemented `sendAll` with non-blocking error recovery in the Mumble C++ plugin.
 > - 🏷️ **Nickname Prefix & Tag Stripping**: Automatically remove clan brackets (`[...]`, `(...)`, `{...}`) and custom prefixes (e.g. `[VIP]`, `CLAN |`) for both overlay labels and TTS announcements.
 > - 🔊 **Recent Speakers on Top & Fade**: Active speakers automatically jump to the top of the overlay, remaining highlighted with a customizable 0–60s fade-out timer.
 > - 👥 **User List Limit**: Restrict the list of displayed users to a maximum count (X users).
-> - ⚡ **Mumble Channel Filtering**: Fixed channel tracking so only users in your current channel are displayed.
+> - ⚡ **Strict Mumble Channel Filtering**: Channel tracking strictly displays only users in your current channel.
 
 Welcome to **KOverlay** – a powerful, modern overlay for Linux (X11 and Wayland) that integrates directly with **TeamSpeak 3** and **Mumble**, featuring voice announcements (TTS) of nicknames joining and leaving your channel! This step-by-step guide will explain how to configure the connection and what each option in the program menu does.
 
@@ -47,16 +49,16 @@ Building from source automatically handles dependency resolution, including AUR 
 
 #### Method B: Install the Pre-compiled Pacman Package
 1. Download the pre-compiled package from GitHub releases:
-   👉 **[Download KOverlay v0.1.15-1 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.15-1/koverlay-0.1.15-1-any.pkg.tar.zst)**
+   👉 **[Download KOverlay v0.1.15-2 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.15-2/koverlay-0.1.15-2-any.pkg.tar.zst)**
 2. **Important Note on Dependencies**: The package depends on `kdotool` (which is in the AUR). Standard `pacman` cannot automatically resolve or download AUR dependencies. You must install `kdotool` first:
    ```bash
    yay -S kdotool   # or: paru -S kdotool
    ```
 3. Install the downloaded package:
    ```bash
-   sudo pacman -U koverlay-0.1.15-1-any.pkg.tar.zst
+   sudo pacman -U koverlay-0.1.15-2-any.pkg.tar.zst
    # Alternatively, let your AUR helper resolve dependencies and install the local package:
-   yay -U koverlay-0.1.15-1-any.pkg.tar.zst
+   yay -U koverlay-0.1.15-2-any.pkg.tar.zst
    ```
 
 ### Ubuntu / Debian / Linux Mint / Pop!_OS / Fedora / Nobara / openSUSE
