@@ -1,18 +1,15 @@
 # <img src="icon.png" width="48" align="center"> KOverlay User Manual
 > ✨ *Entirely vibecoded by Gemini 3.1 Pro AI agent* ✨
 
-> [!CAUTION]
-> **Important Update (v0.1.13-3):**
-> The universal installer (`install.sh`), Pacman package, and configuration guides have been fully fixed!
-> The following automated validation tests were successfully conducted:
-> - **Arch Linux**: Rebuilt Pacman package (`makepkg -f`) and verified system-wide execution.
-> - **Ubuntu (clean test)**: Verified end-to-end installation (`ubuntu:latest` container) including virtualenv creation, requirements installation, and desktop integration.
-> - **Fedora (clean test)**: Verified automatic installation of dependencies (python3, pip, mpv, xdotool) and setup via DNF (`fedora:latest` container).
-> - **Linux Mint**: Verified package compatibility.
-> 
-> Detailed installation guides and dependency instructions (specifically explaining how to handle the AUR package `kdotool` on Arch systems) have been added to the manual below. Everything should now work flawlessly!
+> [!TIP]
+> **What's New in v0.1.15-1:**
+> - 🎙️ **Full Mumble & TeamSpeak 3 Support**: Seamlessly switch between TS3 (ClientQuery) and Mumble (native C++ plugin with local IPC socket).
+> - 🏷️ **Nickname Prefix & Tag Stripping**: Automatically remove clan brackets (`[...]`, `(...)`, `{...}`) and custom prefixes (e.g. `[VIP]`, `CLAN |`) for both overlay labels and TTS announcements.
+> - 🔊 **Recent Speakers on Top & Fade**: Active speakers automatically jump to the top of the overlay, remaining highlighted with a customizable 0–60s fade-out timer.
+> - 👥 **User List Limit**: Restrict the list of displayed users to a maximum count (X users).
+> - ⚡ **Mumble Channel Filtering**: Fixed channel tracking so only users in your current channel are displayed.
 
-Welcome to **KOverlay** – a powerful, modern overlay for Linux (X11 and Wayland) that integrates directly with TeamSpeak 3, featuring voice announcements (TTS) of nicknames joining your channel! This step-by-step guide will explain how to configure the connection and what each option in the program menu does.
+Welcome to **KOverlay** – a powerful, modern overlay for Linux (X11 and Wayland) that integrates directly with **TeamSpeak 3** and **Mumble**, featuring voice announcements (TTS) of nicknames joining and leaving your channel! This step-by-step guide will explain how to configure the connection and what each option in the program menu does.
 
 ---
 
@@ -50,16 +47,16 @@ Building from source automatically handles dependency resolution, including AUR 
 
 #### Method B: Install the Pre-compiled Pacman Package
 1. Download the pre-compiled package from GitHub releases:
-   👉 **[Download KOverlay v0.1.13-3 (.pkg.tar.zst)](https://github.com/Arkanista/koverlay/releases/download/v0.1.13-3/koverlay-0.1.13-3-any.pkg.tar.zst)**
+   👉 **[Download KOverlay v0.1.15-1 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.15-1/koverlay-0.1.15-1-any.pkg.tar.zst)**
 2. **Important Note on Dependencies**: The package depends on `kdotool` (which is in the AUR). Standard `pacman` cannot automatically resolve or download AUR dependencies. You must install `kdotool` first:
    ```bash
    yay -S kdotool   # or: paru -S kdotool
    ```
 3. Install the downloaded package:
    ```bash
-   sudo pacman -U koverlay-0.1.13-3-any.pkg.tar.zst
+   sudo pacman -U koverlay-0.1.15-1-any.pkg.tar.zst
    # Alternatively, let your AUR helper resolve dependencies and install the local package:
-   yay -U koverlay-0.1.13-3-any.pkg.tar.zst
+   yay -U koverlay-0.1.15-1-any.pkg.tar.zst
    ```
 
 ### Ubuntu / Debian / Linux Mint / Pop!_OS / Fedora / Nobara / openSUSE
@@ -111,35 +108,23 @@ To completely remove the application and its shortcuts from your system, simply 
 
 ## Part 2: How to connect KOverlay to TeamSpeak 3
 
-KOverlay does not connect to voice servers in the cloud – it "talks" directly to your running TeamSpeak 3 application via a special built-in TS3 plugin called **ClientQuery**.
+## Part 2: How to Connect (TeamSpeak 3 & Mumble)
 
-To establish this connection, follow these steps:
+KOverlay supports two distinct voice backends: **TeamSpeak 3** and **Mumble**. You can switch between them anytime in the **Settings** window under **Voice Backend**.
 
-### Step 1: Enable the ClientQuery Plugin in TS3
-1. Open **TeamSpeak 3**.
-2. From the top menu bar, select `Tools`, then `Options`.
-3. On the left side of the Options window, select the `Addons` tab.
-4. Scroll through the list (or use the search bar in the top-left) to find a plugin named **ClientQuery**.
-5. Ensure that the plugin is **Enabled**.
+### Option A: Connecting to TeamSpeak 3 (ClientQuery)
+KOverlay talks directly to your running TeamSpeak 3 application via the built-in **ClientQuery** plugin:
+1. Open **TeamSpeak 3** -> `Tools` -> `Options` -> `Addons`.
+2. Locate **ClientQuery** and ensure it is **Enabled**.
+3. Open its Settings / API Key and copy your key.
+4. In KOverlay Settings, select backend **TeamSpeak 3** and paste your API key into the `TS3 API Key:` field.
 
-### Step 2: Copy the API Key
-1. Double-click the enabled **ClientQuery** plugin (or click the 'Settings' button below it).
-2. In the small plugin configuration window, you will find a text field labeled **API Key**.
-3. If the field is empty, generate a new key by clicking the button next to it.
-4. **Copy** this string of characters to your clipboard (Ctrl+C) – this is the unique password that allows local data reading!
-
-### Step 3: Launch KOverlay and Paste the Key
-1. Launch the KOverlay application (e.g., by running the `./start.sh` file in the program directory).
-2. You will see a new circular blue icon with sound waves in your **System Tray** (the taskbar area next to the clock).
-
-> [!NOTE]
-> **First-Time Launch:** If no TS3 API Key is configured yet, KOverlay will automatically open the Settings window on startup to allow you to easily paste the key. Once a valid API key is saved, future launches will run silently in the system tray.
-
-3. Right-click the KOverlay icon and select **Settings** (if not already opened automatically).
-4. At the very top of the window, you will find a field: `TS3 API Key:`.
-5. Paste the copied key from your clipboard (Ctrl+V) into this field.
-
-The key is saved **automatically on the fly**. From now on, KOverlay is fully connected! All you have to do is connect to any server and join a channel in TS3, and the overlays will come to life, displaying the list of participants in the room.
+### Option B: Connecting to Mumble (Native Plugin)
+KOverlay connects to Mumble via a high-performance native plugin and a local IPC socket:
+1. Compile and install the plugin (already included in the Pacman package or installed via `./mumble_plugin/build_and_install.sh`).
+2. Open **Mumble** -> `Configure` -> `Settings` -> `Plugins`.
+3. Check and enable **KOverlay Mumble Plugin**.
+4. In KOverlay Settings, select backend **Mumble** (IPC port `25640` by default). KOverlay will automatically filter the channel and display speaking statuses in real time!
 
 ---
 
@@ -147,15 +132,19 @@ The key is saved **automatically on the fly**. From now on, KOverlay is fully co
 
 The *Settings* window offers highly advanced overlay customization. All options are saved in real-time and updated immediately on the screen, without the need to click a "Save" button.
 
-### General Settings Section
-*   **TS3 API Key:** The unique authorization token from the ClientQuery plugin, described above. Essential for the program to function.
-*   **Target Window Keywords:** Allows you to define exactly what window names KOverlay should look for when deciding if the target game/application is active. By default, it looks for `EVE - ` or `exefile.exe`, but you can enter a comma-separated list of any keywords. This prevents the overlay from incorrectly activating when you browse a forum in your web browser.
-*   **Show ONLY when game is active:** If this option is checked, KOverlay will automatically monitor the system. The overlay will only appear when your target game/application window is on top and has focus. If you switch to a web browser or minimize the game, the window will discreetly disappear.
-    * > [!IMPORTANT]
-    * > **Fullscreen vs. Borderless Windowed (Linux specific)**
-    * > For KOverlay (or any other overlay) to render correctly on top of your game on Linux (X11 & Wayland), you must set the game's display mode to **"Borderless Windowed"** or **"Windowed"**. 
-    * > If you use **"Exclusive Fullscreen"**, the display server gives the game physical and exclusive access to the GPU (unredirection) to maximize FPS, which physically blocks all other windows from drawing on top of it, causing the overlay to be hidden beneath the game.
-*   **Delay hiding when game loses focus:** Extends the above feature. If you alt-tab to a second monitor or another app, the overlay will stay visible for a configurable number of seconds (1 to 60) before fading away. If you return to the game within this time, the overlay remains visible continuously.
+### Voice Backend & Connection
+*   **Voice Backend (TS3 / Mumble):** Switch the active voice client on the fly.
+*   **TS3 API Key / Mumble Port:** Authorization and port settings for the respective clients.
+*   **Target Window Keywords:** Allows you to define window titles KOverlay looks for to detect when the target game is active (e.g., `EVE - `, `exefile.exe`, `Steam`).
+*   **Show ONLY when game is active:** Automatically hides the overlay when you alt-tab out of the game.
+*   **Delay hiding when game loses focus:** Configurable grace period (1–60s) before hiding the overlay when switching windows.
+
+### User List & Speaking Behavior
+*   **Move recent speakers to top of list:** When enabled, users who talk immediately move to the top of the overlay.
+*   **Keep recent speakers highlighted (Fade duration):** Slider from 0 to 60 seconds. Provides a smooth color fade transition back to regular text color after someone stops speaking.
+*   **Limit user list:** Option to restrict the list to the top `X` active users.
+*   **Remove all bracket tags ([...], (...), {...}):** Strips leading tag brackets from player names (e.g. `[CORP] Player` -> `Player`).
+*   **Nick Prefixes...:** Opens a dedicated dialog to configure custom prefix strings to strip (e.g. `[VIP]`, `CLAN |`, etc.) from both overlay labels and TTS announcements.
 
 ### Overlays Section
 *   **Enable Overlay 1 - 4:** KOverlay's architecture allows you to launch up to **four clones** of the overlay. This feature is dedicated to players operating on multiple monitors simultaneously. By checking the respective boxes, you "wake up" the corresponding display identifiers (IDs). For each awakened "ID", the system independently remembers its screen coordinates, allowing you to precisely assign Overlay 2 to the second monitor and Overlay 3 to the third.
