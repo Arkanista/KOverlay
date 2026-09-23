@@ -1,6 +1,6 @@
 pkgname=koverlay
 pkgver=0.1.15
-pkgrel=1
+pkgrel=2
 pkgdesc="A modern, universal Wayland/X11 TeamSpeak 3 and Mumble overlay with TTS voice announcements."
 arch=('any')
 url="https://github.com/arkanis/koverlay" # Replace with actual URL if known

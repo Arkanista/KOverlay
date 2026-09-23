@@ -335,12 +335,14 @@ class OverlayWindow(QWidget):
         active_names = {c["name"] for c in clients}
         
         changed_channel = False
-        if hasattr(self, 'current_cid') and self.current_cid != my_cid:
+        prev_cid = getattr(self, 'current_cid', None)
+        if my_cid is not None and prev_cid is not None and prev_cid != my_cid:
             self.user_history.clear()
             self.last_talk_time.clear()
             self.talking_now.clear()
             changed_channel = True
-        self.current_cid = my_cid
+        if my_cid is not None:
+            self.current_cid = my_cid
         
         was_empty = len(self.user_history) == 0
         

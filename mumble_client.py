@@ -68,14 +68,15 @@ class MumbleClientThread(QThread):
                 if not self.running:
                     break
                 self.error_occurred.emit(f"Mumble connection error: {e}")
-                self.clients_updated.emit([], None)
+                # Do not emit empty clients list on transient socket disconnect/reconnect.
+                # This prevents the overlay from wiping all users, triggering ghost leave/join TTS, and flickering.
                 if self.sock:
                     try:
                         self.sock.close()
                     except Exception:
                         pass
                 self.sock = None
-                time.sleep(2)  # Backoff before reconnect
+                time.sleep(1)  # 1s backoff before reconnect
 
     def stop(self):
         self.running = False

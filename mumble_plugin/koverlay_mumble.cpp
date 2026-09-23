@@ -9,6 +9,8 @@
 #include <atomic>
 #include <cstring>
 #include <algorithm>
+#include <set>
+#include <cerrno>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -93,13 +95,31 @@ std::string buildStateJsonLocked() {
     return json;
 }
 
+bool sendAll(int fd, const std::string &data) {
+    size_t total = 0;
+    while (total < data.size()) {
+        ssize_t sent = send(fd, data.data() + total, data.size() - total, MSG_NOSIGNAL);
+        if (sent > 0) {
+            total += sent;
+        } else if (sent < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+                usleep(1000);
+                continue;
+            }
+            return false;
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
 void broadcastStateLocked() {
     std::string msg = buildStateJsonLocked();
     std::vector<int> aliveClients;
 
     for (int fd : g_clients) {
-        ssize_t sent = send(fd, msg.c_str(), msg.size(), MSG_NOSIGNAL);
-        if (sent > 0) {
+        if (sendAll(fd, msg)) {
             aliveClients.push_back(fd);
         } else {
             close(fd);
@@ -158,8 +178,17 @@ void syncAllUsersLocked(mumble_connection_t connection) {
     mumble_userid_t *users = nullptr;
     size_t count = 0;
     if (g_mumbleAPI.getAllUsers && g_mumbleAPI.getAllUsers(g_pluginID, connection, &users, &count) == MUMBLE_STATUS_OK && users) {
+        std::set<mumble_userid_t> activeSet;
         for (size_t i = 0; i < count; ++i) {
+            activeSet.insert(users[i]);
             updateUserLocked(connection, users[i]);
+        }
+        for (auto it = g_users.begin(); it != g_users.end(); ) {
+            if (activeSet.find(it->first) == activeSet.end()) {
+                it = g_users.erase(it);
+            } else {
+                ++it;
+            }
         }
         if (g_mumbleAPI.freeMemory) {
             g_mumbleAPI.freeMemory(g_pluginID, users);
