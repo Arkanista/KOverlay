@@ -1,7 +1,7 @@
 pkgname=koverlay
-pkgver=0.1.13
-pkgrel=4
-pkgdesc="A modern, universal Wayland/X11 TeamSpeak 3 overlay with TTS voice announcements."
+pkgver=0.1.15
+pkgrel=1
+pkgdesc="A modern, universal Wayland/X11 TeamSpeak 3 and Mumble overlay with TTS voice announcements."
 arch=('any')
 url="https://github.com/arkanis/koverlay" # Replace with actual URL if known
 license=('GPL')
@@ -17,6 +17,11 @@ package() {
     # Install application files and icon
     cp -r "$startdir/"*.py "$pkgdir/opt/koverlay/"
     cp "$startdir/icon.png" "$pkgdir/opt/koverlay/icon.png"
+
+    if [ -d "$startdir/mumble_plugin" ]; then
+        mkdir -p "$pkgdir/opt/koverlay/mumble_plugin"
+        cp -r "$startdir/mumble_plugin/"* "$pkgdir/opt/koverlay/mumble_plugin/"
+    fi
     
     for size in 16 32 48 64 128 256 512; do
         mkdir -p "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps"
@@ -32,7 +37,7 @@ package() {
 Version=$pkgver
 Type=Application
 Name=KOverlay
-Comment=KOverlay TeamSpeak 3 Overlay
+Comment=KOverlay TeamSpeak 3 and Mumble Overlay
 Exec=/usr/bin/koverlay
 Icon=/opt/koverlay/icon.png
 Terminal=false

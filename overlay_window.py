@@ -3,6 +3,21 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPoint
 from PyQt6.QtGui import QColor, QPixmap, QPainter, QPen
 import time
 
+def interpolate_color(col_from_str, col_to_str, progress):
+    progress = max(0.0, min(1.0, progress))
+    c_from = QColor(col_from_str)
+    c_to = QColor(col_to_str)
+    if not c_from.isValid():
+        c_from = QColor("#00ffcc")
+    if not c_to.isValid():
+        c_to = QColor("#96ffffff")
+    
+    r = int(c_from.red() + (c_to.red() - c_from.red()) * progress)
+    g = int(c_from.green() + (c_to.green() - c_from.green()) * progress)
+    b = int(c_from.blue() + (c_to.blue() - c_from.blue()) * progress)
+    a = int(c_from.alpha() + (c_to.alpha() - c_from.alpha()) * progress)
+    return QColor.fromRgb(r, g, b, a).name(QColor.NameFormat.HexArgb)
+
 class OverlayWindow(QWidget):
     blink_finished = pyqtSignal()
 
@@ -16,6 +31,9 @@ class OverlayWindow(QWidget):
         self.blink_count = 0
         self.blink_state = False
         self.user_history = {}
+        self.last_talk_time = {}
+        self.talking_now = {}
+        self.last_clients = []
         
         # Give this widget an object name to apply styles exclusively
         self.setObjectName("OverlayWindowMain")
@@ -79,6 +97,10 @@ class OverlayWindow(QWidget):
         
         self.blink_timer = QTimer(self)
         self.blink_timer.timeout.connect(self._on_blink_tick)
+
+        self.fade_timer = QTimer(self)
+        self.fade_timer.setInterval(40)
+        self.fade_timer.timeout.connect(self._on_fade_tick)
         
         self.setMinimumSize(50, 20)
         
@@ -162,6 +184,40 @@ class OverlayWindow(QWidget):
             self.is_blinking = False
             self.update_style()
             self.blink_finished.emit()
+
+    def _on_fade_tick(self):
+        current_time = time.time()
+        fade_duration = float(self.config.get("speaker_fade_duration", 5))
+        if fade_duration <= 0:
+            self.fade_timer.stop()
+            return
+
+        col_normal = self.config.get('text_color_normal', '#96ffffff')
+        if col_normal.startswith('rgba'): col_normal = '#96ffffff'
+        col_talking = self.config.get('text_color_talking', '#00FFCC')
+        if col_talking.startswith('rgba'): col_talking = '#00FFCC'
+
+        any_fading = False
+        for name, lbl in list(self.labels.items()):
+            data = self.user_history.get(name, {})
+            if data.get("leave_time") is not None:
+                continue
+            if self.talking_now.get(name, False):
+                continue
+
+            last_talk = self.last_talk_time.get(name, 0)
+            elapsed = current_time - last_talk
+            if last_talk > 0 and elapsed < fade_duration:
+                any_fading = True
+                progress = elapsed / fade_duration
+                col = interpolate_color(col_talking, col_normal, progress)
+                lbl.setStyleSheet(f"color: {col}; background-color: transparent; border: none;")
+            elif last_talk > 0 and elapsed >= fade_duration:
+                if col_normal not in lbl.styleSheet():
+                    lbl.setStyleSheet(f"color: {col_normal}; background-color: transparent; border: none;")
+
+        if not any_fading:
+            self.fade_timer.stop()
 
     def set_move_mode(self, enabled):
         self.move_mode = enabled
@@ -264,7 +320,11 @@ class OverlayWindow(QWidget):
             self.setMaximumWidth(16777215)
             self.setFixedWidth(fixed_width)
         
+        if hasattr(self, 'last_clients') and self.last_clients:
+            self.update_clients(self.last_clients, getattr(self, 'current_cid', None))
+
     def update_clients(self, clients, my_cid=None):
+        self.last_clients = clients
         import time
         current_time = time.time()
         
@@ -277,6 +337,8 @@ class OverlayWindow(QWidget):
         changed_channel = False
         if hasattr(self, 'current_cid') and self.current_cid != my_cid:
             self.user_history.clear()
+            self.last_talk_time.clear()
+            self.talking_now.clear()
             changed_channel = True
         self.current_cid = my_cid
         
@@ -296,7 +358,8 @@ class OverlayWindow(QWidget):
                         if self.config.get("tts_join_enabled", True):
                             template = self.config.get("tts_join_text", "%NICK joined")
                             from tts_manager import get_tts_manager, apply_tts_aliases
-                            spoken_name = apply_tts_aliases(name, self.config.get("tts_aliases", {}))
+                            from config import clean_nickname
+                            spoken_name = apply_tts_aliases(clean_nickname(name, self.config), self.config.get("tts_aliases", {}))
                             text = template.replace("%NICK", spoken_name)
                             delay = self.config.get("tts_delay_ms", 0) / 1000.0
                             voice = self.config.get("tts_voice", "en-US-AriaNeural")
@@ -314,7 +377,8 @@ class OverlayWindow(QWidget):
                             if self.config.get("tts_join_enabled", True):
                                 template = self.config.get("tts_join_text", "%NICK joined")
                                 from tts_manager import get_tts_manager, apply_tts_aliases
-                                spoken_name = apply_tts_aliases(name, self.config.get("tts_aliases", {}))
+                                from config import clean_nickname
+                                spoken_name = apply_tts_aliases(clean_nickname(name, self.config), self.config.get("tts_aliases", {}))
                                 text = template.replace("%NICK", spoken_name)
                                 delay = self.config.get("tts_delay_ms", 0) / 1000.0
                                 voice = self.config.get("tts_voice", "en-US-AriaNeural")
@@ -334,7 +398,8 @@ class OverlayWindow(QWidget):
                             if self.config.get("tts_leave_enabled", False):
                                 template = self.config.get("tts_leave_text", "%NICK left")
                                 from tts_manager import get_tts_manager, apply_tts_aliases
-                                spoken_name = apply_tts_aliases(name, self.config.get("tts_aliases", {}))
+                                from config import clean_nickname
+                                spoken_name = apply_tts_aliases(clean_nickname(name, self.config), self.config.get("tts_aliases", {}))
                                 text = template.replace("%NICK", spoken_name)
                                 delay = self.config.get("tts_delay_ms", 0) / 1000.0
                                 voice = self.config.get("tts_voice", "en-US-AriaNeural")
@@ -345,11 +410,22 @@ class OverlayWindow(QWidget):
                     elif current_time - data["leave_time"] > history_duration:
                         # User left longer than history_duration, remove from history
                         del self.user_history[name]
+                        self.last_talk_time.pop(name, None)
+                        self.talking_now.pop(name, None)
         else:
             # History disabled, just match active clients directly
             self.user_history = {}
             for c in clients:
                 self.user_history[c["name"]] = {"join_time": 0, "leave_time": None}
+
+        # Track talking states & timestamps
+        fade_duration = float(self.config.get("speaker_fade_duration", 5))
+        for c in clients:
+            c_name = c["name"]
+            is_talking = c.get("talking", False)
+            self.talking_now[c_name] = is_talking
+            if is_talking:
+                self.last_talk_time[c_name] = current_time
 
         font_family = self.config.get("font_family", "Sans Serif")
         font_size = self.config.get("font_size", 11)
@@ -361,6 +437,8 @@ class OverlayWindow(QWidget):
         col_left = self.config.get('text_color_left', '#808080')
         if col_left.startswith('rgba'): col_left = '#808080'
 
+        recent_speakers_first = self.config.get("recent_speakers_first", False)
+
         # Build ordered list of names to display
         display_names = list(self.user_history.keys())
             
@@ -368,9 +446,28 @@ class OverlayWindow(QWidget):
         def sort_key(name):
             data = self.user_history[name]
             is_left = data["leave_time"] is not None
-            return (1 if is_left else 0, name.lower())
+            if is_left:
+                return (2, 0, name.lower())
+            
+            if recent_speakers_first:
+                last_talk = self.last_talk_time.get(name, 0)
+                if last_talk > 0:
+                    return (0, -last_talk, name.lower())
+                else:
+                    return (1, 0, name.lower())
+            else:
+                return (0, 0, name.lower())
             
         display_names.sort(key=sort_key)
+
+        # Limit user list if enabled
+        if self.config.get("limit_users_enabled", False):
+            try:
+                limit_count = int(str(self.config.get("limit_users_count", "10")).strip())
+                if limit_count > 0:
+                    display_names = display_names[:limit_count]
+            except ValueError:
+                pass
         
         # Remove old labels not in display_names
         to_remove = []
@@ -390,14 +487,18 @@ class OverlayWindow(QWidget):
             is_new = history_enabled and not is_left and (current_time - data["join_time"] < history_duration)
             
             # Format text
-            display_text = name
+            from config import clean_nickname
+            clean_name = clean_nickname(name, self.config)
+            display_text = clean_name
             if is_left:
-                display_text = "✝ " + name
+                display_text = "✝ " + clean_name
             elif is_new:
-                display_text = "+ " + name
+                display_text = "+ " + clean_name
                 
             # Get talking state
-            talking = next((c["talking"] for c in clients if c["name"] == name), False)
+            talking = self.talking_now.get(name, False)
+            last_talk = self.last_talk_time.get(name, 0)
+            elapsed = current_time - last_talk
             
             # Create or update label
             if name not in self.labels:
@@ -422,8 +523,23 @@ class OverlayWindow(QWidget):
                 lbl.setStyleSheet(f"color: {col_left}; background-color: transparent; border: none;")
             elif talking:
                 lbl.setStyleSheet(f"color: {col_talking}; background-color: transparent; border: none;")
+            elif fade_duration > 0 and last_talk > 0 and elapsed < fade_duration:
+                progress = elapsed / fade_duration
+                col = interpolate_color(col_talking, col_normal, progress)
+                lbl.setStyleSheet(f"color: {col}; background-color: transparent; border: none;")
             else:
                 lbl.setStyleSheet(f"color: {col_normal}; background-color: transparent; border: none;")
+
+        # Start fade timer if any user is currently fading
+        if fade_duration > 0:
+            any_fading = any(
+                not self.talking_now.get(name, False) and (0 < self.last_talk_time.get(name, 0) and (current_time - self.last_talk_time.get(name, 0) < fade_duration))
+                for name in display_names
+                if self.user_history.get(name, {}).get("leave_time") is None
+            )
+            if any_fading and not self.fade_timer.isActive():
+                self.fade_timer.start(40)
+
                 
         if self.config.get("dynamic_width", True):
             # Layout constraint will automatically resize the window

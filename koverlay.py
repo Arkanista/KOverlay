@@ -111,11 +111,9 @@ class MainApp:
         self.tray.settings_requested.connect(self.show_settings)
         self.tray.quit_requested.connect(self.quit)
         
-        # TS3 Client
-        self.ts3_thread = TS3ClientThread(self.cfg.get("api_key", ""))
-        self.ts3_thread.clients_updated.connect(self.on_clients_updated)
-        self.ts3_thread.error_occurred.connect(self.on_ts3_error)
-        self.ts3_thread.start()
+        # Voice Client Backend (TS3 or Mumble)
+        self.voice_thread = None
+        self.start_voice_backend()
         
         # Window Tracker (for kdotool/EVE focus)
         self.tracker = WindowTracker(
@@ -128,8 +126,8 @@ class MainApp:
         for overlay in self.overlays.values():
             overlay.blink_finished.connect(self.on_blink_finished)
         
-        # Check if API key is missing
-        if not self.cfg.get("api_key"):
+        # Check if API key is missing (only for TS3 backend)
+        if self.cfg.get("voice_backend", "ts3") == "ts3" and not self.cfg.get("api_key"):
             self.show_settings()
             
         # Start the blink effect requested by the user
@@ -221,18 +219,46 @@ class MainApp:
         new_interval = self.cfg.get("polling_interval_ms", 50)
         if hasattr(self.tracker, 'polling_interval_ms') and self.tracker.polling_interval_ms != new_interval:
             self.tracker.polling_interval_ms = new_interval
-        
-        # Check if API key changed
-        if self.ts3_thread.api_key != self.cfg.get("api_key", ""):
-            self.ts3_thread.stop()
-            self.ts3_thread = TS3ClientThread(self.cfg.get("api_key", ""))
-            self.ts3_thread.clients_updated.connect(self.on_clients_updated)
-            self.ts3_thread.error_occurred.connect(self.on_ts3_error)
-            self.ts3_thread.start()
-            
+
+        # Check if voice backend or its connection settings changed
+        backend = self.cfg.get("voice_backend", "ts3")
+        need_restart = False
+        if getattr(self, 'voice_backend', None) != backend:
+            need_restart = True
+        elif backend == "ts3" and getattr(self.voice_thread, 'api_key', None) != self.cfg.get("api_key", ""):
+            need_restart = True
+        elif backend == "mumble" and getattr(self.voice_thread, 'port', None) != self.cfg.get("mumble_port", 25640):
+            need_restart = True
+
+        if need_restart:
+            self.start_voice_backend()
+
         # Force visibility sync for newly added overlays
         if hasattr(self, 'tracker') and hasattr(self.tracker, 'last_state'):
             self.on_active_window_changed(self.tracker.last_state)
+
+    def start_voice_backend(self):
+        if hasattr(self, 'voice_thread') and self.voice_thread is not None:
+            try:
+                self.voice_thread.stop()
+            except Exception:
+                pass
+            self.voice_thread = None
+
+        backend = self.cfg.get("voice_backend", "ts3")
+        self.voice_backend = backend
+
+        if backend == "mumble":
+            from mumble_client import MumbleClientThread
+            self.voice_thread = MumbleClientThread(port=self.cfg.get("mumble_port", 25640))
+        else:
+            from ts3_client import TS3ClientThread
+            self.voice_thread = TS3ClientThread(self.cfg.get("api_key", ""))
+
+        self.ts3_thread = self.voice_thread  # Backwards compatibility
+        self.voice_thread.clients_updated.connect(self.on_clients_updated)
+        self.voice_thread.error_occurred.connect(self.on_voice_error)
+        self.voice_thread.start()
         
     def on_settings_closed(self):
         self.settings_dialog = None
@@ -274,14 +300,18 @@ class MainApp:
                 continue
             overlay.hide()
             
-    def on_ts3_error(self, err_msg):
+    def on_voice_error(self, err_msg):
         # Just print for now, maybe add tray notification later
         print(err_msg)
+
+    def on_ts3_error(self, err_msg):
+        self.on_voice_error(err_msg)
 
     def quit(self):
         from tts_manager import get_tts_manager
         get_tts_manager().stop()
-        self.ts3_thread.stop()
+        if hasattr(self, 'voice_thread') and self.voice_thread:
+            self.voice_thread.stop()
         self.tracker.stop()
         self.app.quit()
 

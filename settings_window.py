@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QSlider, QCheckBox, QFontComboBox, QSpinBox, QColorDialog, QGroupBox, QComboBox, QScrollArea, QWidget, QMessageBox
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QSlider, QCheckBox, QFontComboBox, QSpinBox, QColorDialog, QGroupBox, QComboBox, QScrollArea, QWidget, QMessageBox, QRadioButton
 from PyQt6.QtCore import Qt, pyqtSignal, QObject, QEvent, QRegularExpression, QUrl
-from PyQt6.QtGui import QColor, QFont, QRegularExpressionValidator, QDesktopServices
+from PyQt6.QtGui import QColor, QFont, QRegularExpressionValidator, QDesktopServices, QIntValidator
 
 class ScrollFilter(QObject):
     def eventFilter(self, obj, event):
@@ -51,27 +51,70 @@ class SettingsWindow(QDialog):
         self.general_group = QGroupBox("General settings")
         general_group_layout = QVBoxLayout()
         
-        # API Key and Target Keywords
-        general_layout = QHBoxLayout()
-        
+        # Voice Platform Selection
+        backend_layout = QHBoxLayout()
+        backend_layout.addWidget(QLabel("<b>Voice Platform:</b>"))
+        self.backend_ts3_radio = QRadioButton("TeamSpeak 3")
+        self.backend_mumble_radio = QRadioButton("Mumble")
+
+        current_backend = self.config.get("voice_backend", "ts3")
+        if current_backend == "mumble":
+            self.backend_mumble_radio.setChecked(True)
+        else:
+            self.backend_ts3_radio.setChecked(True)
+
+        self.backend_ts3_radio.toggled.connect(self._on_backend_toggled)
+        self.backend_mumble_radio.toggled.connect(self._on_backend_toggled)
+
+        backend_layout.addWidget(self.backend_ts3_radio)
+        backend_layout.addWidget(self.backend_mumble_radio)
+        backend_layout.addStretch()
+        general_group_layout.addLayout(backend_layout)
+
+        # Platform specific widgets
+        # 1. TS3 Widget
+        self.ts3_widget = QWidget()
+        ts3_layout = QHBoxLayout(self.ts3_widget)
+        ts3_layout.setContentsMargins(0, 0, 0, 0)
         self.api_key_input = QLineEdit()
         self.api_key_input.setText(self.config.get("api_key", ""))
         self.api_key_input.setPlaceholderText("Enter TS3 API Key here")
         self.api_key_input.editingFinished.connect(self._on_change)
-        general_layout.addWidget(QLabel("TS3 API Key:"))
-        general_layout.addWidget(self.api_key_input)
-        
-        general_layout.addSpacing(20)
-        
+        ts3_layout.addWidget(QLabel("TS3 API Key:"))
+        ts3_layout.addWidget(self.api_key_input)
+        general_group_layout.addWidget(self.ts3_widget)
+
+        # 2. Mumble Widget
+        self.mumble_widget = QWidget()
+        mumble_layout = QHBoxLayout(self.mumble_widget)
+        mumble_layout.setContentsMargins(0, 0, 0, 0)
+        mumble_layout.addWidget(QLabel("Mumble IPC Port:"))
+        self.mumble_port_spin = QSpinBox()
+        self.mumble_port_spin.setRange(1024, 65535)
+        self.mumble_port_spin.setValue(self.config.get("mumble_port", 25640))
+        self.mumble_port_spin.valueChanged.connect(self._on_change)
+        mumble_layout.addWidget(self.mumble_port_spin)
+
+        self.mumble_install_btn = QPushButton("Install / Recompile Mumble Plugin")
+        self.mumble_install_btn.clicked.connect(self._install_mumble_plugin)
+        mumble_layout.addWidget(self.mumble_install_btn)
+        mumble_layout.addStretch()
+        general_group_layout.addWidget(self.mumble_widget)
+
+        # Sync initial visibility
+        self.ts3_widget.setVisible(self.backend_ts3_radio.isChecked())
+        self.mumble_widget.setVisible(self.backend_mumble_radio.isChecked())
+
+        # Target Window Keywords
+        keywords_layout = QHBoxLayout()
         self.keywords_input = QLineEdit()
         current_keywords = self.config.get("target_keywords", ["EVE - ", "exefile.exe"])
         self.keywords_input.setText(", ".join(current_keywords))
         self.keywords_input.setPlaceholderText("e.g. EVE - , exefile.exe")
         self.keywords_input.editingFinished.connect(self._on_change)
-        general_layout.addWidget(QLabel("Target Window Keywords (comma separated):"))
-        general_layout.addWidget(self.keywords_input)
-        
-        general_group_layout.addLayout(general_layout)
+        keywords_layout.addWidget(QLabel("Target Window Keywords (comma separated):"))
+        keywords_layout.addWidget(self.keywords_input)
+        general_group_layout.addLayout(keywords_layout)
         
         # Show Only in Game & Hide Delay
         delay_layout = QHBoxLayout()
@@ -135,6 +178,75 @@ class SettingsWindow(QDialog):
         
         self.history_group.setLayout(history_layout)
         layout.addWidget(self.history_group)
+
+        # Speakers and User List Behavior
+        self.speakers_group = QGroupBox("User List & Speaking Behavior")
+        speakers_layout = QVBoxLayout()
+
+        # Row 1: Put recent speakers at top & Limit users
+        row1_layout = QHBoxLayout()
+        self.recent_speakers_checkbox = QCheckBox("Add recent speakers to top of list")
+        self.recent_speakers_checkbox.setChecked(self.config.get("recent_speakers_first", False))
+        self.recent_speakers_checkbox.toggled.connect(self._on_change)
+        row1_layout.addWidget(self.recent_speakers_checkbox)
+        row1_layout.addSpacing(30)
+
+        self.limit_users_checkbox = QCheckBox("Limit user list to:")
+        self.limit_users_checkbox.setChecked(self.config.get("limit_users_enabled", False))
+        self.limit_users_checkbox.toggled.connect(self._on_change)
+        row1_layout.addWidget(self.limit_users_checkbox)
+
+        self.limit_users_input = QLineEdit()
+        self.limit_users_input.setValidator(QIntValidator(1, 9999))
+        self.limit_users_input.setText(str(self.config.get("limit_users_count", "10")))
+        self.limit_users_input.setFixedWidth(50)
+        self.limit_users_input.setEnabled(self.limit_users_checkbox.isChecked())
+        self.limit_users_checkbox.toggled.connect(self.limit_users_input.setEnabled)
+        self.limit_users_input.textChanged.connect(self._on_change)
+        row1_layout.addWidget(self.limit_users_input)
+        row1_layout.addWidget(QLabel("users"))
+        row1_layout.addStretch()
+        speakers_layout.addLayout(row1_layout)
+
+        # Row 2: Speaker fade duration (0-60s)
+        fade_layout = QHBoxLayout()
+        fade_layout.addWidget(QLabel("Keep recent speakers highlighted (fade duration):"))
+        self.speaker_fade_slider = QSlider(Qt.Orientation.Horizontal)
+        self.speaker_fade_slider.setRange(0, 60)
+        self.speaker_fade_slider.setValue(int(self.config.get("speaker_fade_duration", 5)))
+        fade_val = self.speaker_fade_slider.value()
+        self.speaker_fade_val_label = QLabel(f"{fade_val}s" if fade_val > 0 else "0s (Off)")
+        self.speaker_fade_val_label.setMinimumWidth(60)
+
+        def on_fade_slider_changed(val):
+            self.speaker_fade_val_label.setText(f"{val}s" if val > 0 else "0s (Off)")
+            self._on_change()
+
+        self.speaker_fade_slider.valueChanged.connect(on_fade_slider_changed)
+        fade_layout.addWidget(self.speaker_fade_slider)
+        fade_layout.addWidget(self.speaker_fade_val_label)
+        speakers_layout.addLayout(fade_layout)
+
+        # Row 3: Nickname cleaning (brackets & prefix list)
+        nick_layout = QHBoxLayout()
+        self.strip_brackets_checkbox = QCheckBox("Remove all bracket tags ([...], (...), {...})")
+        self.strip_brackets_checkbox.setChecked(self.config.get("strip_bracket_tags", False))
+        self.strip_brackets_checkbox.toggled.connect(self._on_change)
+        nick_layout.addWidget(self.strip_brackets_checkbox)
+        nick_layout.addSpacing(20)
+
+        self.nick_prefix_btn = QPushButton("Nick Prefixes...")
+        self.nick_prefix_btn.clicked.connect(self._open_prefix_window)
+        nick_layout.addWidget(self.nick_prefix_btn)
+        
+        prefix_count = len(self.config.get("nickname_prefixes", []))
+        self.prefix_count_label = QLabel(f"({prefix_count} custom)" if prefix_count > 0 else "")
+        nick_layout.addWidget(self.prefix_count_label)
+        nick_layout.addStretch()
+        speakers_layout.addLayout(nick_layout)
+
+        self.speakers_group.setLayout(speakers_layout)
+        layout.addWidget(self.speakers_group)
         
         # TTS Settings
         import importlib.util
@@ -649,6 +761,41 @@ class SettingsWindow(QDialog):
             self._update_text_color_left_btn()
             self._on_change()
             
+    def _on_backend_toggled(self):
+        if hasattr(self, 'ts3_widget') and hasattr(self, 'backend_ts3_radio'):
+            self.ts3_widget.setVisible(self.backend_ts3_radio.isChecked())
+        if hasattr(self, 'mumble_widget') and hasattr(self, 'backend_mumble_radio'):
+            self.mumble_widget.setVisible(self.backend_mumble_radio.isChecked())
+        self._on_change()
+
+    def _install_mumble_plugin(self):
+        import os
+        import subprocess
+        plugin_script = os.path.join(os.path.dirname(__file__), "mumble_plugin", "build_and_install.sh")
+        if not os.path.exists(plugin_script):
+            QMessageBox.critical(self, "Error", f"Build script not found at:\n{plugin_script}")
+            return
+        try:
+            res = subprocess.run(["bash", plugin_script], capture_output=True, text=True)
+            if res.returncode == 0:
+                QMessageBox.information(
+                    self,
+                    "Mumble Plugin Installed",
+                    "KOverlay Mumble Plugin successfully built and installed!\n\n"
+                    "Next step:\n"
+                    "1. Open Mumble\n"
+                    "2. Go to: Configure -> Settings -> Plugins\n"
+                    "3. Ensure 'KOverlay Mumble Plugin' is enabled."
+                )
+            else:
+                QMessageBox.critical(
+                    self,
+                    "Installation Failed",
+                    f"Failed to build/install plugin:\n\n{res.stderr or res.stdout}"
+                )
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to execute build script:\n{e}")
+
     def _on_change(self):
         if not hasattr(self, 'monitor_checkboxes'):
             return
@@ -661,6 +808,9 @@ class SettingsWindow(QDialog):
                 self.config["overlay_ids"][o_id] = {}
             self.config["overlay_ids"][o_id]["enabled"] = cb.isChecked()
             
+        self.config["voice_backend"] = "mumble" if hasattr(self, 'backend_mumble_radio') and self.backend_mumble_radio.isChecked() else "ts3"
+        if hasattr(self, 'mumble_port_spin'):
+            self.config["mumble_port"] = self.mumble_port_spin.value()
         self.config["api_key"] = self.api_key_input.text().strip()
         self.config["game_only"] = self.game_only_checkbox.isChecked()
         self.config["hide_delay_enabled"] = self.hide_delay_checkbox.isChecked()
@@ -700,7 +850,18 @@ class SettingsWindow(QDialog):
             self.config["tts_cache_retention_days"] = 0
             
         self.config["history_duration"] = self.history_dur_slider.value()
-        
+
+        if hasattr(self, 'recent_speakers_checkbox'):
+            self.config["recent_speakers_first"] = self.recent_speakers_checkbox.isChecked()
+        if hasattr(self, 'speaker_fade_slider'):
+            self.config["speaker_fade_duration"] = self.speaker_fade_slider.value()
+        if hasattr(self, 'limit_users_checkbox'):
+            self.config["limit_users_enabled"] = self.limit_users_checkbox.isChecked()
+        if hasattr(self, 'limit_users_input'):
+            self.config["limit_users_count"] = self.limit_users_input.text().strip()
+        if hasattr(self, 'strip_brackets_checkbox'):
+            self.config["strip_bracket_tags"] = self.strip_brackets_checkbox.isChecked()
+
         # Emit signal to inform main app to apply changes
         self.config_changed.emit()
         
@@ -709,6 +870,16 @@ class SettingsWindow(QDialog):
         dlg = AliasWindow(self.config.get("tts_aliases", {}), self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.config["tts_aliases"] = dlg.get_aliases()
+            self._on_change()
+        dlg.deleteLater()
+
+    def _open_prefix_window(self):
+        from prefix_window import PrefixWindow
+        dlg = PrefixWindow(self.config.get("nickname_prefixes", []), self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.config["nickname_prefixes"] = dlg.get_prefixes()
+            count = len(self.config["nickname_prefixes"])
+            self.prefix_count_label.setText(f"({count} custom)" if count > 0 else "")
             self._on_change()
         dlg.deleteLater()
 

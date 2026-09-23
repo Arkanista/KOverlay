@@ -4,6 +4,10 @@ __pycache__/
 venv/
 config.json
 *.pkg.tar.zst
+*.tar.gz
+*.zip
+*.so
 pkg/
 src/
 scratch/
+
