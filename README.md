@@ -1,5 +1,5 @@
 # <img src="icon.png" width="48" align="center"> KOverlay User Manual
-> ✨ *Entirely vibecoded by Gemini 3.1 Pro AI agent* ✨
+> ✨ *Entirely vibecoded by Gemini* ✨
 
 > [!TIP]
 > **What's New in v0.1.15-2:**
