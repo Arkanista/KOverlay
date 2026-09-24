@@ -29,5 +29,12 @@ if [ -d "$INSTALL_DIR" ]; then
     rm -rf "$INSTALL_DIR"
 fi
 
+# 3. Remove Mumble Plugin if installed
+MUMBLE_PLUGIN="$HOME/.local/share/Mumble/Mumble/Plugins/koverlay_mumble.so"
+if [ -f "$MUMBLE_PLUGIN" ]; then
+    echo "Removing KOverlay Mumble Plugin ($MUMBLE_PLUGIN)..."
+    rm -f "$MUMBLE_PLUGIN"
+fi
+
 echo "Uninstallation complete! The application has been removed from your system."
 echo "Note: The configuration files in ~/.config/ts3-overlay/ were kept intact. If you want to delete them as well, run: rm -rf ~/.config/ts3-overlay"

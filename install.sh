@@ -9,18 +9,18 @@ echo "Starting KOverlay installation..."
 if command -v apt &> /dev/null; then
     echo "Detected apt (Debian/Ubuntu/Mint)..."
     sudo apt update
-    sudo apt install -y python3 python3-venv python3-pip mpv xdotool
+    sudo apt install -y python3 python3-venv python3-pip mpv xdotool build-essential g++
 elif command -v pacman &> /dev/null; then
     echo "Detected pacman (Arch/Manjaro/CachyOS)..."
-    sudo pacman -Sy --needed python python-pip mpv xdotool
+    sudo pacman -Sy --needed python python-pip mpv xdotool base-devel gcc
 elif command -v dnf &> /dev/null; then
     echo "Detected dnf (Fedora)..."
-    sudo dnf install -y python3 python3-pip mpv xdotool
+    sudo dnf install -y python3 python3-pip mpv xdotool gcc-c++ make
 elif command -v zypper &> /dev/null; then
     echo "Detected zypper (openSUSE)..."
-    sudo zypper install -y python3 python3-pip mpv xdotool
+    sudo zypper install -y python3 python3-pip mpv xdotool gcc-c++ make
 else
-    echo "Unsupported package manager. Please install python3, python3-venv, pip, and mpv manually."
+    echo "Unsupported package manager. Please install python3, python3-venv, pip, mpv, and a C++ compiler manually."
 fi
 
 echo "Checking for required window tracking tools..."
@@ -44,18 +44,32 @@ INSTALL_DIR="$HOME/.local/share/koverlay"
 echo "Installing KOverlay to $INSTALL_DIR..."
 mkdir -p "$INSTALL_DIR"
 
-# Copy Python files, requirements, and app icon
+# Copy Python files, assets, and requirements
 cp *.py "$INSTALL_DIR/"
 cp icon.png "$INSTALL_DIR/"
 cp requirements.txt "$INSTALL_DIR/"
 
+# Copy Mumble plugin source and build files
+if [ -d "mumble_plugin" ]; then
+    echo "Copying Mumble plugin sources..."
+    mkdir -p "$INSTALL_DIR/mumble_plugin"
+    cp -r mumble_plugin/* "$INSTALL_DIR/mumble_plugin/"
+    
+    # Build and install Mumble plugin
+    if [ -f "$INSTALL_DIR/mumble_plugin/build_and_install.sh" ]; then
+        echo "Building and installing KOverlay Mumble Plugin..."
+        bash "$INSTALL_DIR/mumble_plugin/build_and_install.sh" || echo "Warning: Mumble plugin build skipped (can be compiled later via Settings window)."
+    fi
+fi
+
 echo "Installing icon sizes to /usr/share/icons/hicolor..."
 for size in 16 32 48 64 128 256 512; do
-    sudo mkdir -p "/usr/share/icons/hicolor/${size}x${size}/apps"
-    sudo cp "icons/koverlay-${size}.png" "/usr/share/icons/hicolor/${size}x${size}/apps/koverlay.png"
+    if [ -f "icons/koverlay-${size}.png" ]; then
+        sudo mkdir -p "/usr/share/icons/hicolor/${size}x${size}/apps"
+        sudo cp "icons/koverlay-${size}.png" "/usr/share/icons/hicolor/${size}x${size}/apps/koverlay.png"
+    fi
 done
-sudo gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
-# Note: start.sh is no longer needed as we use the venv directly in the desktop file
+sudo gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
 
 # 3. Setup Python Virtual Environment
 echo "Setting up Python virtual environment..."
@@ -67,12 +81,11 @@ fi
 # Generate start script
 cat > start.sh << EOL
 #!/bin/bash
-cd $INSTALL_DIR
-# Use venv python if exists
+cd "$INSTALL_DIR"
 if [ -d "venv" ]; then
-    exec ./venv/bin/python koverlay.py
+    exec ./venv/bin/python koverlay.py "\$@"
 else
-    exec python3 koverlay.py
+    exec python3 koverlay.py "\$@"
 fi
 EOL
 chmod +x start.sh
@@ -89,15 +102,17 @@ mkdir -p ~/.local/share/applications/
 # Generate desktop file dynamically with absolute path
 cat > ~/.local/share/applications/koverlay.desktop << EOL
 [Desktop Entry]
-Version=0.1.13-4
+Version=1.5
 Type=Application
 Name=KOverlay
-Comment=KOverlay - TS3 Overlay
+GenericName=Voice Overlay
+Comment=Universal TeamSpeak 3 and Mumble Overlay with TTS
 Exec="$INSTALL_DIR/venv/bin/python" "$INSTALL_DIR/koverlay.py"
 Path=$INSTALL_DIR
 Icon=koverlay
 Terminal=false
-Categories=Utility;Network;
+Categories=Utility;Network;Audio;
+Keywords=teamspeak;ts3;mumble;overlay;tts;eve;
 EOL
 
 # Update desktop database
