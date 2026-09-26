@@ -14,6 +14,10 @@
 
 Welcome to **KOverlay** – a powerful, modern overlay for Linux (X11 and Wayland) that integrates directly with **TeamSpeak 3** and **Mumble**, featuring voice announcements (TTS) of nicknames joining and leaving your channel! This step-by-step guide will explain how to configure the connection and what each option in the program menu does.
 
+<p align="center">
+  <img src="screenshots/settings_main.jpg" alt="KOverlay Settings Overview" width="800">
+</p>
+
 ---
 
 ## Part 1: Installation & Requirements
@@ -148,6 +152,10 @@ The *Settings* window offers highly advanced overlay customization. All options 
 *   **Limit user list:** Option to restrict the list to the top `X` active users.
 *   **Remove all bracket tags ([...], (...), {...}):** Strips leading tag brackets from player names (e.g. `[CORP] Player` -> `Player`).
 *   **Nick Prefixes...:** Opens a dedicated dialog to configure custom prefix strings to strip (e.g. `[VIP]`, `CLAN |`, etc.) from both overlay labels and TTS announcements.
+
+<p align="center">
+  <img src="screenshots/settings_appearance.png" alt="KOverlay Multi-Overlay & Appearance Settings" width="800">
+</p>
 
 ### Overlays Section
 *   **Enable Overlay 1 - 4:** KOverlay's architecture allows you to launch up to **four clones** of the overlay. This feature is dedicated to players operating on multiple monitors simultaneously. By checking the respective boxes, you "wake up" the corresponding display identifiers (IDs). For each awakened "ID", the system independently remembers its screen coordinates, allowing you to precisely assign Overlay 2 to the second monitor and Overlay 3 to the third.
