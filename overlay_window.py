@@ -462,14 +462,20 @@ class OverlayWindow(QWidget):
             
         display_names.sort(key=sort_key)
 
-        # Limit user list if enabled
+        # Separate active and left users so list limit only trims active users
+        active_display_names = [n for n in display_names if self.user_history[n]["leave_time"] is None]
+        left_display_names = [n for n in display_names if self.user_history[n]["leave_time"] is not None]
+
+        # Limit user list if enabled (trims active users, users who left are always preserved at the bottom)
         if self.config.get("limit_users_enabled", False):
             try:
                 limit_count = int(str(self.config.get("limit_users_count", "10")).strip())
                 if limit_count > 0:
-                    display_names = display_names[:limit_count]
+                    active_display_names = active_display_names[:limit_count]
             except ValueError:
                 pass
+        
+        display_names = active_display_names + left_display_names
         
         # Remove old labels not in display_names
         to_remove = []
