@@ -102,8 +102,18 @@ bool sendAll(int fd, const std::string &data) {
         if (sent > 0) {
             total += sent;
         } else if (sent < 0) {
-            // In non-blocking mode, if buffer is full or would block, drop the client
-            // rather than freezing Mumble with sleep/retry
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // Socket buffer momentarily full, wait up to 20ms for it to become writable
+                pollfd pfd{};
+                pfd.fd = fd;
+                pfd.events = POLLOUT;
+                int pret = poll(&pfd, 1, 20);
+                if (pret > 0 && (pfd.revents & POLLOUT)) {
+                    continue;
+                }
+            } else if (errno == EINTR) {
+                continue;
+            }
             return false;
         } else {
             return false;
@@ -145,18 +155,18 @@ void updateUserLocked(mumble_connection_t connection, mumble_userid_t userID) {
 
     // Get user name
     const char *namePtr = nullptr;
-    std::string name;
+    auto &info = g_users[userID];
     if (g_mumbleAPI.getUserName && g_mumbleAPI.getUserName(g_pluginID, connection, userID, &namePtr) == MUMBLE_STATUS_OK && namePtr) {
-        name = namePtr;
+        info.name = namePtr;
         if (g_mumbleAPI.freeMemory) {
             g_mumbleAPI.freeMemory(g_pluginID, namePtr);
         }
-    } else {
-        name = "User_" + std::to_string(userID);
+    } else if (info.name.empty()) {
+        // Only set fallback User_<ID> if we have never seen a valid name for this user
+        info.name = "User_" + std::to_string(userID);
     }
+    // If info.name is already set (e.g. from previous sync/events), keep it!
 
-    auto &info = g_users[userID];
-    info.name = name;
     info.channel_id = cid;
 }
 
