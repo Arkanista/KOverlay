@@ -425,8 +425,15 @@ MUMBLE_PLUGIN_EXPORT void MUMBLE_PLUGIN_CALLING_CONVENTION mumble_onChannelEnter
 }
 
 MUMBLE_PLUGIN_EXPORT void MUMBLE_PLUGIN_CALLING_CONVENTION mumble_onChannelExited(
-    mumble_connection_t, mumble_userid_t userID, mumble_channelid_t) {
+    mumble_connection_t, mumble_userid_t userID, mumble_channelid_t channelID) {
     std::lock_guard<std::mutex> lock(g_mutex);
+    if (channelID != g_localChannel) {
+        // Not our channel, ignore to avoid false updates
+        return;
+    }
+    if (userID == g_localUserID) {
+        g_localChannel = -1;
+    }
     auto it = g_users.find(userID);
     if (it != g_users.end()) {
         it->second.channel_id = -1;

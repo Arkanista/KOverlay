@@ -4,13 +4,13 @@
 > [!TIP]
 > **What's New in v0.1.16:**
 > - 🛡️ **Mumble Plugin Stability & Anti-Crash Architecture**: Completely eliminated application freezes (deadlocks) and crashes (Segmentation Faults) in Mumble. Background IPC server thread is now strictly decoupled from Mumble API calls, g_mutex deadlocks are resolved, client sockets utilize non-blocking I/O (`O_NONBLOCK`), and talking state updates are handled purely in-memory without redundant Mumble memory allocations.
+> - 🚫 **Eliminated Ghost Leave & Rejoin Bug**: Fixed `mumble_onChannelExited` channel ID filtering to completely prevent false leave/rejoin triggers and unintended TTS notifications when users move or leave other channels.
 > - 👥 **User List Limit & Leave History**: Users who left the channel (`✝`) are always kept visible at the bottom of the list during their history duration even when exceeding population limits.
 > - 🖼️ **Dedicated Screenshots Gallery**: Added full-resolution GUI screenshots directly to the documentation.
 > - 🛠️ **Universal Installer & Uninstaller Enhancements**: `install.sh` and `uninstall.sh` seamlessly manage Mumble C++ plugin deployment, desktop shortcuts, and python environment across all major distributions.
 > - 🎙️ **Full Mumble & TeamSpeak 3 Support**: Seamlessly switch between TS3 (ClientQuery) and Mumble (native C++ plugin with local IPC socket).
 > - 🏷️ **Nickname Prefix & Tag Stripping**: Automatically remove clan brackets (`[...]`, `(...)`, `{...}`) and custom prefixes (e.g. `[VIP]`, `CLAN |`) for both overlay labels and TTS announcements.
 > - 🔊 **Recent Speakers on Top & Fade**: Active speakers automatically jump to the top of the overlay, remaining highlighted with a customizable 0–60s fade-out timer.
-> - ⚡ **Strict Mumble Channel Filtering**: Channel tracking strictly displays only users in your current channel.
 
 Welcome to **KOverlay** – a powerful, modern overlay for Linux (X11 and Wayland) that integrates directly with **TeamSpeak 3** and **Mumble**, featuring voice announcements (TTS) of nicknames joining and leaving your channel! This step-by-step guide will explain how to configure the connection and what each option in the program menu does.
 
