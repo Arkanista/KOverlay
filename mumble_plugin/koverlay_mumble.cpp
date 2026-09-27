@@ -102,10 +102,8 @@ bool sendAll(int fd, const std::string &data) {
         if (sent > 0) {
             total += sent;
         } else if (sent < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
-                usleep(1000);
-                continue;
-            }
+            // In non-blocking mode, if buffer is full or would block, drop the client
+            // rather than freezing Mumble with sleep/retry
             return false;
         } else {
             return false;
@@ -225,7 +223,6 @@ void ipcServerLoop() {
         g_serverSocket = serverFd;
     }
 
-    int pollCount = 0;
     while (g_running) {
         pollfd pfd{};
         pfd.fd = serverFd;
@@ -237,38 +234,20 @@ void ipcServerLoop() {
             socklen_t clientLen = sizeof(clientAddr);
             int clientFd = accept(serverFd, reinterpret_cast<sockaddr *>(&clientAddr), &clientLen);
             if (clientFd >= 0) {
-                // Set non-blocking or short timeout for safety
+                // Set non-blocking mode on client socket
+                int flags = fcntl(clientFd, F_GETFL, 0);
+                if (flags != -1) {
+                    fcntl(clientFd, F_SETFL, flags | O_NONBLOCK);
+                }
+
                 std::lock_guard<std::mutex> lock(g_mutex);
                 g_clients.push_back(clientFd);
 
-                // Refresh user list if connected
-                if (g_hasAPI) {
-                    mumble_connection_t conn = -1;
-                    if (g_mumbleAPI.getActiveServerConnection && g_mumbleAPI.getActiveServerConnection(g_pluginID, &conn) == MUMBLE_STATUS_OK && conn >= 0) {
-                        syncAllUsersLocked(conn);
-                    }
-                }
-
-                // Send immediate snapshot to newly connected client
+                // Note: DO NOT call Mumble API from this thread!
+                // Mumble API queries from non-main threads can cause deadlocks with Qt's main event loop.
+                // We serve the current in-memory snapshot immediately.
                 std::string snapshot = buildStateJsonLocked();
-                send(clientFd, snapshot.c_str(), snapshot.size(), MSG_NOSIGNAL);
-            }
-        }
-
-        // Periodic check every ~600ms if clients are connected
-        pollCount++;
-        if (pollCount >= 3) {
-            pollCount = 0;
-            std::lock_guard<std::mutex> lock(g_mutex);
-            if (!g_clients.empty() && g_hasAPI) {
-                mumble_connection_t conn = -1;
-                if (g_mumbleAPI.getActiveServerConnection && g_mumbleAPI.getActiveServerConnection(g_pluginID, &conn) == MUMBLE_STATUS_OK && conn >= 0) {
-                    mumble_channelid_t prevChannel = g_localChannel;
-                    syncAllUsersLocked(conn);
-                    if (prevChannel != g_localChannel) {
-                        broadcastStateLocked();
-                    }
-                }
+                sendAll(clientFd, snapshot);
             }
         }
     }
@@ -383,8 +362,14 @@ MUMBLE_PLUGIN_EXPORT void MUMBLE_PLUGIN_CALLING_CONVENTION mumble_onUserTalkingS
                       talkingState == MUMBLE_TS_WHISPERING ||
                       talkingState == MUMBLE_TS_SHOUTING);
 
-    updateUserLocked(connection, userID);
-    g_users[userID].talking = isTalking;
+    auto it = g_users.find(userID);
+    if (it != g_users.end()) {
+        it->second.talking = isTalking;
+    } else {
+        // Fallback: if user was not yet registered, update info
+        updateUserLocked(connection, userID);
+        g_users[userID].talking = isTalking;
+    }
 
     broadcastStateLocked();
 }
@@ -429,15 +414,23 @@ MUMBLE_PLUGIN_EXPORT void MUMBLE_PLUGIN_CALLING_CONVENTION mumble_onChannelEnter
     if (userID == g_localUserID) {
         g_localChannel = newChannelID;
     }
-    updateUserLocked(connection, userID);
-    g_users[userID].channel_id = newChannelID;
+    auto it = g_users.find(userID);
+    if (it != g_users.end()) {
+        it->second.channel_id = newChannelID;
+    } else {
+        updateUserLocked(connection, userID);
+        g_users[userID].channel_id = newChannelID;
+    }
     broadcastStateLocked();
 }
 
 MUMBLE_PLUGIN_EXPORT void MUMBLE_PLUGIN_CALLING_CONVENTION mumble_onChannelExited(
-    mumble_connection_t connection, mumble_userid_t userID, mumble_channelid_t) {
+    mumble_connection_t, mumble_userid_t userID, mumble_channelid_t) {
     std::lock_guard<std::mutex> lock(g_mutex);
-    updateUserLocked(connection, userID);
+    auto it = g_users.find(userID);
+    if (it != g_users.end()) {
+        it->second.channel_id = -1;
+    }
     broadcastStateLocked();
 }
 
