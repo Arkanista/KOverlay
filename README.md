@@ -67,37 +67,55 @@ Building from source automatically handles dependency resolution, including AUR 
 
 #### Method B: Install the Pre-compiled Pacman Package
 1. Download the pre-compiled package from GitHub releases:
-   👉 **[Download KOverlay v0.1.18 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.18/koverlay-0.1.18-1-any.pkg.tar.zst)**
+   👉 **[Download KOverlay v0.1.19-2 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.19-2/koverlay-0.1.19-2-any.pkg.tar.zst)**
 2. **Important Note on Dependencies**: The package depends on `kdotool` (which is in the AUR). Standard `pacman` cannot automatically resolve or download AUR dependencies. You must install `kdotool` first:
    ```bash
    yay -S kdotool   # or: paru -S kdotool
    ```
 3. Install the downloaded package:
    ```bash
-   sudo pacman -U koverlay-0.1.18-1-any.pkg.tar.zst
+   sudo pacman -U koverlay-0.1.19-2-any.pkg.tar.zst
    # Alternatively, let your AUR helper resolve dependencies and install the local package:
-   yay -U koverlay-0.1.18-1-any.pkg.tar.zst
+   yay -U koverlay-0.1.19-2-any.pkg.tar.zst
    ```
 
 ### Microsoft Windows (10 / 11)
 
-KOverlay provides a standalone, single-file setup wizard (`KOverlay_Setup.exe`) that includes an isolated Python 3.11 embeddable environment, all required libraries (PyQt6, ts3, edge-tts), and high-resolution icons. No prior Python installation, administrator privileges, or command-line experience is required.
+KOverlay offers two convenient ways to run on Windows: a standalone setup wizard (`KOverlay_Setup.exe`) and a zero-install portable archive (`KOverlay_Portable.zip`). Both include an isolated Python 3.11 embeddable environment, all required libraries (PyQt6, ts3, edge-tts), and high-resolution icons. No prior Python installation or administrator privileges are required.
 
-#### Installing via Setup Wizard (Recommended)
+> [!IMPORTANT]
+> **KOverlay must remain running in the background (system tray)** for the overlay to appear over your game. If KOverlay is closed, the voice overlay will not be visible.
+
+#### Option 1: Setup Wizard (Recommended)
 1. Download the latest installer:
-   👉 **[Download KOverlay_Setup.exe (v0.1.18)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.18/KOverlay_Setup.exe)**
-2. Run `KOverlay_Setup.exe`.
+   👉 **[Download KOverlay_Setup.exe (v0.1.19-2)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.19-2/KOverlay_Setup.exe)**
+2. Run `KOverlay_Setup.exe`:
    - Administrator rights are **not** required. The program installs directly into your user profile: `%LOCALAPPDATA%\Programs\KOverlay`.
+   - **Mumble Check:** If Mumble is running, the installer will inform you and prompt you to close Mumble so it can safely install the Mumble plugin.
 3. Check the box if you want a **Desktop shortcut**, then click **Install**.
-4. On first launch, KOverlay will automatically open the **Settings** window and dock quietly into your Windows System Tray (next to the clock).
+4. On first launch, KOverlay will automatically open the **Settings** window and dock into your Windows System Tray (next to the clock).
+
+#### Option 2: Portable Archive (.zip)
+1. Download the portable package:
+   👉 **[Download KOverlay_Portable.zip (v0.1.19-2)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.19-2/KOverlay_Portable.zip)**
+2. Extract the `.zip` archive to any folder of your choice (e.g. `C:\Games\KOverlay` or your Desktop).
+3. **If you use Mumble:**
+   - Make sure Mumble is closed.
+   - Run `INSTALL_MUMBLE_PLUGIN.bat` inside the extracted folder to automatically install `koverlay_mumble.dll` to `%APPDATA%\Mumble\Mumble\Plugins`.
+   - Alternatively, you can manually copy `mumble_plugin\koverlay_mumble.dll` into `%APPDATA%\Mumble\Mumble\Plugins\`.
+   - Launch Mumble, go to **Settings &rarr; Plugins**, and verify that **KOverlay Mumble Plugin** is enabled.
+4. **Launch KOverlay:**
+   - Double-click `KOverlay.bat` to run KOverlay in the background (using `pythonw.exe`).
+   - An icon will appear in your system tray (near the clock). Right-click it to open Settings or adjust your overlays.
+   - If you need to view live console logs for debugging, run `KOverlay_Debug.bat`.
 
 #### Running and Debugging on Windows
 - **Desktop & Start Menu Shortcuts:** Launches KOverlay directly without showing a background terminal window (using `pythonw.exe`).
-- **Diagnostic Console Mode:** If you ever need to inspect debug logs in real time, run `KOverlay_Debug.bat` located inside the installation directory (`%LOCALAPPDATA%\Programs\KOverlay`).
+- **Diagnostic Console Mode:** If you ever need to inspect debug logs in real time, run `KOverlay_Debug.bat`.
 - **Crash Reports:** In the rare event of an unhandled exception, KOverlay displays a native Windows error dialog with details and logs the traceback to `%LOCALAPPDATA%\koverlay\crash.log`.
 
 #### Uninstallation on Windows
-To completely remove KOverlay, open **Windows Settings &rarr; Apps &rarr; Installed apps**, find **KOverlay**, and click **Uninstall** (or run `unins000.exe` in the application folder). User configuration is stored in `%APPDATA%\koverlay`.
+To remove KOverlay when installed via Setup Wizard, open **Windows Settings &rarr; Apps &rarr; Installed apps**, find **KOverlay**, and click **Uninstall** (or run `unins000.exe` in the application folder). For the portable version, simply delete the extracted folder. User configuration is stored in `%APPDATA%\koverlay`.
 
 ### Ubuntu / Debian / Linux Mint / Pop!_OS / Fedora / Nobara / openSUSE
 For other distributions, a robust, universal installer script is provided:

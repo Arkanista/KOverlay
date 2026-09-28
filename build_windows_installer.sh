@@ -91,6 +91,68 @@ echo [KOverlay exited with code: %ERRORLEVEL%]
 pause
 EOF
 
+cat << 'EOF' > "$BUNDLE_DIR/INSTALL_MUMBLE_PLUGIN.bat"
+@echo off
+setlocal
+echo ========================================================
+echo   Installing KOverlay Mumble Plugin
+echo ========================================================
+echo.
+
+set "DEST=%APPDATA%\Mumble\Mumble\Plugins"
+if not exist "%DEST%" (
+    mkdir "%DEST%" 2>nul
+)
+
+if not exist "%~dp0mumble_plugin\koverlay_mumble.dll" (
+    echo [ERROR] Plugin file koverlay_mumble.dll not found in mumble_plugin folder!
+    pause
+    exit /b 1
+)
+
+copy /y "%~dp0mumble_plugin\koverlay_mumble.dll" "%DEST%\" >nul
+if %ERRORLEVEL% equ 0 (
+    echo [OK] Successfully installed koverlay_mumble.dll to:
+    echo      %DEST%
+    echo.
+    echo Please restart Mumble and verify the plugin is enabled in:
+    echo Settings -^> Plugins -^> KOverlay Mumble Plugin
+) else (
+    echo [ERROR] Failed to copy plugin. If Mumble is running, please close it and try again.
+)
+echo.
+pause
+EOF
+
+cat << 'EOF' > "$BUNDLE_DIR/PORTABLE_README.txt"
+========================================================================
+                      KOverlay Portable for Windows
+========================================================================
+
+1. RUNNING KOVERLAY:
+   - Double-click "KOverlay.bat" to start KOverlay in the background.
+   - An icon will appear in your system tray (near the clock).
+   - Right-click the tray icon to open Settings or adjust overlays.
+   - IMPORTANT: KOverlay must remain running in the background for
+     the voice overlay to appear over your games.
+   - If you encounter any issues, run "KOverlay_Debug.bat" to view
+     diagnostic logs in a console window.
+
+2. FOR MUMBLE USERS:
+   - Double-click "INSTALL_MUMBLE_PLUGIN.bat" (make sure Mumble is
+     closed first) to copy the Mumble plugin automatically into
+     %APPDATA%\Mumble\Mumble\Plugins.
+   - Alternatively, you can manually copy "mumble_plugin\koverlay_mumble.dll"
+     into "%APPDATA%\Mumble\Mumble\Plugins\".
+   - Restart Mumble, go to Settings -> Plugins, and make sure
+     "KOverlay Mumble Plugin" is enabled.
+
+3. FOR TEAMSPEAK 3 USERS:
+   - Open TeamSpeak 3, enable ClientQuery plugin (Tools -> Options -> Addons).
+   - In KOverlay Settings, choose "TeamSpeak 3" and enter your API Key.
+========================================================================
+EOF
+
 # 4. Generate Inno Setup Script
 VERSION=$(grep -m1 '^pkgver=' "$SCRIPT_DIR/PKGBUILD" | cut -d= -f2 | tr -d ' ')
 if [ -z "$VERSION" ]; then
@@ -142,12 +204,45 @@ Name: "{autodesktop}\\{#MyAppName}"; Filename: "{app}\\python\\pythonw.exe"; Par
 
 [Run]
 Filename: "{app}\\python\\pythonw.exe"; Parameters: """{app}\\koverlay.py"""; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+function IsProcessRunning(const ExeName: string): Boolean;
+var
+  ResultCode: Integer;
+  Cmd: string;
+begin
+  Cmd := '/c tasklist /FI "IMAGENAME eq ' + ExeName + '" /NH | find /i "' + ExeName + '"';
+  if Exec(ExpandConstant('{cmd}'), Cmd, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    Result := (ResultCode = 0)
+  else
+    Result := False;
+end;
+
+function InitializeSetup(): Boolean;
+begin
+  Result := True;
+  while IsProcessRunning('mumble.exe') do
+  begin
+    if MsgBox('Mumble is currently running and must be closed before installing KOverlay.'#13#10#13#10 +
+              'Please close Mumble, then click Retry to continue (or Cancel to abort installation).',
+              mbError, MB_RETRYCANCEL) = IDCANCEL then
+    begin
+      Result := False;
+      Exit;
+    end;
+  end;
+end;
 EOF
 
 ISCC_BIN="$HOME/.wine/drive_c/innosetup/ISCC.exe"
 WINEDEBUG=-all wine "$ISCC_BIN" "Z:\\$BUILD_DIR\\installer.iss"
 
+# 5. Build Portable ZIP archive
+echo "[5/5] Creating portable ZIP archive: dist/KOverlay_Portable.zip..."
+rm -f "$OUTPUT_DIR/KOverlay_Portable.zip"
+(cd "$BUILD_DIR" && 7z a -tzip -mx=7 "$OUTPUT_DIR/KOverlay_Portable.zip" ./bundle/* >/dev/null)
+
 echo "=========================================================="
-echo "    SUCCESS! Installer ready at: dist/KOverlay_Setup.exe  "
+echo "    SUCCESS! Build artifacts ready at: $OUTPUT_DIR        "
 echo "=========================================================="
-ls -lh "$OUTPUT_DIR/KOverlay_Setup.exe"
+ls -lh "$OUTPUT_DIR/KOverlay_Setup.exe" "$OUTPUT_DIR/KOverlay_Portable.zip"
