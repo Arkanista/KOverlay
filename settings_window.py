@@ -55,6 +55,20 @@ class SettingsWindow(QDialog):
         
         self.container_widget = QWidget()
         layout = QVBoxLayout(self.container_widget)
+
+        # Prominent Info Banner
+        self.banner_label = QLabel("ℹ️ <b>Important:</b> KOverlay must remain running in the background (system tray) for the overlay to appear.")
+        self.banner_label.setStyleSheet("""
+            QLabel {
+                background-color: rgba(30, 144, 255, 0.15);
+                color: #dbeafe;
+                border: 1px solid rgba(59, 130, 246, 0.45);
+                border-radius: 6px;
+                padding: 10px 14px;
+                font-size: 11pt;
+            }
+        """)
+        layout.addWidget(self.banner_label)
         
         # General Settings Group
         self.general_group = QGroupBox("General settings")

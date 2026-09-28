@@ -164,9 +164,9 @@ class MainApp:
         # Show notification so user knows KOverlay is running in system tray
         self.tray.showMessage(
             "KOverlay",
-            "Application is running in the system tray (near the clock).\nRight-click the tray icon to access Settings.",
+            "KOverlay is running in the system tray.\nIMPORTANT: KOverlay must remain running for the overlay to appear!\nRight-click tray icon to open Settings.",
             self.tray.MessageIcon.Information,
-            4000
+            5000
         )
 
         if self.first_run:
