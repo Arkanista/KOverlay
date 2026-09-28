@@ -97,6 +97,23 @@ std::string buildStateJsonLocked() {
                 continue;
             }
 
+            // If username is unknown, empty, or fallback/placeholder, never include it in the overlay
+            if (u.name.empty()) {
+                continue;
+            }
+            if (u.name.rfind("User_", 0) == 0 || u.name.rfind("user_", 0) == 0) {
+                bool onlyDigits = true;
+                for (size_t i = 5; i < u.name.size(); ++i) {
+                    if (!std::isdigit(static_cast<unsigned char>(u.name[i]))) {
+                        onlyDigits = false;
+                        break;
+                    }
+                }
+                if (onlyDigits && u.name.size() > 5) {
+                    continue;
+                }
+            }
+
             if (!first) json += ",";
             first = false;
 
@@ -175,15 +192,15 @@ void updateUserLocked(mumble_connection_t connection, mumble_userid_t userID) {
     const char *namePtr = nullptr;
     auto &info = g_users[userID];
     if (g_mumbleAPI.getUserName && g_mumbleAPI.getUserName(g_pluginID, connection, userID, &namePtr) == MUMBLE_STATUS_OK && namePtr) {
-        info.name = namePtr;
+        if (namePtr[0] != '\0') {
+            info.name = namePtr;
+        }
         if (g_mumbleAPI.freeMemory) {
             g_mumbleAPI.freeMemory(g_pluginID, namePtr);
         }
-    } else if (info.name.empty()) {
-        // Only set fallback User_<ID> if we have never seen a valid name for this user
-        info.name = "User_" + std::to_string(userID);
     }
-    // If info.name is already set (e.g. from previous sync/events), keep it!
+    // Never fallback to "User_" + userID. If the name is unknown, leave it empty
+    // so the overlay silently ignores it until a valid name is resolved.
 
     info.channel_id = cid;
 }

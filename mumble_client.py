@@ -1,6 +1,7 @@
 import time
 import socket
 import json
+import re
 from PyQt6.QtCore import QThread, pyqtSignal
 
 class MumbleClientThread(QThread):
@@ -58,8 +59,14 @@ class MumbleClientThread(QThread):
                     try:
                         payload = json.loads(line)
                         if payload.get("type") == "update":
-                            clients = payload.get("clients", [])
+                            raw_clients = payload.get("clients", [])
                             channel_id = payload.get("channel_id")
+                            clients = []
+                            for c in raw_clients:
+                                name = (c.get("name") or "").strip()
+                                if not name or re.match(r"^[Uu]ser_\d+$", name) or name.lower() == "unknown":
+                                    continue
+                                clients.append(c)
                             self.clients_updated.emit(clients, channel_id)
                     except json.JSONDecodeError:
                         pass

@@ -1,5 +1,6 @@
 import time
 import socket
+import re
 from PyQt6.QtCore import QThread, pyqtSignal
 
 class TS3ClientThread(QThread):
@@ -82,7 +83,9 @@ class TS3ClientThread(QThread):
                 if filter_cid and client_dict.get('cid') != filter_cid:
                     continue
                     
-                name = client_dict.get('client_nickname', 'Unknown')
+                name = (client_dict.get('client_nickname') or '').strip()
+                if not name or name.lower() == 'unknown' or re.match(r"^[Uu]ser_\d+$", name):
+                    continue
                 talking = client_dict.get('client_flag_talking') == '1'
                 
                 if 'clid' in client_dict:

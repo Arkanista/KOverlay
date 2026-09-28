@@ -4,6 +4,7 @@ from PyQt6.QtGui import QColor, QPixmap, QPainter, QPen
 import time
 import sys
 import os
+import re
 
 def interpolate_color(col_from_str, col_to_str, progress):
     progress = max(0.0, min(1.0, progress))
@@ -371,9 +372,25 @@ class OverlayWindow(QWidget):
             self.update_clients(self.last_clients, getattr(self, 'current_cid', None))
 
     def update_clients(self, clients, my_cid=None):
+        # Filter out unknown/placeholder/User_XX names so they are never displayed or announced
+        clean_clients = []
+        for c in clients:
+            name = (c.get("name") or "").strip()
+            if not name or re.match(r"^[Uu]ser_\d+$", name) or name.lower() == "unknown":
+                continue
+            clean_clients.append(c)
+        clients = clean_clients
+
         self.last_clients = clients
         import time
         current_time = time.time()
+
+        # Purge any previously stored invalid placeholder users from history
+        for k in list(self.user_history.keys()):
+            if not k or re.match(r"^[Uu]ser_\d+$", k) or k.lower() == "unknown":
+                self.user_history.pop(k, None)
+                self.last_talk_time.pop(k, None)
+                self.talking_now.pop(k, None)
         
         history_enabled = self.config.get("history_enabled", False)
         history_duration = self.config.get("history_duration", 60)

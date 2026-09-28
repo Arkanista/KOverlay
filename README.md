@@ -2,12 +2,13 @@
 > ✨ *Entirely vibecoded by Gemini* ✨
 
 > [!TIP]
-> **What's New in v0.1.17:**
+> **What's New in v0.1.18:**
+> - 🛡️ **Placeholder & Unknown User Suppression**: Completely eliminated display and TTS voice announcements of unresolved user names (such as `User_XX` or `Unknown`). If an error occurs or a client's nickname is temporarily not yet resolved by Mumble/TS3, the overlay fails silently and cleanly without showing dummy user labels.
 > - 🪟 **Native Windows 10 & 11 Support**: Standalone single-file setup wizard (`KOverlay_Setup.exe`) with bundled Python 3.11 embeddable runtime, direct Desktop and Start Menu shortcuts, Win32 transparent click-through window styles, and `%APPDATA%\koverlay` configuration storage.
 > - 🔊 **Windows Audio & Edge TTS**: Native Windows MCI audio playback engine for Edge TTS voice announcements without requiring external command-line players (no mpv or ffmpeg needed on Windows).
 > - 🎯 **Win32 Window Tracking**: Native Windows game detection using Win32 API (`GetForegroundWindow`, `GetWindowTextW`) to automatically hide/show overlays when switching tasks.
 > - 🛠️ **First-Run Experience & Crash Reporter**: Automatic settings window launch on first run, tray notifications, and built-in crash logger with native error dialogs (`MessageBoxW`) for seamless diagnostics.
-> - 🎙️ **Mumble Plugin Setup on Windows**: Interactive guide in Settings to quickly install and configure the Mumble C++ plugin on Windows.
+> - 🎙️ **Mumble Plugin Setup on Windows**: Interactive guide in Settings to quickly install and configure the Mumble C++ plugin on Windows, automatically deploying to `%APPDATA%\Mumble\Mumble\Plugins`.
 > - 🛡️ **Mumble Plugin Stability (Linux & Windows)**: Background IPC server thread decoupled from Mumble API calls, non-blocking I/O (`O_NONBLOCK`), and in-memory talking state updates.
 
 Welcome to **KOverlay** – a powerful, modern overlay for Linux (X11 and Wayland) that integrates directly with **TeamSpeak 3** and **Mumble**, featuring voice announcements (TTS) of nicknames joining and leaving your channel! This step-by-step guide will explain how to configure the connection and what each option in the program menu does.
@@ -64,16 +65,16 @@ Building from source automatically handles dependency resolution, including AUR 
 
 #### Method B: Install the Pre-compiled Pacman Package
 1. Download the pre-compiled package from GitHub releases:
-   👉 **[Download KOverlay v0.1.17 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.17/koverlay-0.1.17-1-any.pkg.tar.zst)**
+   👉 **[Download KOverlay v0.1.18 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.18/koverlay-0.1.18-1-any.pkg.tar.zst)**
 2. **Important Note on Dependencies**: The package depends on `kdotool` (which is in the AUR). Standard `pacman` cannot automatically resolve or download AUR dependencies. You must install `kdotool` first:
    ```bash
    yay -S kdotool   # or: paru -S kdotool
    ```
 3. Install the downloaded package:
    ```bash
-   sudo pacman -U koverlay-0.1.17-1-any.pkg.tar.zst
+   sudo pacman -U koverlay-0.1.18-1-any.pkg.tar.zst
    # Alternatively, let your AUR helper resolve dependencies and install the local package:
-   yay -U koverlay-0.1.17-1-any.pkg.tar.zst
+   yay -U koverlay-0.1.18-1-any.pkg.tar.zst
    ```
 
 ### Microsoft Windows (10 / 11)
@@ -82,7 +83,7 @@ KOverlay provides a standalone, single-file setup wizard (`KOverlay_Setup.exe`) 
 
 #### Installing via Setup Wizard (Recommended)
 1. Download the latest installer:
-   👉 **[Download KOverlay_Setup.exe (v0.1.17)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.17/KOverlay_Setup.exe)**
+   👉 **[Download KOverlay_Setup.exe (v0.1.18)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.18/KOverlay_Setup.exe)**
 2. Run `KOverlay_Setup.exe`.
    - Administrator rights are **not** required. The program installs directly into your user profile: `%LOCALAPPDATA%\Programs\KOverlay`.
 3. Check the box if you want a **Desktop shortcut**, then click **Install**.
@@ -177,9 +178,9 @@ KOverlay connects to Mumble via a high-performance native plugin and a local IPC
 
 > [!TIP]
 > You can also download the standalone plugin or unified bundle directly from GitHub releases:
-> - **[koverlay_mumble.mumble_plugin (Universal Bundle)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.17/koverlay_mumble.mumble_plugin)** (Double-click or import via Mumble's "Install plugin" button)
-> - **[koverlay_mumble.dll (Windows x64)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.17/koverlay_mumble.dll)**
-> - **[koverlay_mumble.so (Linux x64)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.17/koverlay_mumble.so)**
+> - **[koverlay_mumble.mumble_plugin (Universal Bundle)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.18/koverlay_mumble.mumble_plugin)** (Double-click or import via Mumble's "Install plugin" button)
+> - **[koverlay_mumble.dll (Windows x64)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.18/koverlay_mumble.dll)**
+> - **[koverlay_mumble.so (Linux x64)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.18/koverlay_mumble.so)**
 
 ---
 

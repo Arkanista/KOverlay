@@ -96,7 +96,7 @@ echo "[5/5] Compiling standalone KOverlay_Setup.exe via Inno Setup..."
 
 cat << EOF > "$BUILD_DIR/installer.iss"
 #define MyAppName "KOverlay"
-#define MyAppVersion "0.1.17"
+#define MyAppVersion "0.1.18"
 #define MyAppPublisher "Arkanis"
 #define MyAppURL "https://github.com/Arkanis/KOverlay"
 
