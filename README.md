@@ -2,15 +2,13 @@
 > ✨ *Entirely vibecoded by Gemini* ✨
 
 > [!TIP]
-> **What's New in v0.1.16:**
-> - 🛡️ **Mumble Plugin Stability & Anti-Crash Architecture**: Completely eliminated application freezes (deadlocks) and crashes (Segmentation Faults) in Mumble. Background IPC server thread is now strictly decoupled from Mumble API calls, g_mutex deadlocks are resolved, client sockets utilize non-blocking I/O (`O_NONBLOCK`), and talking state updates are handled purely in-memory without redundant Mumble memory allocations.
-> - 🚫 **Eliminated Ghost Leave & Rejoin Bug**: Fixed `mumble_onChannelExited` channel ID filtering to completely prevent false leave/rejoin triggers and unintended TTS notifications when users move or leave other channels.
-> - 👥 **User List Limit & Leave History**: Users who left the channel (`✝`) are always kept visible at the bottom of the list during their history duration even when exceeding population limits.
-> - 🖼️ **Dedicated Screenshots Gallery**: Added full-resolution GUI screenshots directly to the documentation.
-> - 🛠️ **Universal Installer & Uninstaller Enhancements**: `install.sh` and `uninstall.sh` seamlessly manage Mumble C++ plugin deployment, desktop shortcuts, and python environment across all major distributions.
-> - 🎙️ **Full Mumble & TeamSpeak 3 Support**: Seamlessly switch between TS3 (ClientQuery) and Mumble (native C++ plugin with local IPC socket).
-> - 🏷️ **Nickname Prefix & Tag Stripping**: Automatically remove clan brackets (`[...]`, `(...)`, `{...}`) and custom prefixes (e.g. `[VIP]`, `CLAN |`) for both overlay labels and TTS announcements.
-> - 🔊 **Recent Speakers on Top & Fade**: Active speakers automatically jump to the top of the overlay, remaining highlighted with a customizable 0–60s fade-out timer.
+> **What's New in v0.1.17:**
+> - 🪟 **Native Windows 10 & 11 Support**: Standalone single-file setup wizard (`KOverlay_Setup.exe`) with bundled Python 3.11 embeddable runtime, direct Desktop and Start Menu shortcuts, Win32 transparent click-through window styles, and `%APPDATA%\koverlay` configuration storage.
+> - 🔊 **Windows Audio & Edge TTS**: Native Windows MCI audio playback engine for Edge TTS voice announcements without requiring external command-line players (no mpv or ffmpeg needed on Windows).
+> - 🎯 **Win32 Window Tracking**: Native Windows game detection using Win32 API (`GetForegroundWindow`, `GetWindowTextW`) to automatically hide/show overlays when switching tasks.
+> - 🛠️ **First-Run Experience & Crash Reporter**: Automatic settings window launch on first run, tray notifications, and built-in crash logger with native error dialogs (`MessageBoxW`) for seamless diagnostics.
+> - 🎙️ **Mumble Plugin Setup on Windows**: Interactive guide in Settings to quickly install and configure the Mumble C++ plugin on Windows.
+> - 🛡️ **Mumble Plugin Stability (Linux & Windows)**: Background IPC server thread decoupled from Mumble API calls, non-blocking I/O (`O_NONBLOCK`), and in-memory talking state updates.
 
 Welcome to **KOverlay** – a powerful, modern overlay for Linux (X11 and Wayland) that integrates directly with **TeamSpeak 3** and **Mumble**, featuring voice announcements (TTS) of nicknames joining and leaving your channel! This step-by-step guide will explain how to configure the connection and what each option in the program menu does.
 
@@ -66,17 +64,37 @@ Building from source automatically handles dependency resolution, including AUR 
 
 #### Method B: Install the Pre-compiled Pacman Package
 1. Download the pre-compiled package from GitHub releases:
-   👉 **[Download KOverlay v0.1.16 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.16/koverlay-0.1.16-1-any.pkg.tar.zst)**
+   👉 **[Download KOverlay v0.1.17 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.17/koverlay-0.1.17-1-any.pkg.tar.zst)**
 2. **Important Note on Dependencies**: The package depends on `kdotool` (which is in the AUR). Standard `pacman` cannot automatically resolve or download AUR dependencies. You must install `kdotool` first:
    ```bash
    yay -S kdotool   # or: paru -S kdotool
    ```
 3. Install the downloaded package:
    ```bash
-   sudo pacman -U koverlay-0.1.16-1-any.pkg.tar.zst
+   sudo pacman -U koverlay-0.1.17-1-any.pkg.tar.zst
    # Alternatively, let your AUR helper resolve dependencies and install the local package:
-   yay -U koverlay-0.1.16-1-any.pkg.tar.zst
+   yay -U koverlay-0.1.17-1-any.pkg.tar.zst
    ```
+
+### Microsoft Windows (10 / 11)
+
+KOverlay provides a standalone, single-file setup wizard (`KOverlay_Setup.exe`) that includes an isolated Python 3.11 embeddable environment, all required libraries (PyQt6, ts3, edge-tts), and high-resolution icons. No prior Python installation, administrator privileges, or command-line experience is required.
+
+#### Installing via Setup Wizard (Recommended)
+1. Download the latest installer:
+   👉 **[Download KOverlay_Setup.exe (v0.1.17)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.17/KOverlay_Setup.exe)**
+2. Run `KOverlay_Setup.exe`.
+   - Administrator rights are **not** required. The program installs directly into your user profile: `%LOCALAPPDATA%\Programs\KOverlay`.
+3. Check the box if you want a **Desktop shortcut**, then click **Install**.
+4. On first launch, KOverlay will automatically open the **Settings** window and dock quietly into your Windows System Tray (next to the clock).
+
+#### Running and Debugging on Windows
+- **Desktop & Start Menu Shortcuts:** Launches KOverlay directly without showing a background terminal window (using `pythonw.exe`).
+- **Diagnostic Console Mode:** If you ever need to inspect debug logs in real time, run `KOverlay_Debug.bat` located inside the installation directory (`%LOCALAPPDATA%\Programs\KOverlay`).
+- **Crash Reports:** In the rare event of an unhandled exception, KOverlay displays a native Windows error dialog with details and logs the traceback to `%LOCALAPPDATA%\koverlay\crash.log`.
+
+#### Uninstallation on Windows
+To completely remove KOverlay, open **Windows Settings &rarr; Apps &rarr; Installed apps**, find **KOverlay**, and click **Uninstall** (or run `unins000.exe` in the application folder). User configuration is stored in `%APPDATA%\koverlay`.
 
 ### Ubuntu / Debian / Linux Mint / Pop!_OS / Fedora / Nobara / openSUSE
 For other distributions, a robust, universal installer script is provided:
@@ -125,8 +143,6 @@ To completely remove the application and its shortcuts from your system, simply 
 
 ---
 
-## Part 2: How to connect KOverlay to TeamSpeak 3
-
 ## Part 2: How to Connect (TeamSpeak 3 & Mumble)
 
 KOverlay supports two distinct voice backends: **TeamSpeak 3** and **Mumble**. You can switch between them anytime in the **Settings** window under **Voice Backend**.
@@ -138,12 +154,32 @@ KOverlay talks directly to your running TeamSpeak 3 application via the built-in
 3. Open its Settings / API Key and copy your key.
 4. In KOverlay Settings, select backend **TeamSpeak 3** and paste your API key into the `TS3 API Key:` field.
 
+> [!NOTE]
+> On both Linux and Windows, **TeamSpeak 3** works natively through ClientQuery without requiring any custom third-party plugins.
+
 ### Option B: Connecting to Mumble (Native Plugin)
-KOverlay connects to Mumble via a high-performance native plugin and a local IPC socket:
-1. Compile and install the plugin (already included in the Pacman package or installed via `./mumble_plugin/build_and_install.sh`).
-2. Open **Mumble** -> `Configure` -> `Settings` -> `Plugins`.
+KOverlay connects to Mumble via a high-performance native plugin and a local IPC socket on TCP port `25640`.
+
+#### On Linux:
+1. Compile and install the plugin (already included if installed via Pacman, or compile manually using the button in Settings or by running `./mumble_plugin/build_and_install.sh`).
+2. Open **Mumble** &rarr; `Configure` &rarr; `Settings` &rarr; `Plugins`.
 3. Check and enable **KOverlay Mumble Plugin**.
-4. In KOverlay Settings, select backend **Mumble** (IPC port `25640` by default). KOverlay will automatically filter the channel and display speaking statuses in real time!
+4. In KOverlay Settings, select backend **Mumble** (IPC port `25640` by default).
+
+#### On Windows:
+`koverlay_mumble.dll` is bundled directly with the application in `%LOCALAPPDATA%\Programs\KOverlay\mumble_plugin\koverlay_mumble.dll`.
+1. In KOverlay Settings, open the Mumble configuration section and click **Install / Update Plugin**. The application will **automatically copy** `koverlay_mumble.dll` into Mumble's plugin directories:
+   - `%APPDATA%\Mumble\Mumble\Plugins\koverlay_mumble.dll` *(primary path for modern Mumble 1.4+ / 1.5+)*
+   - `%APPDATA%\Mumble\Plugins\koverlay_mumble.dll` *(legacy path)*
+2. Open **Mumble** &rarr; `Configure` &rarr; `Settings` &rarr; `Plugins`.
+3. Check and enable **KOverlay Mumble Plugin**, then click **Apply**.
+4. In KOverlay Settings, switch the active Voice Platform to **Mumble**.
+
+> [!TIP]
+> You can also download the standalone plugin or unified bundle directly from GitHub releases:
+> - **[koverlay_mumble.mumble_plugin (Universal Bundle)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.17/koverlay_mumble.mumble_plugin)** (Double-click or import via Mumble's "Install plugin" button)
+> - **[koverlay_mumble.dll (Windows x64)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.17/koverlay_mumble.dll)**
+> - **[koverlay_mumble.so (Linux x64)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.17/koverlay_mumble.so)**
 
 ---
 

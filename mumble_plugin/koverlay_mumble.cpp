@@ -12,12 +12,29 @@
 #include <set>
 #include <cerrno>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
+#include <ws2tcpip.h>
+typedef int socklen_t;
+typedef intptr_t ssize_t;
+#define close closesocket
+#define poll WSAPoll
+#define MSG_NOSIGNAL 0
+#define GET_SOCKET_ERROR() WSAGetLastError()
+#define IS_WOULDBLOCK(err) ((err) == WSAEWOULDBLOCK)
+#define IS_INTR(err) ((err) == WSAEINTR)
+#else
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <poll.h>
+#define GET_SOCKET_ERROR() errno
+#define IS_WOULDBLOCK(err) ((err) == EAGAIN || (err) == EWOULDBLOCK)
+#define IS_INTR(err) ((err) == EINTR)
+#endif
 
 namespace {
 
@@ -98,11 +115,12 @@ std::string buildStateJsonLocked() {
 bool sendAll(int fd, const std::string &data) {
     size_t total = 0;
     while (total < data.size()) {
-        ssize_t sent = send(fd, data.data() + total, data.size() - total, MSG_NOSIGNAL);
+        ssize_t sent = send(fd, data.data() + total, static_cast<int>(data.size() - total), MSG_NOSIGNAL);
         if (sent > 0) {
             total += sent;
         } else if (sent < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            int err = GET_SOCKET_ERROR();
+            if (IS_WOULDBLOCK(err)) {
                 // Socket buffer momentarily full, wait up to 20ms for it to become writable
                 pollfd pfd{};
                 pfd.fd = fd;
@@ -111,7 +129,7 @@ bool sendAll(int fd, const std::string &data) {
                 if (pret > 0 && (pfd.revents & POLLOUT)) {
                     continue;
                 }
-            } else if (errno == EINTR) {
+            } else if (IS_INTR(err)) {
                 continue;
             }
             return false;
@@ -211,7 +229,7 @@ void ipcServerLoop() {
     }
 
     int opt = 1;
-    setsockopt(serverFd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    setsockopt(serverFd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char *>(&opt), sizeof(opt));
 
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
@@ -245,10 +263,15 @@ void ipcServerLoop() {
             int clientFd = accept(serverFd, reinterpret_cast<sockaddr *>(&clientAddr), &clientLen);
             if (clientFd >= 0) {
                 // Set non-blocking mode on client socket
+#ifdef _WIN32
+                u_long mode = 1;
+                ioctlsocket(clientFd, FIONBIO, &mode);
+#else
                 int flags = fcntl(clientFd, F_GETFL, 0);
                 if (flags != -1) {
                     fcntl(clientFd, F_SETFL, flags | O_NONBLOCK);
                 }
+#endif
 
                 std::lock_guard<std::mutex> lock(g_mutex);
                 g_clients.push_back(clientFd);
@@ -285,6 +308,10 @@ void ipcServerLoop() {
 extern "C" {
 
 MUMBLE_PLUGIN_EXPORT mumble_error_t MUMBLE_PLUGIN_CALLING_CONVENTION mumble_init(mumble_plugin_id_t id) {
+#ifdef _WIN32
+    WSADATA wsaData;
+    WSAStartup(MAKEWORD(2, 2), &wsaData);
+#endif
     g_pluginID = id;
     g_running = true;
 
@@ -307,6 +334,9 @@ MUMBLE_PLUGIN_EXPORT void MUMBLE_PLUGIN_CALLING_CONVENTION mumble_shutdown() {
     g_users.clear();
     g_localChannel = -1;
     g_activeConnection = -1;
+#ifdef _WIN32
+    WSACleanup();
+#endif
 }
 
 MUMBLE_PLUGIN_EXPORT struct MumbleStringWrapper MUMBLE_PLUGIN_CALLING_CONVENTION mumble_getName() {

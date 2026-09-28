@@ -47,7 +47,13 @@ mkdir -p "$INSTALL_DIR"
 # Copy Python files, assets, and requirements
 cp *.py "$INSTALL_DIR/"
 cp icon.png "$INSTALL_DIR/"
+if [ -f "icon.ico" ]; then
+    cp icon.ico "$INSTALL_DIR/"
+fi
 cp requirements.txt "$INSTALL_DIR/"
+if [ -d "icons" ]; then
+    cp -r icons "$INSTALL_DIR/"
+fi
 
 # Copy Mumble plugin source and build files
 if [ -d "mumble_plugin" ]; then

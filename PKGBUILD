@@ -1,5 +1,5 @@
 pkgname=koverlay
-pkgver=0.1.16
+pkgver=0.1.17
 pkgrel=1
 pkgdesc="A modern, universal Wayland/X11 TeamSpeak 3 and Mumble overlay with TTS voice announcements."
 arch=('any')
@@ -17,6 +17,12 @@ package() {
     # Install application files and icon
     cp -r "$startdir/"*.py "$pkgdir/opt/koverlay/"
     cp "$startdir/icon.png" "$pkgdir/opt/koverlay/icon.png"
+    if [ -f "$startdir/icon.ico" ]; then
+        cp "$startdir/icon.ico" "$pkgdir/opt/koverlay/icon.ico"
+    fi
+    if [ -d "$startdir/icons" ]; then
+        cp -r "$startdir/icons" "$pkgdir/opt/koverlay/"
+    fi
 
     if [ -d "$startdir/mumble_plugin" ]; then
         mkdir -p "$pkgdir/opt/koverlay/mumble_plugin"

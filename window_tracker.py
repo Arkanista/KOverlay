@@ -1,6 +1,12 @@
+import sys
+import os
 import subprocess
 import time
 from PyQt6.QtCore import QThread, pyqtSignal
+
+if sys.platform == "win32":
+    import ctypes
+    from ctypes import wintypes
 
 class WindowTracker(QThread):
     active_window_changed = pyqtSignal(bool)
@@ -17,6 +23,10 @@ class WindowTracker(QThread):
         self.active_tool = None
 
     def check_tools(self):
+        if sys.platform == "win32":
+            self.active_tool = "win32"
+            return True
+
         try:
             subprocess.run(["kdotool", "--help"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             self.active_tool = "kdotool"
@@ -34,6 +44,36 @@ class WindowTracker(QThread):
         print("Warning: Neither kdotool nor xdotool found. Active window tracking will be disabled (overlay always visible).")
         return False
 
+    def _get_active_window_info_win32(self):
+        try:
+            hwnd = ctypes.windll.user32.GetForegroundWindow()
+            if not hwnd:
+                return ""
+            length = ctypes.windll.user32.GetWindowTextLengthW(hwnd)
+            title = ""
+            if length > 0:
+                buf = ctypes.create_unicode_buffer(length + 1)
+                ctypes.windll.user32.GetWindowTextW(hwnd, buf, length + 1)
+                title = buf.value
+
+            pid = wintypes.DWORD()
+            ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            exe_name = ""
+            if pid.value:
+                # 0x1000 = PROCESS_QUERY_LIMITED_INFORMATION
+                h_proc = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid.value)
+                if h_proc:
+                    try:
+                        exe_buf = ctypes.create_unicode_buffer(1024)
+                        size = wintypes.DWORD(1024)
+                        if ctypes.windll.kernel32.QueryFullProcessImageNameW(h_proc, 0, exe_buf, ctypes.byref(size)):
+                            exe_name = os.path.basename(exe_buf.value)
+                    finally:
+                        ctypes.windll.kernel32.CloseHandle(h_proc)
+            return f"{title} {exe_name}".strip()
+        except Exception:
+            return ""
+
     def run(self):
         tools_available = self.check_tools()
         
@@ -48,17 +88,24 @@ class WindowTracker(QThread):
                 
             is_active = False
             try:
-                # getactivewindow returns the window ID, getwindowname gets the title of that ID
-                result = subprocess.run(
-                    [self.active_tool, "getactivewindow", "getwindowname"],
-                    capture_output=True, text=True, timeout=0.5
-                )
-                if result.returncode == 0:
-                    window_name = result.stdout.strip()
+                if self.active_tool == "win32":
+                    window_info = self._get_active_window_info_win32()
                     for kw in self.target_keywords:
-                        if kw.lower() in window_name.lower():
+                        if kw.lower() in window_info.lower():
                             is_active = True
                             break
+                else:
+                    # getactivewindow returns the window ID, getwindowname gets the title of that ID
+                    result = subprocess.run(
+                        [self.active_tool, "getactivewindow", "getwindowname"],
+                        capture_output=True, text=True, timeout=0.5
+                    )
+                    if result.returncode == 0:
+                        window_name = result.stdout.strip()
+                        for kw in self.target_keywords:
+                            if kw.lower() in window_name.lower():
+                                is_active = True
+                                break
             except Exception as e:
                 # On timeout or broken display server after suspend, assume not active
                 pass

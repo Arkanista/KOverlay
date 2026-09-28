@@ -10,4 +10,6 @@ config.json
 pkg/
 src/
 scratch/
-
+dist/
+build/
+build_win/

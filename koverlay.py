@@ -1,19 +1,69 @@
 import sys
 import os
-import fcntl
 import tempfile
 import ctypes
+import traceback
+import time
 
-try:
-    # Set the process name to 'koverlay' for htop/ps/killall
-    libc = ctypes.cdll.LoadLibrary('libc.so.6')
-    libc.prctl(15, b'koverlay', 0, 0, 0)
-except Exception:
-    pass
+# Ensure application root directory is always on sys.path (critical for Python embeddable)
+app_dir = os.path.dirname(os.path.abspath(__file__))
+if app_dir not in sys.path:
+    sys.path.insert(0, app_dir)
 
-# Force X11 backend (XWayland) to bypass strict Wayland limitations
-# on absolute window positioning and transparent click-through inputs.
-os.environ["QT_QPA_PLATFORM"] = "xcb"
+# Global exception hook to show GUI dialog and write log on unexpected crash
+def handle_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+    err_msg = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+    try:
+        log_dir = os.path.join(os.environ.get("LOCALAPPDATA", tempfile.gettempdir()), "koverlay")
+        os.makedirs(log_dir, exist_ok=True)
+        log_path = os.path.join(log_dir, "crash.log")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"\n--- Crash at {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+            f.write(err_msg)
+    except Exception:
+        log_path = "crash.log"
+
+    if sys.platform == "win32":
+        try:
+            ctypes.windll.user32.MessageBoxW(
+                0,
+                f"Wystąpił błąd podczas działania KOverlay:\n\n{err_msg}\nSzczegóły zapisano w:\n{log_path}",
+                "KOverlay - Błąd",
+                0x10
+            )
+        except Exception:
+            pass
+    print(err_msg, file=sys.stderr)
+
+sys.excepthook = handle_exception
+
+if sys.platform != "win32":
+    try:
+        # Set the process name to 'koverlay' for htop/ps/killall
+        libc = ctypes.cdll.LoadLibrary('libc.so.6')
+        libc.prctl(15, b'koverlay', 0, 0, 0)
+    except Exception:
+        pass
+
+    # Force X11 backend (XWayland) to bypass strict Wayland limitations
+    # on absolute window positioning and transparent click-through inputs.
+    os.environ["QT_QPA_PLATFORM"] = "xcb"
+
+def show_already_running_message():
+    if sys.platform == "win32":
+        try:
+            ctypes.windll.user32.MessageBoxW(
+                0,
+                "KOverlay jest już uruchomiony i działa w zasobniku systemowym (obok zegarka w prawym dolnym rogu ekranu).\n\nKliknij prawym przyciskiem myszy na ikonę KOverlay w zasobniku, aby otworzyć Ustawienia.",
+                "KOverlay",
+                0x40  # MB_ICONINFORMATION
+            )
+        except Exception:
+            pass
+    print("KOverlay is already running. Exiting.")
 
 lock_file_path = os.path.join(tempfile.gettempdir(), 'koverlay.lock')
 lock_file = open(lock_file_path, 'w')
@@ -25,11 +75,17 @@ try:
         shared_memory.detach()
         
     if not shared_memory.create(1):
-        print("KOverlay is already running.")
+        show_already_running_message()
         sys.exit(0)
-    fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-except IOError:
-    print("KOverlay is already running. Exiting.")
+
+    if sys.platform != "win32":
+        import fcntl
+        fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    else:
+        import msvcrt
+        msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+except (IOError, OSError):
+    show_already_running_message()
     sys.exit(0)
 
 from PyQt6.QtWidgets import QApplication
@@ -55,6 +111,7 @@ class MainApp:
         self.app.setWindowIcon(QIcon(icon_path))
         
         # Load config
+        self.first_run = not os.path.exists(config.CONFIG_FILE)
         self.cfg_path = os.path.join(os.path.dirname(__file__), "config.json")
         self.cfg = config.load_config()
         
@@ -103,7 +160,18 @@ class MainApp:
         
         self.tray = TrayIcon(initial_mute=self.cfg.get("tts_muted", False), overlays_config=self.cfg.get("overlay_ids", {}))
         self.tray.show()
-        
+
+        # Show notification so user knows KOverlay is running in system tray
+        self.tray.showMessage(
+            "KOverlay",
+            "Aplikacja działa w zasobniku systemowym (obok zegarka).\nKliknij prawym przyciskiem myszy, aby wejść w Ustawienia.",
+            self.tray.MessageIcon.Information,
+            4000
+        )
+
+        if self.first_run:
+            QTimer.singleShot(600, self.show_settings)
+
         # Connections
         self.tray.move_toggled.connect(self.on_move_toggled)
         self.tray.mute_toggled.connect(self.on_mute_toggled)
@@ -325,5 +393,7 @@ if __name__ == "__main__":
     try:
         app = MainApp()
         app.run()
-    except Exception as e:
-        print(f"Fatal error: {e}")
+    except Exception:
+        exc_type, exc_value, exc_tb = sys.exc_info()
+        handle_exception(exc_type, exc_value, exc_tb)
+        sys.exit(1)

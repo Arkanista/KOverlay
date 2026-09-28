@@ -21,6 +21,13 @@ set_target_properties(koverlay_mumble PROPERTIES
     OUTPUT_NAME "koverlay_mumble"
 )
 
-install(TARGETS koverlay_mumble
-    LIBRARY DESTINATION "$ENV{HOME}/.local/share/Mumble/Mumble/Plugins"
-)
+if(WIN32)
+    target_link_libraries(koverlay_mumble PRIVATE ws2_32)
+    install(TARGETS koverlay_mumble
+        RUNTIME DESTINATION "$ENV{APPDATA}/Mumble/Plugins"
+    )
+else()
+    install(TARGETS koverlay_mumble
+        LIBRARY DESTINATION "$ENV{HOME}/.local/share/Mumble/Mumble/Plugins"
+    )
+endif()

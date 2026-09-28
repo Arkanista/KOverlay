@@ -2,6 +2,8 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPoint
 from PyQt6.QtGui import QColor, QPixmap, QPainter, QPen
 import time
+import sys
+import os
 
 def interpolate_color(col_from_str, col_to_str, progress):
     progress = max(0.0, min(1.0, progress))
@@ -39,15 +41,26 @@ class OverlayWindow(QWidget):
         self.setObjectName("OverlayWindowMain")
         
         # Setup window properties
-        # With X11 bypass, ToolTip correctly prevents taskbar entry and maps perfectly
-        self.setWindowFlags(
-            Qt.WindowType.SplashScreen |
-            Qt.WindowType.FramelessWindowHint |
-            Qt.WindowType.WindowStaysOnTopHint |
-            Qt.WindowType.BypassWindowManagerHint |
-            Qt.WindowType.WindowTransparentForInput |
-            Qt.WindowType.NoDropShadowWindowHint
-        )
+        if sys.platform == "win32":
+            # On Windows: Tool prevents taskbar entry, Frameless + WindowStaysOnTop creates transparent overlay
+            flags = (
+                Qt.WindowType.FramelessWindowHint |
+                Qt.WindowType.WindowStaysOnTopHint |
+                Qt.WindowType.Tool |
+                Qt.WindowType.WindowTransparentForInput |
+                Qt.WindowType.NoDropShadowWindowHint
+            )
+        else:
+            # With X11 bypass, ToolTip correctly prevents taskbar entry and maps perfectly
+            flags = (
+                Qt.WindowType.SplashScreen |
+                Qt.WindowType.FramelessWindowHint |
+                Qt.WindowType.WindowStaysOnTopHint |
+                Qt.WindowType.BypassWindowManagerHint |
+                Qt.WindowType.WindowTransparentForInput |
+                Qt.WindowType.NoDropShadowWindowHint
+            )
+        self.setWindowFlags(flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -68,8 +81,6 @@ class OverlayWindow(QWidget):
         self.icon_label.setVisible(self.config.get("show_three_dots", False))
         
         self.logo_label = QLabel()
-        from PyQt6.QtGui import QPixmap
-        import os
         icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
         pixmap = QPixmap(icon_path).scaled(20, 20, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self.logo_label.setPixmap(pixmap)
@@ -123,6 +134,25 @@ class OverlayWindow(QWidget):
             
         self.update_style()
         
+    def _apply_win32_click_through(self, transparent=True):
+        if sys.platform != "win32":
+            return
+        try:
+            import ctypes
+            hwnd = int(self.winId())
+            if hwnd:
+                GWL_EXSTYLE = -20
+                WS_EX_LAYERED = 0x00080000
+                WS_EX_TRANSPARENT = 0x00000020
+                user32 = ctypes.windll.user32
+                style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+                if transparent:
+                    user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED | WS_EX_TRANSPARENT)
+                else:
+                    user32.SetWindowLongW(hwnd, GWL_EXSTYLE, (style | WS_EX_LAYERED) & ~WS_EX_TRANSPARENT)
+        except Exception:
+            pass
+
     def showEvent(self, event):
         super().showEvent(event)
         mon_cfg = self.config.get("overlay_ids", {}).get(self.overlay_id, {})
@@ -131,6 +161,7 @@ class OverlayWindow(QWidget):
         else:
             offset = 50 * self.numeric_id
             self.move(offset, offset)
+        self._apply_win32_click_through(not self.move_mode)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -222,7 +253,22 @@ class OverlayWindow(QWidget):
     def set_move_mode(self, enabled):
         self.move_mode = enabled
         
-        flags = Qt.WindowType.SplashScreen | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.BypassWindowManagerHint | Qt.WindowType.NoDropShadowWindowHint
+        if sys.platform == "win32":
+            flags = (
+                Qt.WindowType.FramelessWindowHint |
+                Qt.WindowType.WindowStaysOnTopHint |
+                Qt.WindowType.Tool |
+                Qt.WindowType.NoDropShadowWindowHint
+            )
+        else:
+            flags = (
+                Qt.WindowType.SplashScreen |
+                Qt.WindowType.FramelessWindowHint |
+                Qt.WindowType.WindowStaysOnTopHint |
+                Qt.WindowType.BypassWindowManagerHint |
+                Qt.WindowType.NoDropShadowWindowHint
+            )
+
         if not self.move_mode:
             flags |= Qt.WindowType.WindowTransparentForInput
             self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -243,6 +289,7 @@ class OverlayWindow(QWidget):
         self.setWindowFlags(flags)
         self.update_style()
         self.show()
+        self._apply_win32_click_through(not self.move_mode)
         
     def update_style(self):
         show_header = self.config.get("show_header", True)

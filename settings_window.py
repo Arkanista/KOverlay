@@ -1,6 +1,15 @@
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QSlider, QCheckBox, QFontComboBox, QSpinBox, QColorDialog, QGroupBox, QComboBox, QScrollArea, QWidget, QMessageBox, QRadioButton
 from PyQt6.QtCore import Qt, pyqtSignal, QObject, QEvent, QRegularExpression, QUrl
 from PyQt6.QtGui import QColor, QFont, QRegularExpressionValidator, QDesktopServices, QIntValidator
+import os
+import sys
+import shutil
+import importlib.util
+import subprocess
+import tempfile
+import threading
+import hashlib
+from tts_manager import get_tts_manager
 
 class ScrollFilter(QObject):
     def eventFilter(self, obj, event):
@@ -249,11 +258,13 @@ class SettingsWindow(QDialog):
         layout.addWidget(self.speakers_group)
         
         # TTS Settings
-        import importlib.util
-        import shutil
         edge_tts_installed = importlib.util.find_spec("edge_tts") is not None
-        mpv_installed = shutil.which("mpv") is not None
-        tts_available = edge_tts_installed and mpv_installed
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+        mpv_installed = (shutil.which("mpv") is not None) or os.path.isfile(os.path.join(app_dir, "mpv.exe" if sys.platform == "win32" else "mpv"))
+        if sys.platform == "win32":
+            tts_available = edge_tts_installed
+        else:
+            tts_available = edge_tts_installed and mpv_installed
         
         self.tts_group = QGroupBox("Text-to-Speech (TTS)")
         tts_layout = QVBoxLayout()
@@ -270,7 +281,11 @@ class SettingsWindow(QDialog):
         self.tts_checkbox.toggled.connect(self._on_change)
         tts_layout.addWidget(self.tts_checkbox)
         
-        info_label = QLabel("Note: Uses the internet for high-quality voices. Requires 'edge-tts' Python module and 'mpv' player.")
+        if sys.platform == "win32":
+            note_text = "Note: Uses high-quality voices over the internet. Requires 'edge-tts' Python module (supports built-in Windows audio or mpv.exe)."
+        else:
+            note_text = "Note: Uses high-quality voices over the internet. Requires 'edge-tts' Python module and 'mpv' player."
+        info_label = QLabel(note_text)
         font = info_label.font()
         font.setPointSize(font.pointSize() - 2)
         info_label.setFont(font)
@@ -502,8 +517,7 @@ class SettingsWindow(QDialog):
         tts_layout.addLayout(tts_cache_layout)
         
         # Path label
-        import os
-        cache_path = os.path.expanduser("~/.cache/ts3-overlay/tts_cache")
+        cache_path = get_tts_manager(self.config).cache_dir
         path_label = QLabel(f"<span style='color: gray; font-size: 10px;'>Path: {cache_path}</span>")
         tts_layout.addWidget(path_label)
         
@@ -769,8 +783,85 @@ class SettingsWindow(QDialog):
         self._on_change()
 
     def _install_mumble_plugin(self):
-        import os
-        import subprocess
+        if sys.platform == "win32":
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+            candidate_paths = [
+                os.path.join(app_dir, "mumble_plugin", "koverlay_mumble.dll"),
+                os.path.join(app_dir, "koverlay_mumble.dll")
+            ]
+            src_dll = next((p for p in candidate_paths if os.path.isfile(p)), None)
+
+            # Modern Mumble (Qt AppDataLocation) scans %APPDATA%\Mumble\Mumble\Plugins
+            # Legacy/custom configurations scan %APPDATA%\Mumble\Plugins
+            target_dirs = [
+                os.path.expandvars(r"%APPDATA%\Mumble\Mumble\Plugins"),
+                os.path.expandvars(r"%APPDATA%\Mumble\Plugins"),
+                os.path.expandvars(r"%LOCALAPPDATA%\Mumble\Mumble\Plugins"),
+            ]
+
+            installed_destinations = []
+            if src_dll:
+                for target_dir in target_dirs:
+                    try:
+                        os.makedirs(target_dir, exist_ok=True)
+                        dest_dll = os.path.join(target_dir, "koverlay_mumble.dll")
+                        shutil.copy2(src_dll, dest_dll)
+                        installed_destinations.append(dest_dll)
+                    except Exception:
+                        pass
+
+                # Also copy .mumble_plugin bundle if present
+                bundle_src = os.path.join(app_dir, "mumble_plugin", "koverlay_mumble.mumble_plugin")
+                if os.path.isfile(bundle_src):
+                    for target_dir in target_dirs:
+                        try:
+                            shutil.copy2(bundle_src, os.path.join(target_dir, "koverlay_mumble.mumble_plugin"))
+                        except Exception:
+                            pass
+
+                primary_dir = target_dirs[0]
+                msg = (
+                    "<b>KOverlay Mumble Plugin successfully installed!</b><br><br>"
+                    "The plugin was automatically deployed to Mumble's plugin directories:<br>"
+                    f"&bull; <code>{target_dirs[0]}</code><br>"
+                    f"&bull; <code>{target_dirs[1]}</code><br><br>"
+                    "<b>Next steps:</b><br>"
+                    "1. If Mumble is running, restart it or open <b>Configure &rarr; Settings &rarr; Plugins</b>.<br>"
+                    "2. Ensure <b>KOverlay Mumble Plugin</b> is checked and enabled.<br>"
+                    "3. Click <b>Apply</b>.<br><br>"
+                    "<i>Would you like to open the Mumble Plugins directory in Windows Explorer?</i>"
+                )
+                reply = QMessageBox.information(
+                    self,
+                    "Mumble Plugin Installed (Windows)",
+                    msg,
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes
+                )
+                if reply == QMessageBox.StandardButton.Yes:
+                    QDesktopServices.openUrl(QUrl.fromLocalFile(primary_dir))
+                return
+
+            # Fallback if bundled DLL is missing
+            msg = (
+                "<b>koverlay_mumble.dll was not found in your KOverlay installation directory.</b><br><br>"
+                f"Searched in:<br><code>{candidate_paths[0]}</code><br><br>"
+                "You can download <code>koverlay_mumble.dll</code> directly from the KOverlay GitHub repository:<br>"
+                "<a href='https://github.com/Arkanista/KOverlay/releases/latest'>https://github.com/Arkanista/KOverlay/releases/latest</a><br><br>"
+                f"And place it into your Mumble plugins folder:<br><code>{plugins_dir}</code><br><br>"
+                "<i>Would you like to open the Mumble Plugins folder in Windows Explorer now?</i>"
+            )
+            reply = QMessageBox.information(
+                self,
+                "Mumble Plugin Setup (Windows)",
+                msg,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                QDesktopServices.openUrl(QUrl.fromLocalFile(plugins_dir))
+            return
+
         plugin_script = os.path.join(os.path.dirname(__file__), "mumble_plugin", "build_and_install.sh")
         if not os.path.exists(plugin_script):
             QMessageBox.critical(self, "Error", f"Build script not found at:\n{plugin_script}")
@@ -884,14 +975,6 @@ class SettingsWindow(QDialog):
         dlg.deleteLater()
 
     def _test_voice(self):
-        import subprocess
-        import shutil
-        import tempfile
-        import os
-        import threading
-        import hashlib
-        import sys
-        
         voice = self.tts_voice_combo.currentData()
         vol = self.tts_vol_slider.value()
         join_txt = getattr(self, "tts_join_text", None)
@@ -900,7 +983,7 @@ class SettingsWindow(QDialog):
         l_t = leave_txt.text() if leave_txt else "%NICK left"
         
         test_name = self.tts_test_nick.text() or "Arkanis"
-        from tts_manager import get_tts_manager, apply_tts_aliases
+        from tts_manager import apply_tts_aliases
         aliases = self.config.get("tts_aliases", {})
         spoken_name = apply_tts_aliases(test_name, aliases)
         
@@ -926,8 +1009,7 @@ class SettingsWindow(QDialog):
         QTimer.singleShot(10000, update_cache)
 
     def _open_cache_folder(self):
-        import os
-        cache_path = os.path.expanduser("~/.cache/ts3-overlay/tts_cache")
+        cache_path = get_tts_manager(self.config).cache_dir
         os.makedirs(cache_path, exist_ok=True)
         QDesktopServices.openUrl(QUrl.fromLocalFile(cache_path))
 

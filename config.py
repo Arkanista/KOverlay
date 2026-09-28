@@ -1,7 +1,12 @@
 import json
 import os
+import sys
 
-CONFIG_FILE = os.path.expanduser("~/.config/ts3-overlay/config.json")
+if sys.platform == "win32":
+    app_data = os.getenv("APPDATA") or os.path.expanduser("~")
+    CONFIG_FILE = os.path.join(app_data, "koverlay", "config.json")
+else:
+    CONFIG_FILE = os.path.expanduser("~/.config/ts3-overlay/config.json")
 
 def load_config():
     default_config = {

@@ -40,7 +40,11 @@ class TTSManager:
         self.edge_tts_installed = importlib.util.find_spec("edge_tts") is not None
         
         # Setup persistent cache directory
-        self.cache_dir = os.path.expanduser("~/.cache/ts3-overlay/tts_cache")
+        if sys.platform == "win32":
+            base_dir = os.getenv("LOCALAPPDATA") or os.path.expanduser("~")
+            self.cache_dir = os.path.join(base_dir, "koverlay", "tts_cache")
+        else:
+            self.cache_dir = os.path.expanduser("~/.cache/ts3-overlay/tts_cache")
         os.makedirs(self.cache_dir, exist_ok=True)
         
         # Cleanup old files
@@ -139,6 +143,26 @@ class TTSManager:
             except Exception as e:
                 print(f"Error in TTS worker thread: {e}")
 
+    def _play_win32_mci(self, filepath, volume=80):
+        try:
+            import ctypes
+            import uuid
+            alias = f"tts_{uuid.uuid4().hex[:8]}"
+            winmm = ctypes.windll.winmm
+            res = winmm.mciSendStringW(f'open "{filepath}" type mpegvideo alias {alias}', None, 0, None)
+            if res != 0:
+                return False
+            try:
+                vol_val = max(0, min(1000, int(volume * 10)))
+                winmm.mciSendStringW(f'setaudio {alias} volume to {vol_val}', None, 0, None)
+                winmm.mciSendStringW(f'play {alias} wait', None, 0, None)
+            finally:
+                winmm.mciSendStringW(f'close {alias}', None, 0, None)
+            return True
+        except Exception as e:
+            print(f"Windows MCI playback error: {e}")
+            return False
+
     def _play_sync(self, item):
         text = item["text"]
         voice = item["voice"]
@@ -146,7 +170,16 @@ class TTSManager:
         rate = item["rate"]
         safe_text = "".join(c for c in text if c.isalnum() or c in " _-.")
 
-        if self.edge_tts_installed and shutil.which("mpv"):
+        mpv_bin = shutil.which("mpv")
+        if not mpv_bin:
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+            candidate = os.path.join(app_dir, "mpv.exe" if sys.platform == "win32" else "mpv")
+            if os.path.isfile(candidate):
+                mpv_bin = candidate
+
+        can_play_mp3 = bool(mpv_bin) or (sys.platform == "win32")
+
+        if self.edge_tts_installed and can_play_mp3:
             try:
                 # Cache the generated voice per text, voice and rate
                 cache_key = safe_text + "_" + voice + "_" + rate
@@ -163,17 +196,20 @@ class TTSManager:
                     communicate = edge_tts.Communicate(text, voice, rate=rate)
                     asyncio.run(communicate.save(tmp_file))
                     
-                # Use subprocess.run to BLOCK until mpv finishes playing the audio
-                # Added silenceremove filter to strip generated silence at the end
-                subprocess.run([
-                    "mpv", 
-                    "--no-video", 
-                    "--no-terminal", 
-                    f"--volume={vol}", 
-                    # Using -70dB to prevent clipping the soft attack of the first consonant
-                    "--af=silenceremove=stop_periods=-1:stop_duration=0:stop_threshold=-70dB",
-                    tmp_file
-                ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if mpv_bin:
+                    # Use subprocess.run to BLOCK until mpv finishes playing the audio
+                    # Added silenceremove filter to strip generated silence at the end
+                    subprocess.run([
+                        mpv_bin, 
+                        "--no-video", 
+                        "--no-terminal", 
+                        f"--volume={vol}", 
+                        # Using -70dB to prevent clipping the soft attack of the first consonant
+                        "--af=silenceremove=stop_periods=-1:stop_duration=0:stop_threshold=-70dB",
+                        tmp_file
+                    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                elif sys.platform == "win32":
+                    self._play_win32_mci(tmp_file, vol)
             except Exception as e:
                 print(f"Edge TTS error: {e}")
                 
@@ -204,6 +240,22 @@ class TTSManager:
                 stdout=subprocess.DEVNULL, 
                 stderr=subprocess.DEVNULL
             )
+        elif sys.platform == "win32":
+            # Native Windows SAPI fallback via PowerShell
+            try:
+                ps_cmd = (
+                    f"Add-Type -AssemblyName System.Speech; "
+                    f"$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+                    f"$synth.Volume = {vol}; "
+                    f"$synth.Speak('{text}')"
+                )
+                subprocess.run(
+                    ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_cmd],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+            except Exception:
+                pass
 
 # Global accessor
 def get_tts_manager(config=None):

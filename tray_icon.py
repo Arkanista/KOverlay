@@ -1,3 +1,4 @@
+import os
 from PyQt6.QtWidgets import QSystemTrayIcon, QMenu
 from PyQt6.QtGui import QIcon, QPixmap, QColor
 from PyQt6.QtCore import pyqtSignal
@@ -12,10 +13,9 @@ class TrayIcon(QSystemTrayIcon):
     def __init__(self, parent=None, initial_mute=False, overlays_config=None):
         super().__init__(parent)
         
-        import os
         icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
         self.setIcon(QIcon(icon_path))
-        self.setToolTip("KOverlay v0.1.16")
+        self.setToolTip("KOverlay v0.1.17")
         
         # Create menu
         self.menu = QMenu()
