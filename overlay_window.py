@@ -261,9 +261,27 @@ class OverlayWindow(QWidget):
             return
             
         history_enabled = self.config.get("history_enabled", False)
-        # If history is enabled and there are users in history, or history was disabled but left items remain,
-        # periodically refresh the overlay to expire '+' / '✝' markers and prune left users.
-        if (history_enabled and self.user_history) or (not history_enabled and any(d.get("leave_time") is not None for d in self.user_history.values())):
+        history_duration = float(self.config.get("history_duration", 60))
+        current_time = time.time()
+
+        # Only trigger an update if there is something pending expiration:
+        # 1) A user who left and needs to be pruned when history_duration elapses
+        # 2) A user who joined recently and still has '+' displayed that needs to be removed
+        has_pending = False
+        if history_enabled:
+            for data in self.user_history.values():
+                if data.get("leave_time") is not None:
+                    has_pending = True
+                    break
+                join_time = data.get("join_time", 0)
+                if join_time > 0 and (current_time - join_time < history_duration + 2):
+                    has_pending = True
+                    break
+        else:
+            if any(d.get("leave_time") is not None for d in self.user_history.values()):
+                has_pending = True
+
+        if has_pending:
             self.update_clients(self.last_clients, getattr(self, 'current_cid', None))
 
     def set_move_mode(self, enabled):
