@@ -113,6 +113,11 @@ class OverlayWindow(QWidget):
         self.fade_timer = QTimer(self)
         self.fade_timer.setInterval(40)
         self.fade_timer.timeout.connect(self._on_fade_tick)
+
+        self.refresh_timer = QTimer(self)
+        self.refresh_timer.setInterval(1000)
+        self.refresh_timer.timeout.connect(self._on_refresh_tick)
+        self.refresh_timer.start()
         
         self.setMinimumSize(50, 20)
         
@@ -250,6 +255,16 @@ class OverlayWindow(QWidget):
 
         if not any_fading:
             self.fade_timer.stop()
+
+    def _on_refresh_tick(self):
+        if not hasattr(self, 'last_clients') or self.last_clients is None:
+            return
+            
+        history_enabled = self.config.get("history_enabled", False)
+        # If history is enabled and there are users in history, or history was disabled but left items remain,
+        # periodically refresh the overlay to expire '+' / '✝' markers and prune left users.
+        if (history_enabled and self.user_history) or (not history_enabled and any(d.get("leave_time") is not None for d in self.user_history.values())):
+            self.update_clients(self.last_clients, getattr(self, 'current_cid', None))
 
     def set_move_mode(self, enabled):
         self.move_mode = enabled

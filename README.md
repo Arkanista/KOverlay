@@ -2,14 +2,14 @@
 > ✨ *Entirely vibecoded by Gemini* ✨
 
 > [!TIP]
-> **What's New in v0.1.18:**
+> **What's New in v0.1.19:**
+> - ⚡ **Mumble Audio Glitch & "Roboting" Elimination**: Fully decoupled plugin Mumble audio callbacks from IPC socket I/O using a background worker thread (`broadcastWorkerLoop`) and condition variable. Zero audio thread latency ensures pristine Opus/CELT voice transmission with no audio jitter or metallic distortion.
+> - ⏱️ **Automatic Channel History & Status Expiry**: Added an automatic 1-second refresh timer to expire `+` (recently joined) and `✝` (recently left) status indicators strictly according to `history_duration`, without requiring another user to talk or trigger a new voice event.
 > - 🛡️ **Placeholder & Unknown User Suppression**: Completely eliminated display and TTS voice announcements of unresolved user names (such as `User_XX` or `Unknown`). If an error occurs or a client's nickname is temporarily not yet resolved by Mumble/TS3, the overlay fails silently and cleanly without showing dummy user labels.
 > - 🪟 **Native Windows 10 & 11 Support**: Standalone single-file setup wizard (`KOverlay_Setup.exe`) with bundled Python 3.11 embeddable runtime, direct Desktop and Start Menu shortcuts, Win32 transparent click-through window styles, and `%APPDATA%\koverlay` configuration storage.
-> - 🔊 **Windows Audio & Edge TTS**: Native Windows MCI audio playback engine for Edge TTS voice announcements without requiring external command-line players (no mpv or ffmpeg needed on Windows).
+> - 🔊 **Windows Audio & Edge TTS**: Native Windows MCI audio playback engine for Edge TTS voice announcements without requiring external command-line players.
 > - 🎯 **Win32 Window Tracking**: Native Windows game detection using Win32 API (`GetForegroundWindow`, `GetWindowTextW`) to automatically hide/show overlays when switching tasks.
-> - 🛠️ **First-Run Experience & Crash Reporter**: Automatic settings window launch on first run, tray notifications, and built-in crash logger with native error dialogs (`MessageBoxW`) for seamless diagnostics.
-> - 🎙️ **Mumble Plugin Setup on Windows**: Interactive guide in Settings to quickly install and configure the Mumble C++ plugin on Windows, automatically deploying to `%APPDATA%\Mumble\Mumble\Plugins`.
-> - 🛡️ **Mumble Plugin Stability (Linux & Windows)**: Background IPC server thread decoupled from Mumble API calls, non-blocking I/O (`O_NONBLOCK`), and in-memory talking state updates.
+> - 🛠️ **First-Run Experience & Crash Reporter**: Automatic settings window launch on first run, tray notifications, and built-in crash logger with native error dialogs for seamless diagnostics.
 
 Welcome to **KOverlay** – a powerful, modern overlay for Linux (X11 and Wayland) that integrates directly with **TeamSpeak 3** and **Mumble**, featuring voice announcements (TTS) of nicknames joining and leaving your channel! This step-by-step guide will explain how to configure the connection and what each option in the program menu does.
 
