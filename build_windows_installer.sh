@@ -82,21 +82,24 @@ cat << 'EOF' > "$BUNDLE_DIR/KOverlay_Debug.bat"
 @echo off
 cd /d "%~dp0"
 echo ========================================================
-echo   Uruchamianie KOverlay w trybie diagnostycznym (konsola)
+echo   Starting KOverlay in diagnostic mode (console)
 echo ========================================================
 echo.
 "%~dp0python\python.exe" "%~dp0koverlay.py" %*
 echo.
-echo [KOverlay zakonczyl dzialanie z kodem: %ERRORLEVEL%]
+echo [KOverlay exited with code: %ERRORLEVEL%]
 pause
 EOF
 
 # 4. Generate Inno Setup Script
-echo "[5/5] Compiling standalone KOverlay_Setup.exe via Inno Setup..."
+VERSION=$(grep -m1 '^pkgver=' "$SCRIPT_DIR/PKGBUILD" | cut -d= -f2 | tr -d ' ')
+if [ -z "$VERSION" ]; then
+    VERSION="0.1.19"
+fi
 
 cat << EOF > "$BUILD_DIR/installer.iss"
 #define MyAppName "KOverlay"
-#define MyAppVersion "0.1.18"
+#define MyAppVersion "$VERSION"
 #define MyAppPublisher "Arkanis"
 #define MyAppURL "https://github.com/Arkanis/KOverlay"
 
@@ -121,8 +124,8 @@ SolidCompression=yes
 WizardStyle=modern
 
 [Languages]
-Name: "polish"; MessagesFile: "compiler:Languages\\Polish.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "polish"; MessagesFile: "compiler:Languages\\Polish.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"

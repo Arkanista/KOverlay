@@ -30,8 +30,8 @@ def handle_exception(exc_type, exc_value, exc_traceback):
         try:
             ctypes.windll.user32.MessageBoxW(
                 0,
-                f"Wystąpił błąd podczas działania KOverlay:\n\n{err_msg}\nSzczegóły zapisano w:\n{log_path}",
-                "KOverlay - Błąd",
+                f"An error occurred while running KOverlay:\n\n{err_msg}\nDetails saved to:\n{log_path}",
+                "KOverlay - Error",
                 0x10
             )
         except Exception:
@@ -57,7 +57,7 @@ def show_already_running_message():
         try:
             ctypes.windll.user32.MessageBoxW(
                 0,
-                "KOverlay jest już uruchomiony i działa w zasobniku systemowym (obok zegarka w prawym dolnym rogu ekranu).\n\nKliknij prawym przyciskiem myszy na ikonę KOverlay w zasobniku, aby otworzyć Ustawienia.",
+                "KOverlay is already running and active in the system tray (near the clock in the notification area).\n\nRight-click the KOverlay tray icon to open Settings.",
                 "KOverlay",
                 0x40  # MB_ICONINFORMATION
             )
@@ -164,7 +164,7 @@ class MainApp:
         # Show notification so user knows KOverlay is running in system tray
         self.tray.showMessage(
             "KOverlay",
-            "Aplikacja działa w zasobniku systemowym (obok zegarka).\nKliknij prawym przyciskiem myszy, aby wejść w Ustawienia.",
+            "Application is running in the system tray (near the clock).\nRight-click the tray icon to access Settings.",
             self.tray.MessageIcon.Information,
             4000
         )
