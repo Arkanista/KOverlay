@@ -98,16 +98,25 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 #### Option 2: Portable Archive (.zip)
 1. Download the portable package:
    👉 **[Download KOverlay_Portable.zip (v0.1.19-2)](https://github.com/Arkanista/KOverlay/releases/download/v0.1.19-2/KOverlay_Portable.zip)**
-2. Extract the `.zip` archive to any folder of your choice (e.g. `C:\Games\KOverlay` or your Desktop).
-3. **If you use Mumble:**
+2. Extract the `.zip` archive to any directory you prefer (e.g. `C:\Games\KOverlay` or your Desktop).
+3. **How to Launch KOverlay:**
+   - Inside the extracted folder, double-click **`KOverlay.bat`**.
+   - KOverlay will start quietly in the background without keeping a console window open (`pythonw.exe`).
+   - An icon will appear in your **Windows System Tray** (near the clock). Right-click it to open Settings or adjust your overlays.
+   - *Diagnostic mode:* If you ever need to view live console logs for debugging, run `KOverlay_Debug.bat`.
+4. **Creating a Desktop Shortcut:**
+   - Right-click **`KOverlay.bat`** in the extracted folder &rarr; select **Send to &rarr; Desktop (create shortcut)** (or *Show more options &rarr; Send to...* on Windows 11).
+   - *(Optional icon)*: Right-click your new shortcut &rarr; **Properties** &rarr; **Change Icon...** &rarr; Browse and select `icon.ico` from your KOverlay folder.
+5. **Adding to Windows Startup (Autostart on Boot):**
+   - Press `Win + R` on your keyboard, type **`shell:startup`**, and press **Enter**.
+   - Windows will open your Startup folder (`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup`).
+   - Copy and paste your desktop shortcut into this folder (or right-click drag `KOverlay.bat` into this folder and select **Create shortcuts here**).
+   - KOverlay will now start automatically in the system tray every time Windows boots!
+6. **If you use Mumble:**
    - Make sure Mumble is closed.
    - Run `INSTALL_MUMBLE_PLUGIN.bat` inside the extracted folder to automatically install `koverlay_mumble.dll` to `%APPDATA%\Mumble\Mumble\Plugins`.
    - Alternatively, you can manually copy `mumble_plugin\koverlay_mumble.dll` into `%APPDATA%\Mumble\Mumble\Plugins\`.
    - Launch Mumble, go to **Settings &rarr; Plugins**, and verify that **KOverlay Mumble Plugin** is enabled.
-4. **Launch KOverlay:**
-   - Double-click `KOverlay.bat` to run KOverlay in the background (using `pythonw.exe`).
-   - An icon will appear in your system tray (near the clock). Right-click it to open Settings or adjust your overlays.
-   - If you need to view live console logs for debugging, run `KOverlay_Debug.bat`.
 
 #### Running and Debugging on Windows
 - **Desktop & Start Menu Shortcuts:** Launches KOverlay directly without showing a background terminal window (using `pythonw.exe`).

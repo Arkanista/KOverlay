@@ -129,25 +129,35 @@ cat << 'EOF' > "$BUNDLE_DIR/PORTABLE_README.txt"
                       KOverlay Portable for Windows
 ========================================================================
 
-1. RUNNING KOVERLAY:
-   - Double-click "KOverlay.bat" to start KOverlay in the background.
-   - An icon will appear in your system tray (near the clock).
-   - Right-click the tray icon to open Settings or adjust overlays.
+1. HOW TO RUN KOVERLAY:
+   - Double-click "KOverlay.bat" inside this folder to start KOverlay
+     silently in the background (using pythonw.exe).
+   - An icon will appear in your Windows System Tray (near the clock).
+   - Right-click the tray icon to open Settings or adjust your overlays.
    - IMPORTANT: KOverlay must remain running in the background for
      the voice overlay to appear over your games.
-   - If you encounter any issues, run "KOverlay_Debug.bat" to view
-     diagnostic logs in a console window.
+   - Diagnostic mode: If you ever need to view live console logs,
+     run "KOverlay_Debug.bat" instead.
 
-2. FOR MUMBLE USERS:
-   - Double-click "INSTALL_MUMBLE_PLUGIN.bat" (make sure Mumble is
-     closed first) to copy the Mumble plugin automatically into
-     %APPDATA%\Mumble\Mumble\Plugins.
-   - Alternatively, you can manually copy "mumble_plugin\koverlay_mumble.dll"
-     into "%APPDATA%\Mumble\Mumble\Plugins\".
+2. CREATING A DESKTOP SHORTCUT:
+   - Right-click "KOverlay.bat" -> "Send to" -> "Desktop (create shortcut)".
+   - (Optional): Right-click your new shortcut -> Properties -> "Change Icon"
+     and select "icon.ico" from this folder.
+
+3. ADDING TO WINDOWS STARTUP (AUTOSTART ON BOOT):
+   - Press Win + R, type "shell:startup", and press Enter.
+   - Copy and paste your desktop shortcut into that Startup folder.
+   - KOverlay will now start automatically in the system tray when Windows boots.
+
+4. FOR MUMBLE USERS:
+   - Make sure Mumble is closed first.
+   - Double-click "INSTALL_MUMBLE_PLUGIN.bat" to automatically copy
+     "koverlay_mumble.dll" to %APPDATA%\Mumble\Mumble\Plugins.
+   - Alternatively, copy "mumble_plugin\koverlay_mumble.dll" manually.
    - Restart Mumble, go to Settings -> Plugins, and make sure
      "KOverlay Mumble Plugin" is enabled.
 
-3. FOR TEAMSPEAK 3 USERS:
+5. FOR TEAMSPEAK 3 USERS:
    - Open TeamSpeak 3, enable ClientQuery plugin (Tools -> Options -> Addons).
    - In KOverlay Settings, choose "TeamSpeak 3" and enter your API Key.
 ========================================================================
