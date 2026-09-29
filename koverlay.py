@@ -101,6 +101,16 @@ class MainApp:
     def __init__(self):
         self.app = QApplication(sys.argv)
         self.app.setQuitOnLastWindowClosed(False)
+
+        # Apply system theme (Dark/Light on Windows, native on Linux)
+        import theme_manager
+        theme_manager.apply_app_theme(self.app)
+
+        if sys.platform == "win32":
+            self.theme_timer = QTimer(self.app)
+            self.theme_timer.timeout.connect(self._check_system_theme)
+            self.theme_timer.start(2500)
+
         self.hide_timer = QTimer()
         self.hide_timer.setSingleShot(True)
         self.hide_timer.timeout.connect(self._execute_hide)
@@ -235,6 +245,13 @@ class MainApp:
     def save_config(self):
         config.save_config(self.cfg)
 
+    def _check_system_theme(self):
+        windows = []
+        if hasattr(self, 'settings_dialog') and self.settings_dialog is not None:
+            windows.append(self.settings_dialog)
+        import theme_manager
+        theme_manager.check_and_update_theme(self.app, windows)
+
     def show_settings(self):
         if hasattr(self, 'settings_dialog') and self.settings_dialog is not None:
             self.settings_dialog.activateWindow()
@@ -248,6 +265,9 @@ class MainApp:
         self.settings_dialog.finished.connect(self.on_settings_closed)
         self.settings_dialog.setModal(False)
         self.settings_dialog.show()
+
+        import theme_manager
+        theme_manager.apply_window_theme(self.settings_dialog)
 
     def on_settings_changed(self):
         config.save_config(self.cfg)

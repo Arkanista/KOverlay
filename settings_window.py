@@ -797,6 +797,14 @@ class SettingsWindow(QDialog):
         except Exception:
             pass
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        try:
+            import theme_manager
+            theme_manager.apply_window_theme(self)
+        except Exception:
+            pass
+
     def changeEvent(self, event):
         super().changeEvent(event)
         try:
