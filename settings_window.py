@@ -1,6 +1,10 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QSlider, QCheckBox, QFontComboBox, QSpinBox, QColorDialog, QGroupBox, QComboBox, QScrollArea, QWidget, QMessageBox, QRadioButton
+from PyQt6.QtWidgets import (
+    QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout,
+    QSlider, QCheckBox, QFontComboBox, QSpinBox, QColorDialog, QGroupBox,
+    QComboBox, QScrollArea, QWidget, QMessageBox, QRadioButton, QApplication
+)
 from PyQt6.QtCore import Qt, pyqtSignal, QObject, QEvent, QRegularExpression, QUrl
-from PyQt6.QtGui import QColor, QFont, QRegularExpressionValidator, QDesktopServices, QIntValidator
+from PyQt6.QtGui import QColor, QFont, QRegularExpressionValidator, QDesktopServices, QIntValidator, QPalette
 import os
 import sys
 import shutil
@@ -58,17 +62,8 @@ class SettingsWindow(QDialog):
 
         # Prominent Info Banner
         self.banner_label = QLabel("ℹ️ <b>Important:</b> KOverlay must remain running in the background (system tray) for the overlay to appear.")
-        self.banner_label.setStyleSheet("""
-            QLabel {
-                background-color: rgba(30, 144, 255, 0.15);
-                color: #dbeafe;
-                border: 1px solid rgba(59, 130, 246, 0.45);
-                border-radius: 6px;
-                padding: 10px 14px;
-                font-size: 11pt;
-            }
-        """)
         layout.addWidget(self.banner_label)
+        self._update_banner_style()
         
         # General Settings Group
         self.general_group = QGroupBox("General settings")
@@ -733,7 +728,77 @@ class SettingsWindow(QDialog):
                 # Only allow wheel scroll when the user specifically clicks and focuses on the widget
                 child.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-        
+        # Listen to system color scheme changes (Windows 10/11 & Linux)
+        try:
+            hints = QApplication.styleHints()
+            if hasattr(hints, 'colorSchemeChanged'):
+                hints.colorSchemeChanged.connect(self._update_banner_style)
+        except Exception:
+            pass
+
+    def _is_dark_theme(self) -> bool:
+        # 1. Official Qt 6.5+ cross-platform ColorScheme (Windows 10/11, Linux, macOS)
+        try:
+            hints = QApplication.styleHints()
+            if hasattr(hints, 'colorScheme'):
+                scheme = hints.colorScheme()
+                if scheme == Qt.ColorScheme.Dark:
+                    return True
+                elif scheme == Qt.ColorScheme.Light:
+                    return False
+        except Exception:
+            pass
+
+        # 2. Windows registry check if on Windows
+        if sys.platform == "win32":
+            try:
+                import winreg
+                key = winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+                )
+                val, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+                winreg.CloseKey(key)
+                return val == 0
+            except Exception:
+                pass
+
+        # 3. Fallback: inspect widget palette luminance
+        try:
+            window_col = self.palette().color(QPalette.ColorRole.Window)
+            text_col = self.palette().color(QPalette.ColorRole.WindowText)
+            return text_col.lightness() > window_col.lightness()
+        except Exception:
+            return False
+
+    def _update_banner_style(self, *args):
+        if not hasattr(self, 'banner_label'):
+            return
+        if self._is_dark_theme():
+            bg_col = "rgba(30, 144, 255, 0.15)"
+            text_col = "#dbeafe"
+            border_col = "rgba(59, 130, 246, 0.45)"
+        else:
+            bg_col = "#e0f2fe"
+            text_col = "#0c4a6e"
+            border_col = "#7dd3fc"
+
+        self.banner_label.setStyleSheet(f"""
+            QLabel {{
+                background-color: {bg_col};
+                color: {text_col};
+                border: 1px solid {border_col};
+                border-radius: 6px;
+                padding: 10px 14px;
+                font-size: 11pt;
+            }}
+        """)
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QEvent.Type.PaletteChange, QEvent.Type.ThemeChange):
+            self._update_banner_style()
+
     def _update_opacity_normal_label(self, val):
         self.opacity_normal_val_label.setText(f"{val}%")
 
