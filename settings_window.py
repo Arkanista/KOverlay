@@ -737,52 +737,52 @@ class SettingsWindow(QDialog):
             pass
 
     def _is_dark_theme(self) -> bool:
-        # 1. Official Qt 6.5+ cross-platform ColorScheme (Windows 10/11, Linux, macOS)
+        """
+        Determines whether the window is currently rendering in a dark theme.
+        Directly inspects the actual widget palette luminance rather than OS-level
+        hints, because on Windows Qt widgets often render in light mode even when
+        the OS taskbar/shell is dark.
+        """
         try:
-            hints = QApplication.styleHints()
-            if hasattr(hints, 'colorScheme'):
-                scheme = hints.colorScheme()
-                if scheme == Qt.ColorScheme.Dark:
-                    return True
-                elif scheme == Qt.ColorScheme.Light:
-                    return False
+            # 1. Inspect actual widget palette
+            window_col = self.palette().color(QPalette.ColorRole.Window)
+            text_col = self.palette().color(QPalette.ColorRole.WindowText)
+
+            # If default text in this window is dark (black/gray), the window is LIGHT!
+            if text_col.lightness() < 128:
+                return False
+
+            # If window background is bright (white/light gray), the window is LIGHT!
+            if window_col.lightness() >= 128:
+                return False
+
+            # If text is brighter than window background, it is DARK!
+            return text_col.lightness() > window_col.lightness()
         except Exception:
             pass
 
-        # 2. Windows registry check if on Windows
-        if sys.platform == "win32":
-            try:
-                import winreg
-                key = winreg.OpenKey(
-                    winreg.HKEY_CURRENT_USER,
-                    r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
-                )
-                val, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
-                winreg.CloseKey(key)
-                return val == 0
-            except Exception:
-                pass
-
-        # 3. Fallback: inspect widget palette luminance
+        # Fallback to style hints only if palette inspection fails
         try:
-            window_col = self.palette().color(QPalette.ColorRole.Window)
-            text_col = self.palette().color(QPalette.ColorRole.WindowText)
-            return text_col.lightness() > window_col.lightness()
+            hints = QApplication.styleHints()
+            if hasattr(hints, 'colorScheme'):
+                return hints.colorScheme() == Qt.ColorScheme.Dark
         except Exception:
-            return False
+            pass
+
+        return False
 
     def _update_banner_style(self, *args):
         try:
             if not hasattr(self, 'banner_label'):
                 return
             if self._is_dark_theme():
-                bg_col = "rgba(30, 144, 255, 0.15)"
-                text_col = "#dbeafe"
-                border_col = "rgba(59, 130, 246, 0.45)"
+                bg_col = "rgba(30, 144, 255, 0.18)"
+                text_col = "#ffffff"
+                border_col = "rgba(59, 130, 246, 0.55)"
             else:
-                bg_col = "#e0f2fe"
-                text_col = "#0c4a6e"
-                border_col = "#7dd3fc"
+                bg_col = "#dbeafe"
+                text_col = "#1e3a8a"
+                border_col = "#3b82f6"
 
             self.banner_label.setStyleSheet(f"""
                 QLabel {{
