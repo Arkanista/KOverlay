@@ -772,32 +772,42 @@ class SettingsWindow(QDialog):
             return False
 
     def _update_banner_style(self, *args):
-        if not hasattr(self, 'banner_label'):
-            return
-        if self._is_dark_theme():
-            bg_col = "rgba(30, 144, 255, 0.15)"
-            text_col = "#dbeafe"
-            border_col = "rgba(59, 130, 246, 0.45)"
-        else:
-            bg_col = "#e0f2fe"
-            text_col = "#0c4a6e"
-            border_col = "#7dd3fc"
+        try:
+            if not hasattr(self, 'banner_label'):
+                return
+            if self._is_dark_theme():
+                bg_col = "rgba(30, 144, 255, 0.15)"
+                text_col = "#dbeafe"
+                border_col = "rgba(59, 130, 246, 0.45)"
+            else:
+                bg_col = "#e0f2fe"
+                text_col = "#0c4a6e"
+                border_col = "#7dd3fc"
 
-        self.banner_label.setStyleSheet(f"""
-            QLabel {{
-                background-color: {bg_col};
-                color: {text_col};
-                border: 1px solid {border_col};
-                border-radius: 6px;
-                padding: 10px 14px;
-                font-size: 11pt;
-            }}
-        """)
+            self.banner_label.setStyleSheet(f"""
+                QLabel {{
+                    background-color: {bg_col};
+                    color: {text_col};
+                    border: 1px solid {border_col};
+                    border-radius: 6px;
+                    padding: 10px 14px;
+                    font-size: 11pt;
+                }}
+            """)
+        except Exception:
+            pass
 
     def changeEvent(self, event):
         super().changeEvent(event)
-        if event.type() in (QEvent.Type.PaletteChange, QEvent.Type.ThemeChange):
-            self._update_banner_style()
+        try:
+            if event.type() in (
+                QEvent.Type.PaletteChange,
+                QEvent.Type.ApplicationPaletteChange,
+                QEvent.Type.StyleChange
+            ):
+                self._update_banner_style()
+        except Exception:
+            pass
 
     def _update_opacity_normal_label(self, val):
         self.opacity_normal_val_label.setText(f"{val}%")
