@@ -23,8 +23,10 @@ class ScrollFilter(QObject):
                 return True
         return super().eventFilter(obj, event)
 
-class SettingsWindow(QDialog):
+class SettingsWindow(QWidget):
     config_changed = pyqtSignal()
+    finished = pyqtSignal(int)
+    closed = pyqtSignal()
 
     def __init__(self, current_config, parent=None):
         super().__init__(parent)
@@ -32,6 +34,11 @@ class SettingsWindow(QDialog):
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.setFixedWidth(1000)
         self.setMaximumHeight(768)
+
+        icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
+        if os.path.exists(icon_path):
+            from PyQt6.QtGui import QIcon
+            self.setWindowIcon(QIcon(icon_path))
         self.setStyleSheet("""
             QGroupBox {
                 border: 1px solid rgba(130, 130, 130, 0.4);
@@ -816,6 +823,24 @@ class SettingsWindow(QDialog):
                 self._update_banner_style()
         except Exception:
             pass
+
+    def accept(self):
+        self.finished.emit(1)
+        self.closed.emit()
+        self.close()
+
+    def reject(self):
+        self.finished.emit(0)
+        self.closed.emit()
+        self.close()
+
+    def setModal(self, modal=False):
+        pass
+
+    def closeEvent(self, event):
+        self.finished.emit(0)
+        self.closed.emit()
+        super().closeEvent(event)
 
     def _update_opacity_normal_label(self, val):
         self.opacity_normal_val_label.setText(f"{val}%")
