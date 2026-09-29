@@ -1081,20 +1081,18 @@ class SettingsWindow(QWidget):
     def _open_alias_window(self):
         from alias_window import AliasWindow
         dlg = AliasWindow(self.config.get("tts_aliases", {}), self)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
+        if dlg.exec() == AliasWindow.Accepted:
             self.config["tts_aliases"] = dlg.get_aliases()
             self._on_change()
-        dlg.deleteLater()
 
     def _open_prefix_window(self):
         from prefix_window import PrefixWindow
         dlg = PrefixWindow(self.config.get("nickname_prefixes", []), self)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
+        if dlg.exec() == PrefixWindow.Accepted:
             self.config["nickname_prefixes"] = dlg.get_prefixes()
             count = len(self.config["nickname_prefixes"])
             self.prefix_count_label.setText(f"({count} custom)" if count > 0 else "")
             self._on_change()
-        dlg.deleteLater()
 
     def _test_voice(self):
         voice = self.tts_voice_combo.currentData()
