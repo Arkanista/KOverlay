@@ -166,7 +166,7 @@ EOF
 # 4. Generate Inno Setup Script
 VERSION=$(grep -m1 '^pkgver=' "$SCRIPT_DIR/PKGBUILD" | cut -d= -f2 | tr -d ' ')
 if [ -z "$VERSION" ]; then
-    VERSION="0.1.19"
+    VERSION="1.0.0"
 fi
 
 cat << EOF > "$BUILD_DIR/installer.iss"

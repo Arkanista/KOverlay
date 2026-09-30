@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 project(koverlay_mumble
-    VERSION "0.1.0"
+    VERSION "1.0.0"
     DESCRIPTION "KOverlay Mumble Plugin"
     LANGUAGES CXX
 )

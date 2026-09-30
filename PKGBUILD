@@ -1,9 +1,9 @@
 pkgname=koverlay
-pkgver=0.1.19
-pkgrel=2
+pkgver=1.0.0
+pkgrel=1
 pkgdesc="A modern, universal Wayland/X11 TeamSpeak 3 and Mumble overlay with TTS voice announcements."
 arch=('any')
-url="https://github.com/arkanis/koverlay" # Replace with actual URL if known
+url="https://github.com/Arkanista/KOverlay"
 license=('GPL')
 depends=('python' 'python-pyqt6' 'qt6-svg' 'kdotool' 'xdotool' 'mpv')
 makedepends=('python-pip')

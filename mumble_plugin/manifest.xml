@@ -1,6 +1,6 @@
 <bundle version="1.0.0">
     <name>KOverlay Mumble Plugin</name>
-    <version>0.1.18</version>
+    <version>1.0.0</version>
     <description>KOverlay IPC integration plugin for Mumble</description>
     <assets>
         <plugin os="windows" arch="x64">koverlay_mumble.dll</plugin>
