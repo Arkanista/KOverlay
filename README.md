@@ -69,16 +69,16 @@ Building from source automatically handles dependency resolution, including AUR 
 
 #### Method B: Install the Pre-compiled Pacman Package
 1. Download the pre-compiled package from GitHub releases:
-   👉 **[Download KOverlay v1.0.0 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.0.0/koverlay-1.0.0-1-any.pkg.tar.zst)**
+   👉 **[Download KOverlay v1.0.0 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.0.0/koverlay-1.0.0-2-any.pkg.tar.zst)**
 2. **Important Note on Dependencies**: The package depends on `kdotool` (which is in the AUR). Standard `pacman` cannot automatically resolve or download AUR dependencies. You must install `kdotool` first:
    ```bash
    yay -S kdotool   # or: paru -S kdotool
    ```
 3. Install the downloaded package:
    ```bash
-   sudo pacman -U koverlay-1.0.0-1-any.pkg.tar.zst
+   sudo pacman -U koverlay-1.0.0-2-any.pkg.tar.zst
    # Alternatively, let your AUR helper resolve dependencies and install the local package:
-   yay -U koverlay-1.0.0-1-any.pkg.tar.zst
+   yay -U koverlay-1.0.0-2-any.pkg.tar.zst
    ```
 
 ### Microsoft Windows (10 / 11)
