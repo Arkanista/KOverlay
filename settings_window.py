@@ -938,7 +938,9 @@ class SettingsWindow(QWidget):
                 self.discord_auth_btn.setText("Authorize Discord")
                 self.discord_auth_btn.setEnabled(True)
 
-    def _on_backend_toggled(self):
+    def _on_backend_toggled(self, checked=True):
+        if not checked:
+            return
         self._sync_backend_widgets()
         self._on_change()
 

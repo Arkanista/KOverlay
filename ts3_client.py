@@ -125,11 +125,22 @@ class TS3ClientThread(QThread):
                     break
                 self.error_occurred.emit(f"Connection error: {e}")
                 self.sock = None
-                time.sleep(2) # Backoff
+                self._sleep_interruptible(2.0) # Backoff
+
+    def _sleep_interruptible(self, seconds: float):
+        deadline = time.time() + seconds
+        while self.running and time.time() < deadline:
+            time.sleep(0.05)
 
     def stop(self):
         self.running = False
         if self.sock:
-            try: self.sock.close()
-            except: pass
-        self.wait()
+            try:
+                self.sock.shutdown(socket.SHUT_RDWR)
+            except Exception:
+                pass
+            try:
+                self.sock.close()
+            except Exception:
+                pass
+        self.wait(2000)

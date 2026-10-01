@@ -83,7 +83,12 @@ class MumbleClientThread(QThread):
                     except Exception:
                         pass
                 self.sock = None
-                time.sleep(1)  # 1s backoff before reconnect
+                self._sleep_interruptible(1.0)  # 1s backoff before reconnect
+
+    def _sleep_interruptible(self, seconds: float):
+        deadline = time.time() + seconds
+        while self.running and time.time() < deadline:
+            time.sleep(0.05)
 
     def stop(self):
         self.running = False
@@ -96,4 +101,4 @@ class MumbleClientThread(QThread):
                 self.sock.close()
             except Exception:
                 pass
-        self.wait()
+        self.wait(2000)

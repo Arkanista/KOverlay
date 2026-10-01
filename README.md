@@ -30,9 +30,11 @@ Welcome to **KOverlay** – a powerful, modern overlay for Linux (X11 and Waylan
 </p>
 
 <p align="center">
-  <img src="screenshots/overlay.png" alt="KOverlay Live Voice Overlay" width="220">
+  <img src="screenshots/overlay.png" alt="KOverlay Live Voice Overlay" width="220" style="vertical-align: middle;">
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="screenshots/tray_windows.png" alt="KOverlay Windows Tray Menu & Platform Switcher" width="200" style="vertical-align: middle;">
   <br>
-  <em>Live Voice Overlay in action (Active Channel & Speaking Indicators)</em>
+  <em>Left: Live Voice Overlay in action (Active Channel & Speaking Indicators) &nbsp;|&nbsp; Right: System Tray Menu with Platform Switcher on Windows</em>
 </p>
 
 ---

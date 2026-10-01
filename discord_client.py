@@ -18,9 +18,12 @@ class DiscordIpcTransport:
     def __init__(self):
         self.sock = None
         self.win_handle = None
+        self.timeout = 2.0
+        self._closing = False
 
     def connect(self):
         self.close()
+        self._closing = False
         if sys.platform == "win32":
             return self._connect_windows()
         else:
@@ -58,6 +61,11 @@ class DiscordIpcTransport:
         INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
 
         kernel32 = ctypes.windll.kernel32
+        kernel32.CreateFileW.restype = wintypes.HANDLE
+        kernel32.CreateFileW.argtypes = [
+            wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+            ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE
+        ]
 
         for i in range(10):
             pipe_path = f"\\\\.\\pipe\\discord-ipc-{i}"
@@ -70,8 +78,9 @@ class DiscordIpcTransport:
                 FILE_ATTRIBUTE_NORMAL,
                 None
             )
-            if handle != INVALID_HANDLE_VALUE:
+            if handle != INVALID_HANDLE_VALUE and handle != -1 and handle != 0:
                 self.win_handle = handle
+                self._closing = False
                 return True
         return False
 
@@ -82,6 +91,11 @@ class DiscordIpcTransport:
             import ctypes
             from ctypes import wintypes
             kernel32 = ctypes.windll.kernel32
+            kernel32.WriteFile.argtypes = [
+                wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD,
+                ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p
+            ]
+            kernel32.WriteFile.restype = wintypes.BOOL
             written = wintypes.DWORD()
             success = kernel32.WriteFile(self.win_handle, data, len(data), ctypes.byref(written), None)
             if not success:
@@ -102,19 +116,50 @@ class DiscordIpcTransport:
             import ctypes
             from ctypes import wintypes
             kernel32 = ctypes.windll.kernel32
+            kernel32.PeekNamedPipe.argtypes = [
+                wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD,
+                ctypes.POINTER(wintypes.DWORD), ctypes.POINTER(wintypes.DWORD), ctypes.POINTER(wintypes.DWORD)
+            ]
+            kernel32.PeekNamedPipe.restype = wintypes.BOOL
+            kernel32.ReadFile.argtypes = [
+                wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD,
+                ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p
+            ]
+            kernel32.ReadFile.restype = wintypes.BOOL
+
+            start_time = time.time()
+            avail = wintypes.DWORD()
             while len(received) < length:
-                to_read = min(4096, length - len(received))
+                handle = self.win_handle
+                if self._closing or not handle:
+                    raise ConnectionResetError("Discord IPC handle closed")
+
+                success = kernel32.PeekNamedPipe(
+                    handle, None, 0, None, ctypes.byref(avail), None
+                )
+                if not success:
+                    raise ConnectionResetError("Discord IPC named pipe broken")
+
+                if avail.value == 0:
+                    if self.timeout is not None and (time.time() - start_time) >= self.timeout:
+                        raise TimeoutError("Discord IPC read timed out")
+                    time.sleep(0.02)
+                    continue
+
+                to_read = min(avail.value, length - len(received))
                 buf = ctypes.create_string_buffer(to_read)
                 read_bytes = wintypes.DWORD()
-                success = kernel32.ReadFile(self.win_handle, buf, to_read, ctypes.byref(read_bytes), None)
+                success = kernel32.ReadFile(handle, buf, to_read, ctypes.byref(read_bytes), None)
                 if not success or read_bytes.value == 0:
                     raise ConnectionResetError("Discord IPC named pipe closed")
                 received += buf.raw[:read_bytes.value]
+                start_time = time.time()
             return received
         else:
             raise OSError("Not connected to Discord IPC")
 
     def set_timeout(self, timeout_sec: float):
+        self.timeout = timeout_sec
         if self.sock:
             self.sock.settimeout(timeout_sec)
 
@@ -122,6 +167,7 @@ class DiscordIpcTransport:
     recv = recv_exact
 
     def close(self):
+        self._closing = True
         if self.sock:
             try:
                 self.sock.shutdown(socket.SHUT_RDWR)
@@ -133,13 +179,20 @@ class DiscordIpcTransport:
                 pass
             self.sock = None
         if self.win_handle:
+            handle = self.win_handle
+            self.win_handle = None
             try:
                 import ctypes
+                from ctypes import wintypes
                 kernel32 = ctypes.windll.kernel32
-                kernel32.CloseHandle(self.win_handle)
+                kernel32.CancelIoEx.argtypes = [wintypes.HANDLE, ctypes.c_void_p]
+                kernel32.CancelIoEx.restype = wintypes.BOOL
+                kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+                kernel32.CloseHandle.restype = wintypes.BOOL
+                kernel32.CancelIoEx(handle, None)
+                kernel32.CloseHandle(handle)
             except Exception:
                 pass
-            self.win_handle = None
 
 
 class DiscordClientThread(QThread):
@@ -170,8 +223,13 @@ class DiscordClientThread(QThread):
             body = self.transport.recv_exact(length)
             data = json.loads(body.decode("utf-8", errors="replace"))
             return opcode, data
-        except socket.timeout:
+        except (socket.timeout, TimeoutError):
             return None, None
+
+    def _sleep_interruptible(self, seconds: float):
+        deadline = time.time() + seconds
+        while self.running and time.time() < deadline:
+            time.sleep(0.05)
 
     def _send_cmd(self, cmd: str, args=None, evt=None):
         nonce = str(uuid.uuid4())
@@ -249,12 +307,12 @@ class DiscordClientThread(QThread):
             try:
                 if not self.access_token:
                     # Not authorized: idle peacefully without connecting or prompting Discord
-                    time.sleep(1.0)
+                    self._sleep_interruptible(1.0)
                     continue
 
                 # Connect to Discord IPC
                 if not self.transport.connect():
-                    time.sleep(2.0)
+                    self._sleep_interruptible(2.0)
                     continue
 
                 # Handshake
@@ -266,7 +324,7 @@ class DiscordClientThread(QThread):
                 # Authenticate silently using saved token
                 if not self._authenticate():
                     self.transport.close()
-                    time.sleep(2.0)
+                    self._sleep_interruptible(2.0)
                     continue
 
                 # Subscribe to global voice channel change
@@ -277,7 +335,7 @@ class DiscordClientThread(QThread):
 
                 # Event loop
                 while self.running:
-                    op, msg = self._recv_packet(timeout=1.0)
+                    op, msg = self._recv_packet(timeout=0.5)
                     if not msg:
                         continue
 
@@ -372,12 +430,12 @@ class DiscordClientThread(QThread):
                     break
                 self.error_occurred.emit(f"Discord connection error: {e}")
                 self.transport.close()
-                time.sleep(2.0)
+                self._sleep_interruptible(2.0)
 
     def stop(self):
         self.running = False
         self.transport.close()
-        self.wait(1500)
+        self.wait(2000)
 
 
 class DiscordAuthThread(QThread):

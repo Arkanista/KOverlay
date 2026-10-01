@@ -351,6 +351,8 @@ class MainApp:
         if hasattr(self, 'voice_thread') and self.voice_thread is not None:
             try:
                 self.voice_thread.stop()
+                if self.voice_thread.isRunning():
+                    self.voice_thread.wait(500)
             except Exception:
                 pass
             self.voice_thread = None
