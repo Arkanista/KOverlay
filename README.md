@@ -219,10 +219,10 @@ KOverlay connects to Mumble via a high-performance native plugin and a local IPC
 KOverlay connects directly to your running Discord desktop application using Discord's native local IPC RPC protocol:
 1. Ensure the **Discord Desktop App** is running on your machine.
 2. In KOverlay (via the system tray `Platform` submenu or in Settings), select **Discord**.
-3. On first connection, Discord will automatically pop up a native desktop authorization prompt: *"An application wants to access your Discord account"*.
-4. Simply click **Authorize**.
+3. In Settings, click **"Authorize Discord"**. Discord will pop up a desktop authorization prompt: *"An application wants to access your Discord account"*.
+4. Click **Authorize** in your Discord app.
 5. KOverlay will immediately display your currently joined voice channel, active speakers, user list, and join/leave events.
-6. The authorization token is safely saved in your local configuration, so you will not need to authorize again! If you ever want to re-authorize, click the **"Re-authorize Discord"** button in Settings.
+6. The authorization token is safely saved in your local configuration, so you will not need to authorize again! The button dynamically switches to **"Unauthorize Discord"** if you ever wish to disconnect or clear the authorization.
 
 > [!NOTE]
 > Discord integration tracks the **voice channel** you are currently connected to. When you switch voice channels, KOverlay automatically updates the overlay to show your current channel members. Zero bot configuration, developer portal setup, or server admin permissions are required!
