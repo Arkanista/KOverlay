@@ -1,7 +1,23 @@
 # <img src="icon.png" width="48" align="center"> KOverlay User Manual
 > ✨ *Entirely vibecoded by Gemini* ✨
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+<p align="center">
+  <a href="https://buymeacoffee.com/arkanis" target="_blank">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50">
+  </a>
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License: GPL v3"></a>
+  &nbsp;
+  <a href="https://buymeacoffee.com/arkanis" target="_blank"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=flat&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me A Coffee"></a>
+</p>
+
+> [!NOTE]
+> ☕ **Podoba Ci się KOverlay? / Enjoying KOverlay?**  
+> Jeśli ten program jest dla Ciebie przydatny i chcesz wesprzeć moją pracę, możesz postawić mi kawę:  
+> 👉 **[Kup kawę na buymeacoffee.com/arkanis](https://buymeacoffee.com/arkanis)** — dziękuję za każde wsparcie! ❤️
+
 
 > [!TIP]
 > **What's New in v1.1.0 (Discord Voice Integration & Tray Platform Switcher):**
@@ -330,7 +346,20 @@ The *Settings* window offers highly advanced overlay customization. All options 
 
 ---
 
+## Support
+
+If you find KOverlay useful and want to support its ongoing development, you can buy me a coffee!
+
+<p align="center">
+  <a href="https://buymeacoffee.com/arkanis" target="_blank">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50">
+  </a>
+</p>
+
+---
+
 ## License
 
 This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. See the [LICENSE](LICENSE) file for the full text of the license.
+
 
