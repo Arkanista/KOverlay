@@ -116,6 +116,18 @@ class TTSManager:
         except queue.Full:
             print("TTS Queue is full. Dropping message:", text)
 
+    def clear_queue(self):
+        """Clears all pending announcements from the queue."""
+        try:
+            while not self.message_queue.empty():
+                try:
+                    self.message_queue.get_nowait()
+                    self.message_queue.task_done()
+                except Exception:
+                    break
+        except Exception:
+            pass
+
     def stop(self):
         """Signal the worker thread to stop processing."""
         self.is_running = False

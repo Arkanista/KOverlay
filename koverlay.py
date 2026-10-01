@@ -357,8 +357,11 @@ class MainApp:
                 pass
             self.voice_thread = None
 
-        # Clear overlay users when switching voice backend
-        self.on_clients_updated([], None)
+        # Cleanly reset overlays and TTS queue when switching voice backend
+        from tts_manager import get_tts_manager
+        get_tts_manager().clear_queue()
+        for overlay in self.overlays.values():
+            overlay.reset_voice_state()
 
         backend = self.cfg.get("voice_backend", "ts3")
         self.voice_backend = backend

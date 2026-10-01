@@ -37,6 +37,7 @@ class OverlayWindow(QWidget):
         self.last_talk_time = {}
         self.talking_now = {}
         self.last_clients = []
+        self.is_initial_snapshot = True
         
         # Give this widget an object name to apply styles exclusively
         self.setObjectName("OverlayWindowMain")
@@ -404,6 +405,25 @@ class OverlayWindow(QWidget):
         if hasattr(self, 'last_clients') and self.last_clients:
             self.update_clients(self.last_clients, getattr(self, 'current_cid', None))
 
+    def reset_voice_state(self):
+        """Cleanly resets all user history, labels, and state without triggering leave/join events or TTS."""
+        self.user_history.clear()
+        self.last_talk_time.clear()
+        self.talking_now.clear()
+        self.last_clients = []
+        self.current_cid = None
+        self.is_initial_snapshot = True
+
+        for name, lbl in list(self.labels.items()):
+            self.users_container.removeWidget(lbl)
+            lbl.deleteLater()
+        self.labels.clear()
+
+        if hasattr(self, 'fade_timer') and self.fade_timer.isActive():
+            self.fade_timer.stop()
+
+        self.adjustSize()
+
     def update_clients(self, clients, my_cid=None):
         # Filter out unknown/placeholder/User_XX names so they are never displayed or announced
         clean_clients = []
@@ -413,6 +433,11 @@ class OverlayWindow(QWidget):
                 continue
             clean_clients.append(c)
         clients = clean_clients
+
+        # If disconnected from voice / not in any channel
+        if not clients and my_cid is None:
+            self.reset_voice_state()
+            return
 
         self.last_clients = clients
         import time
@@ -441,19 +466,22 @@ class OverlayWindow(QWidget):
         if my_cid is not None:
             self.current_cid = my_cid
         
-        was_empty = len(self.user_history) == 0
-        
+        was_empty = (len(self.user_history) == 0)
+        is_initial = getattr(self, 'is_initial_snapshot', False) or was_empty or changed_channel
+        if clients:
+            self.is_initial_snapshot = False
+
         # Update user history
         if history_enabled:
             # Mark new users
             for c in clients:
                 name = c["name"]
                 if name not in self.user_history:
-                    # User wasn't seen before, they joined now
-                    join_time = 0 if (was_empty or changed_channel) else current_time
+                    # User wasn't seen before, they joined now (join_time = 0 on initial snapshot/channel switch so no '+')
+                    join_time = 0 if is_initial else current_time
                     self.user_history[name] = {"join_time": join_time, "leave_time": None}
                     
-                    if not (was_empty or changed_channel) and self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
+                    if not is_initial and self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
                         if self.config.get("tts_join_enabled", True):
                             template = self.config.get("tts_join_text", "%NICK joined")
                             from tts_manager import get_tts_manager, apply_tts_aliases
@@ -470,9 +498,10 @@ class OverlayWindow(QWidget):
                     # User is known, if they previously left, they are back
                     if self.user_history[name]["leave_time"] is not None:
                         # Re-joined! We update join_time and clear leave_time
-                        self.user_history[name] = {"join_time": current_time, "leave_time": None}
+                        join_time = 0 if is_initial else current_time
+                        self.user_history[name] = {"join_time": join_time, "leave_time": None}
                         
-                        if self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
+                        if not is_initial and self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
                             if self.config.get("tts_join_enabled", True):
                                 template = self.config.get("tts_join_text", "%NICK joined")
                                 from tts_manager import get_tts_manager, apply_tts_aliases
@@ -486,31 +515,32 @@ class OverlayWindow(QWidget):
                                 from tts_manager import get_tts_manager
                                 get_tts_manager().enqueue(text, voice=voice, volume=vol, delay=delay, rate=rate)
             
-            # Mark users who left
-            for name, data in list(self.user_history.items()):
-                if name not in active_names:
-                    if data["leave_time"] is None:
-                        # User just left
-                        data["leave_time"] = current_time
-                        
-                        if self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
-                            if self.config.get("tts_leave_enabled", False):
-                                template = self.config.get("tts_leave_text", "%NICK left")
-                                from tts_manager import get_tts_manager, apply_tts_aliases
-                                from config import clean_nickname
-                                spoken_name = apply_tts_aliases(clean_nickname(name, self.config), self.config.get("tts_aliases", {}))
-                                text = template.replace("%NICK", spoken_name)
-                                delay = self.config.get("tts_delay_ms", 0) / 1000.0
-                                voice = self.config.get("tts_voice", "en-US-AriaNeural")
-                                rate = self.config.get("tts_rate", "+0%")
-                                vol = self.config.get("tts_volume", 80)
-                                from tts_manager import get_tts_manager
-                                get_tts_manager().enqueue(text, voice=voice, volume=vol, delay=delay, rate=rate)
-                    elif current_time - data["leave_time"] > history_duration:
-                        # User left longer than history_duration, remove from history
-                        del self.user_history[name]
-                        self.last_talk_time.pop(name, None)
-                        self.talking_now.pop(name, None)
+            # Mark users who left (only when not in an initial snapshot or channel switch)
+            if not is_initial:
+                for name, data in list(self.user_history.items()):
+                    if name not in active_names:
+                        if data["leave_time"] is None:
+                            # User just left
+                            data["leave_time"] = current_time
+                            
+                            if self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
+                                if self.config.get("tts_leave_enabled", False):
+                                    template = self.config.get("tts_leave_text", "%NICK left")
+                                    from tts_manager import get_tts_manager, apply_tts_aliases
+                                    from config import clean_nickname
+                                    spoken_name = apply_tts_aliases(clean_nickname(name, self.config), self.config.get("tts_aliases", {}))
+                                    text = template.replace("%NICK", spoken_name)
+                                    delay = self.config.get("tts_delay_ms", 0) / 1000.0
+                                    voice = self.config.get("tts_voice", "en-US-AriaNeural")
+                                    rate = self.config.get("tts_rate", "+0%")
+                                    vol = self.config.get("tts_volume", 80)
+                                    from tts_manager import get_tts_manager
+                                    get_tts_manager().enqueue(text, voice=voice, volume=vol, delay=delay, rate=rate)
+                        elif current_time - data["leave_time"] > history_duration:
+                            # User left longer than history_duration, remove from history
+                            del self.user_history[name]
+                            self.last_talk_time.pop(name, None)
+                            self.talking_now.pop(name, None)
         else:
             # History disabled, just match active clients directly
             self.user_history = {}

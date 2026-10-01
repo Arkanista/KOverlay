@@ -14,9 +14,9 @@
 </p>
 
 > [!NOTE]
-> ☕ **Podoba Ci się KOverlay? / Enjoying KOverlay?**  
-> Jeśli ten program jest dla Ciebie przydatny i chcesz wesprzeć moją pracę, możesz postawić mi kawę:  
-> 👉 **[Kup kawę na buymeacoffee.com/arkanis](https://buymeacoffee.com/arkanis)** — dziękuję za każde wsparcie! ❤️
+> ☕ **Enjoying KOverlay?**  
+> If you find this software useful and would like to support its ongoing development, you can buy me a coffee:  
+> 👉 **[Buy me a coffee on buymeacoffee.com/arkanis](https://buymeacoffee.com/arkanis)** — thank you for your support! ❤️
 
 
 > [!TIP]
