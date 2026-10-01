@@ -7,15 +7,16 @@ class TrayIcon(QSystemTrayIcon):
     move_toggled = pyqtSignal(bool)
     mute_toggled = pyqtSignal(bool)
     overlay_toggled = pyqtSignal(str, bool)
+    platform_changed = pyqtSignal(str)
     settings_requested = pyqtSignal()
     quit_requested = pyqtSignal()
 
-    def __init__(self, parent=None, initial_mute=False, overlays_config=None):
+    def __init__(self, parent=None, initial_mute=False, overlays_config=None, initial_platform="ts3"):
         super().__init__(parent)
         
         icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
         self.setIcon(QIcon(icon_path))
-        self.setToolTip("KOverlay v1.0.0")
+        self.setToolTip("KOverlay v1.1.0")
         
         # Create menu
         self.menu = QMenu()
@@ -45,6 +46,23 @@ class TrayIcon(QSystemTrayIcon):
 
         self.menu.addSeparator()
         
+        # Platform Submenu
+        self.platform_menu = self.menu.addMenu("Platform")
+        
+        self.action_ts3 = self.platform_menu.addAction("TeamSpeak 3")
+        self.action_ts3.setCheckable(True)
+        self.action_ts3.triggered.connect(lambda: self._on_platform_clicked("ts3"))
+        
+        self.action_mumble = self.platform_menu.addAction("Mumble")
+        self.action_mumble.setCheckable(True)
+        self.action_mumble.triggered.connect(lambda: self._on_platform_clicked("mumble"))
+        
+        self.action_discord = self.platform_menu.addAction("Discord")
+        self.action_discord.setCheckable(True)
+        self.action_discord.triggered.connect(lambda: self._on_platform_clicked("discord"))
+
+        self.set_active_platform(initial_platform)
+        
         self.settings_action = self.menu.addAction("Settings")
         self.settings_action.triggered.connect(self.settings_requested.emit)
         
@@ -55,8 +73,25 @@ class TrayIcon(QSystemTrayIcon):
         
         self.setContextMenu(self.menu)
 
+    def _on_platform_clicked(self, platform):
+        self.set_active_platform(platform)
+        self.platform_changed.emit(platform)
+
     def update_overlay_state(self, overlay_id, is_enabled):
         if overlay_id in self.overlay_actions:
             self.overlay_actions[overlay_id].blockSignals(True)
             self.overlay_actions[overlay_id].setChecked(is_enabled)
             self.overlay_actions[overlay_id].blockSignals(False)
+
+    def set_active_platform(self, platform):
+        if hasattr(self, 'action_ts3'):
+            self.action_ts3.blockSignals(True)
+            self.action_mumble.blockSignals(True)
+            self.action_discord.blockSignals(True)
+            self.action_ts3.setChecked(platform not in ("mumble", "discord"))
+            self.action_mumble.setChecked(platform == "mumble")
+            self.action_discord.setChecked(platform == "discord")
+            self.action_ts3.blockSignals(False)
+            self.action_mumble.blockSignals(False)
+            self.action_discord.blockSignals(False)
+

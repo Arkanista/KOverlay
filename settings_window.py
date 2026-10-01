@@ -81,18 +81,23 @@ class SettingsWindow(QWidget):
         backend_layout.addWidget(QLabel("<b>Voice Platform:</b>"))
         self.backend_ts3_radio = QRadioButton("TeamSpeak 3")
         self.backend_mumble_radio = QRadioButton("Mumble")
+        self.backend_discord_radio = QRadioButton("Discord")
 
         current_backend = self.config.get("voice_backend", "ts3")
-        if current_backend == "mumble":
+        if current_backend == "discord":
+            self.backend_discord_radio.setChecked(True)
+        elif current_backend == "mumble":
             self.backend_mumble_radio.setChecked(True)
         else:
             self.backend_ts3_radio.setChecked(True)
 
         self.backend_ts3_radio.toggled.connect(self._on_backend_toggled)
         self.backend_mumble_radio.toggled.connect(self._on_backend_toggled)
+        self.backend_discord_radio.toggled.connect(self._on_backend_toggled)
 
         backend_layout.addWidget(self.backend_ts3_radio)
         backend_layout.addWidget(self.backend_mumble_radio)
+        backend_layout.addWidget(self.backend_discord_radio)
         backend_layout.addStretch()
         general_group_layout.addLayout(backend_layout)
 
@@ -126,9 +131,23 @@ class SettingsWindow(QWidget):
         mumble_layout.addStretch()
         general_group_layout.addWidget(self.mumble_widget)
 
+        # 3. Discord Widget
+        self.discord_widget = QWidget()
+        discord_layout = QHBoxLayout(self.discord_widget)
+        discord_layout.setContentsMargins(0, 0, 0, 0)
+        self.discord_status_label = QLabel("Discord connects automatically via local IPC.")
+        discord_layout.addWidget(self.discord_status_label)
+        self.discord_reauth_btn = QPushButton("Re-authorize Discord")
+        self.discord_reauth_btn.clicked.connect(self._reauthorize_discord)
+        discord_layout.addWidget(self.discord_reauth_btn)
+        self.discord_unauth_btn = QPushButton("Unauthorize Discord")
+        self.discord_unauth_btn.clicked.connect(self._unauthorize_discord)
+        discord_layout.addWidget(self.discord_unauth_btn)
+        discord_layout.addStretch()
+        general_group_layout.addWidget(self.discord_widget)
+
         # Sync initial visibility
-        self.ts3_widget.setVisible(self.backend_ts3_radio.isChecked())
-        self.mumble_widget.setVisible(self.backend_mumble_radio.isChecked())
+        self._sync_backend_widgets()
 
         # Target Window Keywords
         keywords_layout = QHBoxLayout()
@@ -897,12 +916,73 @@ class SettingsWindow(QWidget):
             self._update_text_color_left_btn()
             self._on_change()
             
-    def _on_backend_toggled(self):
+    def _sync_backend_widgets(self):
         if hasattr(self, 'ts3_widget') and hasattr(self, 'backend_ts3_radio'):
             self.ts3_widget.setVisible(self.backend_ts3_radio.isChecked())
         if hasattr(self, 'mumble_widget') and hasattr(self, 'backend_mumble_radio'):
             self.mumble_widget.setVisible(self.backend_mumble_radio.isChecked())
+        if hasattr(self, 'discord_widget') and hasattr(self, 'backend_discord_radio'):
+            self.discord_widget.setVisible(self.backend_discord_radio.isChecked())
+            self._update_discord_status_label()
+
+    def _update_discord_status_label(self):
+        if hasattr(self, 'discord_status_label') and hasattr(self, 'discord_unauth_btn'):
+            token = self.config.get("discord_access_token", "")
+            if token:
+                self.discord_status_label.setText("Discord: Authorized (Local IPC)")
+                self.discord_unauth_btn.setEnabled(True)
+            else:
+                self.discord_status_label.setText("Discord: Not authorized (Requires consent)")
+                self.discord_unauth_btn.setEnabled(False)
+
+    def _on_backend_toggled(self):
+        self._sync_backend_widgets()
         self._on_change()
+
+    def set_active_platform(self, platform):
+        if hasattr(self, 'backend_ts3_radio'):
+            self.backend_ts3_radio.blockSignals(True)
+            self.backend_mumble_radio.blockSignals(True)
+            self.backend_discord_radio.blockSignals(True)
+            if platform == "discord":
+                self.backend_discord_radio.setChecked(True)
+            elif platform == "mumble":
+                self.backend_mumble_radio.setChecked(True)
+            else:
+                self.backend_ts3_radio.setChecked(True)
+            self.backend_ts3_radio.blockSignals(False)
+            self.backend_mumble_radio.blockSignals(False)
+            self.backend_discord_radio.blockSignals(False)
+            self._sync_backend_widgets()
+
+    def _reauthorize_discord(self):
+        self.config["discord_access_token"] = ""
+        self._on_change()
+        self._update_discord_status_label()
+        QMessageBox.information(
+            self,
+            "Discord Re-authorization",
+            "Discord authorization token cleared.<br><br>When KOverlay connects to Discord, click <b>Authorize</b> in your Discord app."
+        )
+
+    def _unauthorize_discord(self):
+        reply = QMessageBox.question(
+            self,
+            "Unauthorize Discord",
+            "Are you sure you want to unauthorize Discord?<br><br>"
+            "This will clear the saved Discord authorization token.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self.config["discord_access_token"] = ""
+            self._on_change()
+            self._update_discord_status_label()
+            QMessageBox.information(
+                self,
+                "Discord Unauthorized",
+                "Discord access token has been cleared successfully."
+            )
 
     def _install_mumble_plugin(self):
         if sys.platform == "win32":
@@ -1021,7 +1101,12 @@ class SettingsWindow(QWidget):
                 self.config["overlay_ids"][o_id] = {}
             self.config["overlay_ids"][o_id]["enabled"] = cb.isChecked()
             
-        self.config["voice_backend"] = "mumble" if hasattr(self, 'backend_mumble_radio') and self.backend_mumble_radio.isChecked() else "ts3"
+        if hasattr(self, 'backend_discord_radio') and self.backend_discord_radio.isChecked():
+            self.config["voice_backend"] = "discord"
+        elif hasattr(self, 'backend_mumble_radio') and self.backend_mumble_radio.isChecked():
+            self.config["voice_backend"] = "mumble"
+        else:
+            self.config["voice_backend"] = "ts3"
         if hasattr(self, 'mumble_port_spin'):
             self.config["mumble_port"] = self.mumble_port_spin.value()
         self.config["api_key"] = self.api_key_input.text().strip()

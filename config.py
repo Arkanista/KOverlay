@@ -13,6 +13,8 @@ def load_config():
         "voice_backend": "ts3",
         "api_key": "",
         "mumble_port": 25640,
+        "discord_client_id": "207646673902501888",
+        "discord_access_token": "",
         "opacity": 0.8,
         "recent_speakers_first": False,
         "speaker_fade_duration": 5,
@@ -31,6 +33,10 @@ def load_config():
                 cfg["voice_backend"] = "ts3"
             if "mumble_port" not in cfg:
                 cfg["mumble_port"] = 25640
+            if "discord_client_id" not in cfg:
+                cfg["discord_client_id"] = "207646673902501888"
+            if "discord_access_token" not in cfg:
+                cfg["discord_access_token"] = ""
             if "recent_speakers_first" not in cfg:
                 cfg["recent_speakers_first"] = False
             if "speaker_fade_duration" not in cfg:

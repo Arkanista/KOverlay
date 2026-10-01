@@ -2,7 +2,9 @@
 > ✨ *Entirely vibecoded by Gemini* ✨
 
 > [!TIP]
-> **What's New in v1.0.0 (First Official Release):**
+> **What's New in v1.1.0 (Discord Voice Integration & Tray Platform Switcher):**
+> - 🎮 **Discord Voice Platform Integration**: Direct integration with Discord desktop client via local IPC / StreamKit protocol. Displays active voice channels, live speaking indicators, and join/leave events with zero bot setup or server permissions required.
+> - 🔄 **Dynamic System Tray Platform Switcher**: Switch effortlessly between TeamSpeak 3, Mumble, and Discord right from the system tray menu (`Platform` submenu located right above Settings) with live checkmark feedback.
 > - 🎨 **Brand New Modern Icon**: Complete visual refresh of the application icon across all platforms, including multi-resolution Windows ICO (16x16 to 256x256) and Linux Hicolor icon sets (16 to 512px).
 > - 🌗 **Adaptive Windows Dark & Light Theme**: Native integration with Windows 10 & 11 Personalization settings (dark/light palette, tray context menu styling, and immersive DWM dark titlebars) with zero overhead.
 > - 🪟 **Solid Opaque Dialogs**: Completely resolved KDE Plasma and Linux compositor translucency bugs by upgrading settings and subordinate dialogs (Aliases, Prefixes) to top-level window structures.
@@ -15,7 +17,7 @@
 > [!IMPORTANT]
 > **KOverlay must remain running in the background (in the system tray)** for the overlay to appear over your game. If KOverlay is closed, the voice overlay will not be visible.
 
-Welcome to **KOverlay** – a powerful, modern overlay for Linux (X11 and Wayland) that integrates directly with **TeamSpeak 3** and **Mumble**, featuring voice announcements (TTS) of nicknames joining and leaving your channel! This step-by-step guide will explain how to configure the connection and what each option in the program menu does.
+Welcome to **KOverlay** – a powerful, modern overlay for Linux (X11 and Wayland) and Windows that integrates directly with **TeamSpeak 3**, **Mumble**, and **Discord**, featuring voice announcements (TTS) of nicknames joining and leaving your channel! This step-by-step guide will explain how to configure the connection and what each option in the program menu does.
 
 ---
 
@@ -69,16 +71,16 @@ Building from source automatically handles dependency resolution, including AUR 
 
 #### Method B: Install the Pre-compiled Pacman Package
 1. Download the pre-compiled package from GitHub releases:
-   👉 **[Download KOverlay v1.0.0 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.0.0/koverlay-1.0.0-2-any.pkg.tar.zst)**
+   👉 **[Download KOverlay v1.1.0 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.0/koverlay-1.1.0-1-any.pkg.tar.zst)**
 2. **Important Note on Dependencies**: The package depends on `kdotool` (which is in the AUR). Standard `pacman` cannot automatically resolve or download AUR dependencies. You must install `kdotool` first:
    ```bash
    yay -S kdotool   # or: paru -S kdotool
    ```
 3. Install the downloaded package:
    ```bash
-   sudo pacman -U koverlay-1.0.0-2-any.pkg.tar.zst
+   sudo pacman -U koverlay-1.1.0-1-any.pkg.tar.zst
    # Alternatively, let your AUR helper resolve dependencies and install the local package:
-   yay -U koverlay-1.0.0-2-any.pkg.tar.zst
+   yay -U koverlay-1.1.0-1-any.pkg.tar.zst
    ```
 
 ### Microsoft Windows (10 / 11)
@@ -90,7 +92,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 1: Setup Wizard (Recommended)
 1. Download the latest installer:
-   👉 **[Download KOverlay_Setup.exe (v1.0.0)](https://github.com/Arkanista/KOverlay/releases/download/v1.0.0/KOverlay_Setup.exe)**
+   👉 **[Download KOverlay_Setup.exe (v1.1.0)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.0/KOverlay_Setup.exe)**
 2. Run `KOverlay_Setup.exe`:
    - Administrator rights are **not** required. The program installs directly into your user profile: `%LOCALAPPDATA%\Programs\KOverlay`.
    - **Mumble Check:** If Mumble is running, the installer will inform you and prompt you to close Mumble so it can safely install the Mumble plugin.
@@ -99,7 +101,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 2: Portable Archive (.zip)
 1. Download the portable package:
-   👉 **[Download KOverlay_Portable.zip (v1.0.0)](https://github.com/Arkanista/KOverlay/releases/download/v1.0.0/KOverlay_Portable.zip)**
+   👉 **[Download KOverlay_Portable.zip (v1.1.0)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.0/KOverlay_Portable.zip)**
 2. Extract the `.zip` archive to any directory you prefer (e.g. `C:\Games\KOverlay` or your Desktop).
 3. **How to Launch KOverlay:**
    - Inside the extracted folder, double-click **`KOverlay.bat`**.
@@ -175,9 +177,9 @@ To completely remove the application and its shortcuts from your system, simply 
 
 ---
 
-## Part 2: How to Connect (TeamSpeak 3 & Mumble)
+## Part 2: How to Connect (TeamSpeak 3, Mumble & Discord)
 
-KOverlay supports two distinct voice backends: **TeamSpeak 3** and **Mumble**. You can switch between them anytime in the **Settings** window under **Voice Backend**.
+KOverlay supports three voice backends: **TeamSpeak 3**, **Mumble**, and **Discord**. You can switch between them anytime directly from the **System Tray Menu** (`Platform` submenu) or in the **Settings** window.
 
 ### Option A: Connecting to TeamSpeak 3 (ClientQuery)
 KOverlay talks directly to your running TeamSpeak 3 application via the built-in **ClientQuery** plugin:
@@ -209,9 +211,21 @@ KOverlay connects to Mumble via a high-performance native plugin and a local IPC
 
 > [!TIP]
 > You can also download the standalone plugin or unified bundle directly from GitHub releases:
-> - **[koverlay_mumble.mumble_plugin (Universal Bundle)](https://github.com/Arkanista/KOverlay/releases/download/v1.0.0/koverlay_mumble.mumble_plugin)** (Double-click or import via Mumble's "Install plugin" button)
-> - **[koverlay_mumble.dll (Windows x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.0.0/koverlay_mumble.dll)**
-> - **[koverlay_mumble.so (Linux x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.0.0/koverlay_mumble.so)**
+> - **[koverlay_mumble.mumble_plugin (Universal Bundle)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.0/koverlay_mumble.mumble_plugin)** (Double-click or import via Mumble's "Install plugin" button)
+> - **[koverlay_mumble.dll (Windows x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.0/koverlay_mumble.dll)**
+> - **[koverlay_mumble.so (Linux x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.0/koverlay_mumble.so)**
+
+### Option C: Connecting to Discord (Local IPC / StreamKit)
+KOverlay connects directly to your running Discord desktop application using Discord's native local IPC RPC protocol:
+1. Ensure the **Discord Desktop App** is running on your machine.
+2. In KOverlay (via the system tray `Platform` submenu or in Settings), select **Discord**.
+3. On first connection, Discord will automatically pop up a native desktop authorization prompt: *"An application wants to access your Discord account"*.
+4. Simply click **Authorize**.
+5. KOverlay will immediately display your currently joined voice channel, active speakers, user list, and join/leave events.
+6. The authorization token is safely saved in your local configuration, so you will not need to authorize again! If you ever want to re-authorize, click the **"Re-authorize Discord"** button in Settings.
+
+> [!NOTE]
+> Discord integration tracks the **voice channel** you are currently connected to. When you switch voice channels, KOverlay automatically updates the overlay to show your current channel members. Zero bot configuration, developer portal setup, or server admin permissions are required!
 
 ---
 
@@ -220,8 +234,8 @@ KOverlay connects to Mumble via a high-performance native plugin and a local IPC
 The *Settings* window offers highly advanced overlay customization. All options are saved in real-time and updated immediately on the screen, without the need to click a "Save" button.
 
 ### Voice Backend & Connection
-*   **Voice Backend (TS3 / Mumble):** Switch the active voice client on the fly.
-*   **TS3 API Key / Mumble Port:** Authorization and port settings for the respective clients.
+*   **Voice Platform (TeamSpeak 3 / Mumble / Discord):** Switch the active voice client on the fly.
+*   **TS3 API Key / Mumble Port / Discord Re-authorization:** Authorization and port settings for the respective clients.
 *   **Target Window Keywords:** Allows you to define window titles KOverlay looks for to detect when the target game is active (e.g., `EVE - `, `exefile.exe`, `Steam`).
 *   **Show ONLY when game is active:** Automatically hides the overlay when you alt-tab out of the game.
 *   **Delay hiding when game loses focus:** Configurable grace period (1–60s) before hiding the overlay when switching windows.
@@ -297,3 +311,10 @@ The *Settings* window offers highly advanced overlay customization. All options 
 
 2. **Mute TTS Voice (Checkbox):**
    * A quick toggle switch. Checking this option will instantly mute all voice announcements without changing your master settings. Perfect for temporarily silencing the bot without having to open the full Settings panel!
+
+3. **Platform / Voice Platform (Submenu):**
+   * Placed conveniently right above the **Settings** action in the tray menu.
+   * Expands into three mutually exclusive choices: **TeamSpeak 3**, **Mumble**, and **Discord**.
+   * Displays a checkmark next to the currently active platform.
+   * Selecting another platform dynamically reconfigures the voice client on the fly, without needing to open the full Settings window or restart the app!
+

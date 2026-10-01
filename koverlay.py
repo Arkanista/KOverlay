@@ -168,7 +168,11 @@ class MainApp:
                 overlay.show()
                 self.overlays[overlay_id] = overlay
         
-        self.tray = TrayIcon(initial_mute=self.cfg.get("tts_muted", False), overlays_config=self.cfg.get("overlay_ids", {}))
+        self.tray = TrayIcon(
+            initial_mute=self.cfg.get("tts_muted", False),
+            overlays_config=self.cfg.get("overlay_ids", {}),
+            initial_platform=self.cfg.get("voice_backend", "ts3")
+        )
         self.tray.show()
 
         # Show notification so user knows KOverlay is running in system tray
@@ -186,6 +190,7 @@ class MainApp:
         self.tray.move_toggled.connect(self.on_move_toggled)
         self.tray.mute_toggled.connect(self.on_mute_toggled)
         self.tray.overlay_toggled.connect(self.on_tray_overlay_toggled)
+        self.tray.platform_changed.connect(self.on_platform_changed)
         self.tray.settings_requested.connect(self.show_settings)
         self.tray.quit_requested.connect(self.quit)
         
@@ -238,6 +243,16 @@ class MainApp:
         self.cfg["overlay_ids"][overlay_id]["enabled"] = is_enabled
         self.save_config()
         self.on_settings_changed()
+
+    def on_platform_changed(self, platform):
+        if self.cfg.get("voice_backend", "ts3") == platform:
+            return
+        self.cfg["voice_backend"] = platform
+        self.save_config()
+        self.tray.set_active_platform(platform)
+        if hasattr(self, 'settings_dialog') and self.settings_dialog is not None:
+            self.settings_dialog.set_active_platform(platform)
+        self.start_voice_backend()
 
     def on_blink_finished(self):
         self.on_active_window_changed(self.tracker.last_state)
@@ -310,12 +325,15 @@ class MainApp:
 
         # Check if voice backend or its connection settings changed
         backend = self.cfg.get("voice_backend", "ts3")
+        self.tray.set_active_platform(backend)
         need_restart = False
         if getattr(self, 'voice_backend', None) != backend:
             need_restart = True
         elif backend == "ts3" and getattr(self.voice_thread, 'api_key', None) != self.cfg.get("api_key", ""):
             need_restart = True
         elif backend == "mumble" and getattr(self.voice_thread, 'port', None) != self.cfg.get("mumble_port", 25640):
+            need_restart = True
+        elif backend == "discord" and getattr(self.voice_thread, 'access_token', None) != self.cfg.get("discord_access_token", ""):
             need_restart = True
 
         if need_restart:
@@ -325,6 +343,10 @@ class MainApp:
         if hasattr(self, 'tracker') and hasattr(self.tracker, 'last_state'):
             self.on_active_window_changed(self.tracker.last_state)
 
+    def _on_discord_token_saved(self, token):
+        self.cfg["discord_access_token"] = token
+        self.save_config()
+
     def start_voice_backend(self):
         if hasattr(self, 'voice_thread') and self.voice_thread is not None:
             try:
@@ -333,10 +355,20 @@ class MainApp:
                 pass
             self.voice_thread = None
 
+        # Clear overlay users when switching voice backend
+        self.on_clients_updated([], None)
+
         backend = self.cfg.get("voice_backend", "ts3")
         self.voice_backend = backend
 
-        if backend == "mumble":
+        if backend == "discord":
+            from discord_client import DiscordClientThread
+            self.voice_thread = DiscordClientThread(
+                client_id=self.cfg.get("discord_client_id", "207646673902501888"),
+                access_token=self.cfg.get("discord_access_token", ""),
+                token_save_callback=self._on_discord_token_saved
+            )
+        elif backend == "mumble":
             from mumble_client import MumbleClientThread
             self.voice_thread = MumbleClientThread(port=self.cfg.get("mumble_port", 25640))
         else:

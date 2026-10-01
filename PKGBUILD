@@ -1,7 +1,7 @@
 pkgname=koverlay
-pkgver=1.0.0
-pkgrel=2
-pkgdesc="A modern, universal Wayland/X11 TeamSpeak 3 and Mumble overlay with TTS voice announcements."
+pkgver=1.1.0
+pkgrel=1
+pkgdesc="A modern, universal Wayland/X11 TeamSpeak 3, Mumble and Discord overlay with TTS voice announcements."
 arch=('any')
 url="https://github.com/Arkanista/KOverlay"
 license=('GPL')
@@ -44,12 +44,12 @@ Version=1.5
 Type=Application
 Name=KOverlay
 GenericName=Voice Overlay
-Comment=Universal TeamSpeak 3 and Mumble Overlay with TTS
+Comment=Universal TeamSpeak 3, Mumble and Discord Overlay with TTS
 Exec=/usr/bin/koverlay
 Icon=koverlay
 Terminal=false
 Categories=Utility;Network;Audio;
-Keywords=teamspeak;ts3;mumble;overlay;tts;eve;
+Keywords=teamspeak;ts3;mumble;discord;overlay;tts;eve;
 EOF
 
     # Create wrapper executable

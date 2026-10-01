@@ -249,7 +249,7 @@ if (-not (Test-Path $regPath)) {
     New-Item -Path $regPath -Force | Out-Null
 }
 Set-ItemProperty -Path $regPath -Name "DisplayName" -Value "KOverlay"
-Set-ItemProperty -Path $regPath -Name "DisplayVersion" -Value "1.0.0"
+Set-ItemProperty -Path $regPath -Name "DisplayVersion" -Value "1.1.0"
 Set-ItemProperty -Path $regPath -Name "Publisher" -Value "Arkanis"
 Set-ItemProperty -Path $regPath -Name "DisplayIcon" -Value "$iconLocation"
 Set-ItemProperty -Path $regPath -Name "UninstallString" -Value "`"$InstallDir\uninstall_windows.bat`""

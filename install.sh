@@ -112,13 +112,13 @@ Version=1.5
 Type=Application
 Name=KOverlay
 GenericName=Voice Overlay
-Comment=Universal TeamSpeak 3 and Mumble Overlay with TTS
+Comment=Universal TeamSpeak 3, Mumble and Discord Overlay with TTS
 Exec="$INSTALL_DIR/venv/bin/python" "$INSTALL_DIR/koverlay.py"
 Path=$INSTALL_DIR
 Icon=koverlay
 Terminal=false
 Categories=Utility;Network;Audio;
-Keywords=teamspeak;ts3;mumble;overlay;tts;eve;
+Keywords=teamspeak;ts3;mumble;discord;overlay;tts;eve;
 EOL
 
 # Update desktop database

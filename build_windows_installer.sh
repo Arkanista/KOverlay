@@ -160,13 +160,18 @@ cat << 'EOF' > "$BUNDLE_DIR/PORTABLE_README.txt"
 5. FOR TEAMSPEAK 3 USERS:
    - Open TeamSpeak 3, enable ClientQuery plugin (Tools -> Options -> Addons).
    - In KOverlay Settings, choose "TeamSpeak 3" and enter your API Key.
+
+6. FOR DISCORD USERS:
+   - Ensure Discord desktop app is running.
+   - In KOverlay tray icon or Settings, switch Voice Platform to "Discord".
+   - When prompted by Discord, click "Authorize" to allow KOverlay to display voice channel activity.
 ========================================================================
 EOF
 
 # 4. Generate Inno Setup Script
 VERSION=$(grep -m1 '^pkgver=' "$SCRIPT_DIR/PKGBUILD" | cut -d= -f2 | tr -d ' ')
 if [ -z "$VERSION" ]; then
-    VERSION="1.0.0"
+    VERSION="1.1.0"
 fi
 
 cat << EOF > "$BUILD_DIR/installer.iss"
