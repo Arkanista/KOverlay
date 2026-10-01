@@ -65,7 +65,7 @@ fi
 # 4. Copy application files
 echo "[4/5] Copying application files..."
 cp *.py "$BUNDLE_DIR/"
-cp icon.png icon.ico requirements.txt "$BUNDLE_DIR/"
+cp icon.png icon.ico requirements.txt LICENSE "$BUNDLE_DIR/"
 cp -r icons "$BUNDLE_DIR/"
 if [ -d "mumble_plugin" ]; then
     cp -r mumble_plugin "$BUNDLE_DIR/"
@@ -199,6 +199,7 @@ UninstallDisplayIcon={app}\\icon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
+LicenseFile=Z:\\$SCRIPT_DIR\\LICENSE
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

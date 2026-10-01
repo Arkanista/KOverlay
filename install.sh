@@ -50,6 +50,9 @@ cp icon.png "$INSTALL_DIR/"
 if [ -f "icon.ico" ]; then
     cp icon.ico "$INSTALL_DIR/"
 fi
+if [ -f "LICENSE" ]; then
+    cp LICENSE "$INSTALL_DIR/"
+fi
 cp requirements.txt "$INSTALL_DIR/"
 if [ -d "icons" ]; then
     cp -r icons "$INSTALL_DIR/"

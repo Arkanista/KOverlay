@@ -1,6 +1,8 @@
 # <img src="icon.png" width="48" align="center"> KOverlay User Manual
 > ✨ *Entirely vibecoded by Gemini* ✨
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+
 > [!TIP]
 > **What's New in v1.1.0 (Discord Voice Integration & Tray Platform Switcher):**
 > - 🎮 **Discord Voice Platform Integration**: Direct integration with Discord desktop client via local IPC / StreamKit protocol. Displays active voice channels, live speaking indicators, and join/leave events with zero bot setup or server permissions required.
@@ -325,4 +327,10 @@ The *Settings* window offers highly advanced overlay customization. All options 
    * Expands into three mutually exclusive choices: **TeamSpeak 3**, **Mumble**, and **Discord**.
    * Displays a checkmark next to the currently active platform.
    * Selecting another platform dynamically reconfigures the voice client on the fly, without needing to open the full Settings window or restart the app!
+
+---
+
+## License
+
+This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. See the [LICENSE](LICENSE) file for the full text of the license.
 

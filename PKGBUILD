@@ -4,7 +4,7 @@ pkgrel=1
 pkgdesc="A modern, universal Wayland/X11 TeamSpeak 3, Mumble and Discord overlay with TTS voice announcements."
 arch=('any')
 url="https://github.com/Arkanista/KOverlay"
-license=('GPL')
+license=('GPL-3.0-or-later')
 depends=('python' 'python-pyqt6' 'qt6-svg' 'kdotool' 'xdotool' 'mpv')
 makedepends=('python-pip')
 source=()
@@ -14,9 +14,14 @@ package() {
     mkdir -p "$pkgdir/opt/koverlay"
     mkdir -p "$pkgdir/usr/bin"
     mkdir -p "$pkgdir/usr/share/applications"
+    mkdir -p "$pkgdir/usr/share/licenses/$pkgname"
     # Install application files and icon
     cp -r "$startdir/"*.py "$pkgdir/opt/koverlay/"
     cp "$startdir/icon.png" "$pkgdir/opt/koverlay/icon.png"
+    if [ -f "$startdir/LICENSE" ]; then
+        cp "$startdir/LICENSE" "$pkgdir/opt/koverlay/LICENSE"
+        install -Dm644 "$startdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    fi
     if [ -f "$startdir/icon.ico" ]; then
         cp "$startdir/icon.ico" "$pkgdir/opt/koverlay/icon.ico"
     fi
