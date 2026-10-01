@@ -10,6 +10,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 # Standard StreamKit Overlay Client ID
 DISCORD_CLIENT_ID = "207646673902501888"
+DEFAULT_CLIENT_ID = DISCORD_CLIENT_ID
 TOKEN_ENDPOINT = "https://streamkit.discord.com/overlay/token"
 
 class DiscordIpcTransport:
@@ -117,6 +118,9 @@ class DiscordIpcTransport:
         if self.sock:
             self.sock.settimeout(timeout_sec)
 
+    send = send_raw
+    recv = recv_exact
+
     def close(self):
         if self.sock:
             try:
@@ -207,47 +211,19 @@ class DiscordClientThread(QThread):
             return data.get("access_token", "")
 
     def _authenticate(self):
-        # 1. Try saved access token if available
-        if self.access_token:
-            self._send_cmd("AUTHENTICATE", args={"access_token": self.access_token})
-            op, resp = self._recv_packet(timeout=5.0)
-            if resp and resp.get("cmd") == "AUTHENTICATE" and resp.get("evt") != "ERROR":
-                return True
-            # Token expired or invalid
-            self.access_token = ""
-            if self.token_save_callback:
-                self.token_save_callback("")
+        if not self.access_token:
+            return False
 
-        # 2. Trigger AUTHORIZE flow (shows Discord popup if first time)
-        self._send_cmd("AUTHORIZE", args={
-            "client_id": self.client_id,
-            "scopes": ["rpc", "messages.read"],
-            "prompt": "consent"
-        })
+        self._send_cmd("AUTHENTICATE", args={"access_token": self.access_token})
+        op, resp = self._recv_packet(timeout=5.0)
+        if resp and resp.get("cmd") == "AUTHENTICATE" and resp.get("evt") != "ERROR":
+            return True
 
-        # Wait up to 60s for user authorization in Discord UI
-        start_wait = time.time()
-        while self.running and (time.time() - start_wait < 60.0):
-            op, resp = self._recv_packet(timeout=1.0)
-            if not resp:
-                continue
-            if resp.get("cmd") == "AUTHORIZE":
-                if resp.get("evt") == "ERROR":
-                    raise Exception(f"Authorization error: {resp.get('data', {}).get('message')}")
-                code = resp.get("data", {}).get("code")
-                if code:
-                    token = self._exchange_code_for_token(code)
-                    if token:
-                        self.access_token = token
-                        if self.token_save_callback:
-                            self.token_save_callback(token)
-                        # Authenticate with the newly acquired token
-                        self._send_cmd("AUTHENTICATE", args={"access_token": self.access_token})
-                        op, auth_resp = self._recv_packet(timeout=5.0)
-                        if auth_resp and auth_resp.get("cmd") == "AUTHENTICATE" and auth_resp.get("evt") != "ERROR":
-                            return True
-                    raise Exception("Failed to retrieve access token from Discord StreamKit endpoint")
-        raise TimeoutError("Timed out waiting for Discord user authorization")
+        # Token expired or invalid - clear it, but do NOT prompt Discord automatically
+        self.access_token = ""
+        if self.token_save_callback:
+            self.token_save_callback("")
+        return False
 
     def _subscribe_channel_events(self, channel_id):
         if not channel_id:
@@ -271,6 +247,11 @@ class DiscordClientThread(QThread):
     def run(self):
         while self.running:
             try:
+                if not self.access_token:
+                    # Not authorized: idle peacefully without connecting or prompting Discord
+                    time.sleep(1.0)
+                    continue
+
                 # Connect to Discord IPC
                 if not self.transport.connect():
                     time.sleep(2.0)
@@ -282,9 +263,11 @@ class DiscordClientThread(QThread):
                 if not ready or ready.get("evt") != "READY":
                     raise ConnectionError("Discord IPC handshake failed")
 
-                # Authenticate
+                # Authenticate silently using saved token
                 if not self._authenticate():
-                    raise ConnectionError("Discord authentication failed")
+                    self.transport.close()
+                    time.sleep(2.0)
+                    continue
 
                 # Subscribe to global voice channel change
                 self._send_cmd("SUBSCRIBE", evt="VOICE_CHANNEL_SELECT")
@@ -395,3 +378,99 @@ class DiscordClientThread(QThread):
         self.running = False
         self.transport.close()
         self.wait(1500)
+
+
+class DiscordAuthThread(QThread):
+    auth_success = pyqtSignal(str)
+    auth_failed = pyqtSignal(str)
+
+    def __init__(self, client_id=DEFAULT_CLIENT_ID, parent=None):
+        super().__init__(parent)
+        self.client_id = client_id
+        self.transport = DiscordIpcTransport()
+        self.running = True
+
+    def _send_packet(self, op: int, payload: dict):
+        data = json.dumps(payload).encode("utf-8")
+        header = struct.pack("<II", op, len(data))
+        self.transport.send_raw(header + data)
+
+    def _recv_packet(self, timeout=5.0):
+        if timeout is not None:
+            self.transport.set_timeout(timeout)
+        try:
+            header_data = self.transport.recv_exact(8)
+            op, length = struct.unpack("<II", header_data)
+            body = self.transport.recv_exact(length)
+            return op, json.loads(body.decode("utf-8", errors="replace"))
+        except Exception:
+            return None, None
+
+    def _send_cmd(self, cmd: str, args: dict = None, evt: str = None):
+        payload = {"cmd": cmd, "nonce": str(uuid.uuid4())}
+        if args is not None:
+            payload["args"] = args
+        if evt is not None:
+            payload["evt"] = evt
+        self._send_packet(1, payload)
+
+    def _exchange_code_for_token(self, code: str) -> str:
+        req = urllib.request.Request(
+            TOKEN_ENDPOINT,
+            data=json.dumps({"code": code}).encode("utf-8"),
+            headers={"Content-Type": "application/json", "User-Agent": "KOverlay"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8", errors="replace"))
+            return data.get("access_token", "")
+
+    def run(self):
+        try:
+            if not self.transport.connect():
+                self.auth_failed.emit("Could not connect to Discord. Make sure the Discord desktop app is running.")
+                return
+
+            # Handshake
+            self._send_packet(0, {"v": 1, "client_id": self.client_id})
+            op, ready = self._recv_packet(timeout=5.0)
+            if not ready or ready.get("evt") != "READY":
+                self.auth_failed.emit("Discord IPC handshake failed.")
+                return
+
+            # Prompt Discord for authorization
+            self._send_cmd("AUTHORIZE", args={
+                "client_id": self.client_id,
+                "scopes": ["rpc", "messages.read"],
+                "prompt": "consent"
+            })
+
+            start_wait = time.time()
+            while self.running and (time.time() - start_wait < 60.0):
+                op, resp = self._recv_packet(timeout=1.0)
+                if not resp:
+                    continue
+                if resp.get("cmd") == "AUTHORIZE":
+                    if resp.get("evt") == "ERROR":
+                        err_msg = resp.get("data", {}).get("message", "Authorization denied in Discord.")
+                        self.auth_failed.emit(f"Discord authorization error: {err_msg}")
+                        return
+                    code = resp.get("data", {}).get("code")
+                    if code:
+                        token = self._exchange_code_for_token(code)
+                        if token:
+                            self.auth_success.emit(token)
+                            return
+                        else:
+                            self.auth_failed.emit("Failed to obtain access token from Discord.")
+                            return
+            if self.running:
+                self.auth_failed.emit("Timed out waiting for authorization in Discord.")
+        except Exception as e:
+            self.auth_failed.emit(str(e))
+        finally:
+            self.transport.close()
+
+    def cancel(self):
+        self.running = False
+        self.transport.close()
+        self.wait(1000)

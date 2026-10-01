@@ -33,7 +33,8 @@ class SettingsWindow(QWidget):
         self.setWindowTitle("KOverlay Settings")
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.setFixedWidth(1000)
-        self.setMaximumHeight(768)
+        self.resize(1000, 768)
+        self.setMinimumHeight(400)
 
         icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
         if os.path.exists(icon_path):
@@ -137,14 +138,12 @@ class SettingsWindow(QWidget):
         discord_layout.setContentsMargins(0, 0, 0, 0)
         self.discord_status_label = QLabel("Discord connects automatically via local IPC.")
         discord_layout.addWidget(self.discord_status_label)
-        self.discord_reauth_btn = QPushButton("Re-authorize Discord")
-        self.discord_reauth_btn.clicked.connect(self._reauthorize_discord)
-        discord_layout.addWidget(self.discord_reauth_btn)
-        self.discord_unauth_btn = QPushButton("Unauthorize Discord")
-        self.discord_unauth_btn.clicked.connect(self._unauthorize_discord)
-        discord_layout.addWidget(self.discord_unauth_btn)
+        self.discord_auth_btn = QPushButton("Authorize Discord")
+        self.discord_auth_btn.clicked.connect(self._on_discord_auth_btn_clicked)
+        discord_layout.addWidget(self.discord_auth_btn)
         discord_layout.addStretch()
         general_group_layout.addWidget(self.discord_widget)
+        self._auth_thread = None
 
         # Sync initial visibility
         self._sync_backend_widgets()
@@ -857,6 +856,8 @@ class SettingsWindow(QWidget):
         pass
 
     def closeEvent(self, event):
+        if hasattr(self, '_auth_thread') and self._auth_thread is not None and self._auth_thread.isRunning():
+            self._auth_thread.cancel()
         self.finished.emit(0)
         self.closed.emit()
         super().closeEvent(event)
@@ -923,17 +924,19 @@ class SettingsWindow(QWidget):
             self.mumble_widget.setVisible(self.backend_mumble_radio.isChecked())
         if hasattr(self, 'discord_widget') and hasattr(self, 'backend_discord_radio'):
             self.discord_widget.setVisible(self.backend_discord_radio.isChecked())
-            self._update_discord_status_label()
+            self._update_discord_ui()
 
-    def _update_discord_status_label(self):
-        if hasattr(self, 'discord_status_label') and hasattr(self, 'discord_unauth_btn'):
+    def _update_discord_ui(self):
+        if hasattr(self, 'discord_status_label') and hasattr(self, 'discord_auth_btn'):
             token = self.config.get("discord_access_token", "")
             if token:
                 self.discord_status_label.setText("Discord: Authorized (Local IPC)")
-                self.discord_unauth_btn.setEnabled(True)
+                self.discord_auth_btn.setText("Unauthorize Discord")
+                self.discord_auth_btn.setEnabled(True)
             else:
-                self.discord_status_label.setText("Discord: Not authorized (Requires consent)")
-                self.discord_unauth_btn.setEnabled(False)
+                self.discord_status_label.setText("Discord: Not authorized")
+                self.discord_auth_btn.setText("Authorize Discord")
+                self.discord_auth_btn.setEnabled(True)
 
     def _on_backend_toggled(self):
         self._sync_backend_widgets()
@@ -955,34 +958,63 @@ class SettingsWindow(QWidget):
             self.backend_discord_radio.blockSignals(False)
             self._sync_backend_widgets()
 
-    def _reauthorize_discord(self):
-        self.config["discord_access_token"] = ""
+    def _on_discord_auth_btn_clicked(self):
+        token = self.config.get("discord_access_token", "")
+        if token:
+            reply = QMessageBox.question(
+                self,
+                "Unauthorize Discord",
+                "Are you sure you want to unauthorize Discord?<br><br>"
+                "This will disconnect KOverlay from Discord and clear the saved authorization token.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.config["discord_access_token"] = ""
+                self._on_change()
+                self._update_discord_ui()
+                QMessageBox.information(
+                    self,
+                    "Discord Unauthorized",
+                    "Discord access token has been cleared successfully."
+                )
+        else:
+            self._start_discord_authorization()
+
+    def _start_discord_authorization(self):
+        from discord_client import DiscordAuthThread
+        self.discord_auth_btn.setEnabled(False)
+        self.discord_auth_btn.setText("Authorizing... (Check Discord)")
+        self.discord_status_label.setText("Discord: Waiting for authorization in Discord...")
+
+        if hasattr(self, '_auth_thread') and self._auth_thread is not None and self._auth_thread.isRunning():
+            self._auth_thread.cancel()
+
+        self._auth_thread = DiscordAuthThread(
+            client_id=self.config.get("discord_client_id", "207646673902501888"),
+            parent=self
+        )
+        self._auth_thread.auth_success.connect(self._on_discord_auth_success)
+        self._auth_thread.auth_failed.connect(self._on_discord_auth_failed)
+        self._auth_thread.start()
+
+    def _on_discord_auth_success(self, token):
+        self.config["discord_access_token"] = token
         self._on_change()
-        self._update_discord_status_label()
+        self._update_discord_ui()
         QMessageBox.information(
             self,
-            "Discord Re-authorization",
-            "Discord authorization token cleared.<br><br>When KOverlay connects to Discord, click <b>Authorize</b> in your Discord app."
+            "Discord Authorized",
+            "Discord authorization successful!<br>KOverlay is now connected to Discord."
         )
 
-    def _unauthorize_discord(self):
-        reply = QMessageBox.question(
+    def _on_discord_auth_failed(self, error_msg):
+        self._update_discord_ui()
+        QMessageBox.warning(
             self,
-            "Unauthorize Discord",
-            "Are you sure you want to unauthorize Discord?<br><br>"
-            "This will clear the saved Discord authorization token.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
+            "Discord Authorization Failed",
+            f"Could not authorize Discord:<br><br>{error_msg}"
         )
-        if reply == QMessageBox.StandardButton.Yes:
-            self.config["discord_access_token"] = ""
-            self._on_change()
-            self._update_discord_status_label()
-            QMessageBox.information(
-                self,
-                "Discord Unauthorized",
-                "Discord access token has been cleared successfully."
-            )
 
     def _install_mumble_plugin(self):
         if sys.platform == "win32":
