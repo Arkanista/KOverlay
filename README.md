@@ -24,15 +24,15 @@ Welcome to **KOverlay** – a powerful, modern overlay for Linux (X11 and Waylan
 ## Screenshots
 
 <p align="center">
-  <img src="screenshots/settings_main.jpg" alt="KOverlay Settings - Voice & Detection" width="850">
+  <img src="screenshots/settings.png" alt="KOverlay Settings - Voice Platforms, Detection, TTS & Customization" width="850">
   <br>
-  <em>Voice Platform (TS3 & Mumble), Game Detection, Speaking Behavior & Text-to-Speech (TTS)</em>
+  <em>Unified Settings: Voice Platforms (TeamSpeak 3, Mumble, Discord), Window Detection, TTS, Multi-Overlay & Appearance</em>
 </p>
 
 <p align="center">
-  <img src="screenshots/settings_appearance.png" alt="KOverlay Settings - Overlays & Appearance" width="850">
+  <img src="screenshots/overlay.png" alt="KOverlay Live Voice Overlay" width="220">
   <br>
-  <em>Multi-Overlay Management (1–4), Dynamic Width, Opacity & Color Customization</em>
+  <em>Live Voice Overlay in action (Active Channel & Speaking Indicators)</em>
 </p>
 
 ---
