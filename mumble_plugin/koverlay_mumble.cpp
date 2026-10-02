@@ -100,7 +100,7 @@ std::string buildStateJsonLocked() {
 
     // Strictly filter: only include users who belong to the local user's current channel
     if (g_localChannel != -1) {
-        bool first = true;
+        std::vector<const UserInfo*> channelUsers;
         for (const auto &pair : g_users) {
             const UserInfo &u = pair.second;
             if (u.channel_id != g_localChannel) {
@@ -124,6 +124,26 @@ std::string buildStateJsonLocked() {
                 }
             }
 
+            channelUsers.push_back(&u);
+        }
+
+        // Sort identically to Mumble's User::lessThan (case-insensitive, then case-sensitive)
+        std::sort(channelUsers.begin(), channelUsers.end(), [](const UserInfo *a, const UserInfo *b) {
+            size_t minLen = std::min(a->name.size(), b->name.size());
+            for (size_t i = 0; i < minLen; ++i) {
+                char ca = std::tolower(static_cast<unsigned char>(a->name[i]));
+                char cb = std::tolower(static_cast<unsigned char>(b->name[i]));
+                if (ca != cb) return ca < cb;
+            }
+            if (a->name.size() != b->name.size()) {
+                return a->name.size() < b->name.size();
+            }
+            return a->name < b->name;
+        });
+
+        bool first = true;
+        for (const UserInfo *uPtr : channelUsers) {
+            const UserInfo &u = *uPtr;
             if (!first) json += ",";
             first = false;
 

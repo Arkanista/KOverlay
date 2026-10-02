@@ -24,7 +24,6 @@
 > - 🔀 **Advanced User List Sorting**: Configure your preferred sorting mode in Settings:
 >   - `Alphabetical (recent speakers on top while fading)` (**Default**): Active and fading speakers stay on top ordered by most recent speaker, then smoothly transition back into alphabetical order once fade duration finishes.
 >   - `Recent speakers on top (most recent first)`: Anyone who spoke stays pinned to the top.
->   - `Voice client order`: Matches the channel order in TeamSpeak 3 / Mumble / Discord.
 >   - `Alphabetical (speakers in-place)`: Standard alphabetical listing without moving speakers to the top.
 > - ⬇️ **Guaranteed Bottom Placement for Users Who Left**: Users who disconnected or left the channel (`✝`) are always placed at the very bottom of the overlay across all sorting modes.
 > - 🧹 **Clean Platform Switching**: Platform transitions reset state cleanly, preventing false join/leave indicator artifacts and TTS speech spam.

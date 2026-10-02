@@ -67,6 +67,8 @@ class MumbleClientThread(QThread):
                                 if not name or re.match(r"^[Uu]ser_\d+$", name) or name.lower() == "unknown":
                                     continue
                                 clients.append(c)
+                            # Sort clients identically to Mumble client's internal channel tree sorting
+                            clients.sort(key=lambda c: (c.get("name", "").casefold(), c.get("name", "")))
                             self.clients_updated.emit(clients, channel_id)
                     except json.JSONDecodeError:
                         pass

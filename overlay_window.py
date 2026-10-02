@@ -588,11 +588,8 @@ class OverlayWindow(QWidget):
 
         from config import clean_nickname
 
-        # Original order in voice client (TS3, Mumble, Discord)
-        client_order = {c["name"]: idx for idx, c in enumerate(clients)}
-
         sort_mode = self.config.get("sort_order")
-        if not sort_mode:
+        if not sort_mode or sort_mode == "voice":
             sort_mode = "recent_speakers" if self.config.get("recent_speakers_first", False) else "alphabetical_fading_top"
 
         # Build ordered list of names to display
@@ -609,19 +606,13 @@ class OverlayWindow(QWidget):
                 leave_t = data.get("leave_time", 0) or 0
                 return (99, -leave_t, cleaned)
 
-            if sort_mode == "voice":
-                # Voice client order
-                idx = client_order.get(name, 999999)
-                return (0, idx, cleaned)
-
-            elif sort_mode == "recent_speakers":
+            if sort_mode == "recent_speakers":
                 # Speaking order: most recent on top
                 last_talk = self.last_talk_time.get(name, 0)
                 if last_talk > 0:
                     return (0, -last_talk, cleaned)
                 else:
-                    idx = client_order.get(name, 999999)
-                    return (1, idx, cleaned)
+                    return (1, cleaned)
 
             elif sort_mode == "alphabetical":
                 # Alphabetical: speakers stay in-place within the list

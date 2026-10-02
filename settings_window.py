@@ -233,7 +233,6 @@ class SettingsWindow(QWidget):
         self.sort_order_combo = QComboBox()
         self.sort_order_combo.addItem("Alphabetical (recent speakers on top while fading)", "alphabetical_fading_top")
         self.sort_order_combo.addItem("Recent speakers on top (most recent first)", "recent_speakers")
-        self.sort_order_combo.addItem("Voice client order", "voice")
         self.sort_order_combo.addItem("Alphabetical (speakers in-place)", "alphabetical")
         
         current_sort = self.config.get("sort_order")

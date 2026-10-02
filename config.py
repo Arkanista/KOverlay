@@ -38,8 +38,8 @@ def load_config():
                 cfg["discord_client_id"] = "207646673902501888"
             if "discord_access_token" not in cfg:
                 cfg["discord_access_token"] = ""
-            if "sort_order" not in cfg:
-                if cfg.get("recent_speakers_first", False):
+            if "sort_order" not in cfg or cfg.get("sort_order") == "voice":
+                if cfg.get("recent_speakers_first", False) and cfg.get("sort_order") != "voice":
                     cfg["sort_order"] = "recent_speakers"
                 else:
                     cfg["sort_order"] = "alphabetical_fading_top"
