@@ -226,13 +226,32 @@ class SettingsWindow(QWidget):
         self.speakers_group = QGroupBox("User List & Speaking Behavior")
         speakers_layout = QVBoxLayout()
 
-        # Row 1: Put recent speakers at top & Limit users
+        # Row 1: Sorting options & Limit users
         row1_layout = QHBoxLayout()
-        self.recent_speakers_checkbox = QCheckBox("Add recent speakers to top of list")
-        self.recent_speakers_checkbox.setChecked(self.config.get("recent_speakers_first", False))
-        self.recent_speakers_checkbox.toggled.connect(self._on_change)
-        row1_layout.addWidget(self.recent_speakers_checkbox)
-        row1_layout.addSpacing(30)
+        row1_layout.addWidget(QLabel("User list sorting:"))
+        
+        self.sort_order_combo = QComboBox()
+        self.sort_order_combo.addItem("Alphabetical (recent speakers on top while fading)", "alphabetical_fading_top")
+        self.sort_order_combo.addItem("Recent speakers on top (most recent first)", "recent_speakers")
+        self.sort_order_combo.addItem("Voice client order", "voice")
+        self.sort_order_combo.addItem("Alphabetical (speakers in-place)", "alphabetical")
+        
+        current_sort = self.config.get("sort_order")
+        if not current_sort:
+            if "recent_speakers_first" in self.config and self.config.get("recent_speakers_first", False):
+                current_sort = "recent_speakers"
+            else:
+                current_sort = "alphabetical_fading_top"
+                
+        idx = self.sort_order_combo.findData(current_sort)
+        if idx >= 0:
+            self.sort_order_combo.setCurrentIndex(idx)
+        else:
+            self.sort_order_combo.setCurrentIndex(0)
+            
+        self.sort_order_combo.currentIndexChanged.connect(self._on_change)
+        row1_layout.addWidget(self.sort_order_combo)
+        row1_layout.addSpacing(25)
 
         self.limit_users_checkbox = QCheckBox("Limit user list to:")
         self.limit_users_checkbox.setChecked(self.config.get("limit_users_enabled", False))
@@ -250,6 +269,10 @@ class SettingsWindow(QWidget):
         row1_layout.addWidget(QLabel("users"))
         row1_layout.addStretch()
         speakers_layout.addLayout(row1_layout)
+
+        # Informational note regarding users who left
+        sort_note = QLabel("<span style='color: gray; font-size: 11px;'>Note: Users who left the channel are always placed at the bottom of the list.</span>")
+        speakers_layout.addWidget(sort_note)
 
         # Row 2: Speaker fade duration (0-60s)
         fade_layout = QHBoxLayout()
@@ -1183,7 +1206,11 @@ class SettingsWindow(QWidget):
             
         self.config["history_duration"] = self.history_dur_slider.value()
 
-        if hasattr(self, 'recent_speakers_checkbox'):
+        if hasattr(self, 'sort_order_combo'):
+            chosen_sort = self.sort_order_combo.currentData()
+            self.config["sort_order"] = chosen_sort
+            self.config["recent_speakers_first"] = (chosen_sort == "recent_speakers")
+        elif hasattr(self, 'recent_speakers_checkbox'):
             self.config["recent_speakers_first"] = self.recent_speakers_checkbox.isChecked()
         if hasattr(self, 'speaker_fade_slider'):
             self.config["speaker_fade_duration"] = self.speaker_fade_slider.value()

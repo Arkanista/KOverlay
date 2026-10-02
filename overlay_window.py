@@ -235,6 +235,9 @@ class OverlayWindow(QWidget):
         col_talking = self.config.get('text_color_talking', '#00FFCC')
         if col_talking.startswith('rgba'): col_talking = '#00FFCC'
 
+        sort_mode = self.config.get("sort_order", "alphabetical_fading_top")
+        needs_resort = False
+
         any_fading = False
         for name, lbl in list(self.labels.items()):
             data = self.user_history.get(name, {})
@@ -253,6 +256,11 @@ class OverlayWindow(QWidget):
             elif last_talk > 0 and elapsed >= fade_duration:
                 if col_normal not in lbl.styleSheet():
                     lbl.setStyleSheet(f"color: {col_normal}; background-color: transparent; border: none;")
+                    if sort_mode == "alphabetical_fading_top":
+                        needs_resort = True
+
+        if needs_resort and hasattr(self, 'last_clients') and self.last_clients is not None:
+            self.update_clients(self.last_clients, getattr(self, 'current_cid', None))
 
         if not any_fading:
             self.fade_timer.stop()
@@ -268,6 +276,7 @@ class OverlayWindow(QWidget):
         # Only trigger an update if there is something pending expiration:
         # 1) A user who left and needs to be pruned when history_duration elapses
         # 2) A user who joined recently and still has '+' displayed that needs to be removed
+        # 3) A user whose fade duration elapsed in alphabetical_fading_top mode
         has_pending = False
         if history_enabled:
             for data in self.user_history.values():
@@ -281,6 +290,17 @@ class OverlayWindow(QWidget):
         else:
             if any(d.get("leave_time") is not None for d in self.user_history.values()):
                 has_pending = True
+
+        sort_mode = self.config.get("sort_order", "alphabetical_fading_top")
+        if not has_pending and sort_mode == "alphabetical_fading_top":
+            fade_duration = float(self.config.get("speaker_fade_duration", 5))
+            if fade_duration > 0:
+                for name, data in self.user_history.items():
+                    if data.get("leave_time") is None:
+                        last_talk = self.last_talk_time.get(name, 0)
+                        if last_talk > 0 and (current_time - last_talk < fade_duration + 2):
+                            has_pending = True
+                            break
 
         if has_pending:
             self.update_clients(self.last_clients, getattr(self, 'current_cid', None))
@@ -566,26 +586,60 @@ class OverlayWindow(QWidget):
         col_left = self.config.get('text_color_left', '#808080')
         if col_left.startswith('rgba'): col_left = '#808080'
 
-        recent_speakers_first = self.config.get("recent_speakers_first", False)
+        from config import clean_nickname
+
+        # Original order in voice client (TS3, Mumble, Discord)
+        client_order = {c["name"]: idx for idx, c in enumerate(clients)}
+
+        sort_mode = self.config.get("sort_order")
+        if not sort_mode:
+            sort_mode = "recent_speakers" if self.config.get("recent_speakers_first", False) else "alphabetical_fading_top"
 
         # Build ordered list of names to display
         display_names = list(self.user_history.keys())
             
-        # We need to sort: active first, then left users
+        # We need to sort: active first, then left users always at the bottom
         def sort_key(name):
-            data = self.user_history[name]
-            is_left = data["leave_time"] is not None
+            data = self.user_history.get(name, {})
+            is_left = data.get("leave_time") is not None
+            cleaned = clean_nickname(name, self.config).lower()
+
+            # Rule: Always place users who left the channel at the bottom
             if is_left:
-                return (2, 0, name.lower())
-            
-            if recent_speakers_first:
+                leave_t = data.get("leave_time", 0) or 0
+                return (99, -leave_t, cleaned)
+
+            if sort_mode == "voice":
+                # Voice client order
+                idx = client_order.get(name, 999999)
+                return (0, idx, cleaned)
+
+            elif sort_mode == "recent_speakers":
+                # Speaking order: most recent on top
                 last_talk = self.last_talk_time.get(name, 0)
                 if last_talk > 0:
-                    return (0, -last_talk, name.lower())
+                    return (0, -last_talk, cleaned)
                 else:
-                    return (1, 0, name.lower())
-            else:
-                return (0, 0, name.lower())
+                    idx = client_order.get(name, 999999)
+                    return (1, idx, cleaned)
+
+            elif sort_mode == "alphabetical":
+                # Alphabetical: speakers stay in-place within the list
+                return (0, cleaned)
+
+            elif sort_mode == "alphabetical_fading_top":
+                # Alphabetical: recent speakers on top while talking or fading, then fall back alphabetically
+                is_talking = self.talking_now.get(name, False)
+                last_talk = self.last_talk_time.get(name, 0)
+                elapsed = current_time - last_talk if last_talk > 0 else 999999
+                is_recent_fading = is_talking or (fade_duration > 0 and last_talk > 0 and elapsed < fade_duration)
+                
+                if is_recent_fading:
+                    return (0, -last_talk, cleaned)
+                else:
+                    return (1, cleaned)
+
+            return (0, cleaned)
             
         display_names.sort(key=sort_key)
 

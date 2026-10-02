@@ -16,6 +16,7 @@ def load_config():
         "discord_client_id": "207646673902501888",
         "discord_access_token": "",
         "opacity": 0.8,
+        "sort_order": "alphabetical_fading_top",
         "recent_speakers_first": False,
         "speaker_fade_duration": 5,
         "limit_users_enabled": False,
@@ -37,8 +38,13 @@ def load_config():
                 cfg["discord_client_id"] = "207646673902501888"
             if "discord_access_token" not in cfg:
                 cfg["discord_access_token"] = ""
+            if "sort_order" not in cfg:
+                if cfg.get("recent_speakers_first", False):
+                    cfg["sort_order"] = "recent_speakers"
+                else:
+                    cfg["sort_order"] = "alphabetical_fading_top"
             if "recent_speakers_first" not in cfg:
-                cfg["recent_speakers_first"] = False
+                cfg["recent_speakers_first"] = (cfg.get("sort_order") == "recent_speakers")
             if "speaker_fade_duration" not in cfg:
                 cfg["speaker_fade_duration"] = 5
             if "limit_users_enabled" not in cfg:
