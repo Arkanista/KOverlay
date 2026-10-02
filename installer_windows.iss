@@ -2,7 +2,7 @@
 ; Generates a single-file setup wizard: KOverlay_Setup.exe
 
 #define MyAppName "KOverlay"
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "1.1.1"
 #define MyAppPublisher "Arkanis"
 #define MyAppURL "https://github.com/Arkanis/KOverlay"
 #define MyAppExeName "koverlay.py"
