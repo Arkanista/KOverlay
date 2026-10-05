@@ -4,11 +4,45 @@ import sys
 
 if sys.platform == "win32":
     app_data = os.getenv("APPDATA") or os.path.expanduser("~")
-    CONFIG_FILE = os.path.join(app_data, "koverlay", "config.json")
+    CONFIG_DIR = os.path.join(app_data, "koverlay")
+    CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
+    LEGACY_CONFIG_FILE = None
+    DOT_CONFIG_DIR = None
 else:
-    CONFIG_FILE = os.path.expanduser("~/.config/ts3-overlay/config.json")
+    xdg_config = os.getenv("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    CONFIG_DIR = os.path.join(xdg_config, "koverlay")
+    CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
+    LEGACY_CONFIG_DIR = os.path.expanduser("~/.config/ts3-overlay")
+    LEGACY_CONFIG_FILE = os.path.join(LEGACY_CONFIG_DIR, "config.json")
+
+def _migrate_legacy_config():
+    if sys.platform == "win32":
+        return
+    try:
+        # Migrate config file if new one does not exist but legacy one does
+        if not os.path.exists(CONFIG_FILE):
+            if LEGACY_CONFIG_FILE and os.path.exists(LEGACY_CONFIG_FILE):
+                os.makedirs(CONFIG_DIR, exist_ok=True)
+                import shutil
+                shutil.copy2(LEGACY_CONFIG_FILE, CONFIG_FILE)
+                print(f"[KOverlay] Migrated configuration from {LEGACY_CONFIG_FILE} to {CONFIG_FILE}")
+            elif os.path.exists(os.path.expanduser("~/.koverlay/config.json")) and not os.path.islink(os.path.expanduser("~/.koverlay")):
+                os.makedirs(CONFIG_DIR, exist_ok=True)
+                import shutil
+                shutil.copy2(os.path.expanduser("~/.koverlay/config.json"), CONFIG_FILE)
+
+        # Remove any lingering ~/.koverlay symlink if present
+        dot_symlink = os.path.expanduser("~/.koverlay")
+        if os.path.islink(dot_symlink):
+            try:
+                os.unlink(dot_symlink)
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"[KOverlay] Note during config migration: {e}")
 
 def load_config():
+    _migrate_legacy_config()
     default_config = {
         "voice_backend": "ts3",
         "api_key": "",

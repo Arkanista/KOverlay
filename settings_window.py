@@ -27,6 +27,7 @@ class SettingsWindow(QWidget):
     config_changed = pyqtSignal()
     finished = pyqtSignal(int)
     closed = pyqtSignal()
+    reset_positions_requested = pyqtSignal()
 
     def __init__(self, current_config, parent=None):
         super().__init__(parent)
@@ -193,7 +194,7 @@ class SettingsWindow(QWidget):
         self.history_group = QGroupBox("Join/Leave History")
         history_layout = QVBoxLayout()
         
-        self.history_checkbox = QCheckBox("Enable Join/Leave History (+ / ✝ indicators)")
+        self.history_checkbox = QCheckBox("Enable Join/Leave History (🡅 / 🡇 indicators)")
         self.history_checkbox.setChecked(self.config.get("history_enabled", False))
         self.history_checkbox.toggled.connect(self._on_change)
         history_layout.addWidget(self.history_checkbox)
@@ -595,6 +596,13 @@ class SettingsWindow(QWidget):
             cb.toggled.connect(self._on_change)
             self.monitor_checkboxes[overlay_id] = cb
             monitors_layout.addWidget(cb)
+            
+        monitors_layout.addStretch()
+        self.reset_positions_btn = QPushButton("Reset overlay positions")
+        self.reset_positions_btn.setToolTip("Place all overlays side-by-side in the center of the primary monitor.")
+        self.reset_positions_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.reset_positions_btn.clicked.connect(self._on_reset_positions_clicked)
+        monitors_layout.addWidget(self.reset_positions_btn)
             
         monitors_group_layout.addLayout(monitors_layout)
 
@@ -1144,6 +1152,12 @@ class SettingsWindow(QWidget):
                 )
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to execute build script:\n{e}")
+
+    def _on_reset_positions_clicked(self):
+        self.reset_positions_requested.emit()
+        self.reset_positions_btn.setText("Positions Reset! ✓")
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(2000, lambda: self.reset_positions_btn.setText("Reset overlay positions"))
 
     def _on_change(self):
         if not hasattr(self, 'monitor_checkboxes'):

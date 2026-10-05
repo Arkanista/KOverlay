@@ -199,6 +199,10 @@ class MainApp:
         self.tray.settings_requested.connect(self.show_settings)
         self.tray.quit_requested.connect(self.quit)
         
+        # Screen changes connection to prevent overlays from being lost off-screen
+        self.app.screenRemoved.connect(lambda _: self.sanitize_all_overlay_positions())
+        self.app.primaryScreenChanged.connect(lambda _: self.sanitize_all_overlay_positions())
+        
         # Voice Client Backend (TS3 or Mumble)
         self.voice_thread = None
         self.start_voice_backend()
@@ -297,11 +301,77 @@ class MainApp:
         self.settings_dialog = SettingsWindow(self.cfg)
         self.settings_dialog.config_changed.connect(self.on_settings_changed)
         self.settings_dialog.finished.connect(self.on_settings_closed)
+        self.settings_dialog.reset_positions_requested.connect(self.reset_overlay_positions)
         self.settings_dialog.setModal(False)
         self.settings_dialog.show()
 
         import theme_manager
         theme_manager.apply_window_theme(self.settings_dialog)
+
+    def reset_overlay_positions(self):
+        """
+        Positions all 4 overlays side-by-side in the center of the primary monitor.
+        """
+        primary = self.app.primaryScreen() if hasattr(self, 'app') else QApplication.primaryScreen()
+        if not primary and hasattr(self, 'app') and self.app.screens():
+            primary = self.app.screens()[0]
+        if not primary:
+            return
+            
+        avail = primary.availableGeometry()
+        gap = 24
+        
+        widths = []
+        heights = []
+        for idx in range(1, 5):
+            o_id = str(idx)
+            overlay = self.overlays.get(o_id)
+            w = overlay.width() if (overlay and overlay.width() > 100) else self.cfg.get("fixed_width", 220)
+            w = max(w, 200)
+            h = overlay.height() if (overlay and overlay.height() > 50) else 120
+            widths.append(w)
+            heights.append(h)
+            
+        total_w = sum(widths) + gap * (len(widths) - 1)
+        start_x = avail.x() + max(0, (avail.width() - total_w) // 2)
+        max_h = max(heights)
+        center_y = avail.y() + max(0, (avail.height() - max_h) // 2)
+        
+        if "overlay_ids" not in self.cfg:
+            self.cfg["overlay_ids"] = {}
+            
+        curr_x = start_x
+        for i, idx in enumerate(range(1, 5)):
+            o_id = str(idx)
+            w = widths[i]
+            
+            if o_id not in self.cfg["overlay_ids"]:
+                self.cfg["overlay_ids"][o_id] = {}
+                
+            self.cfg["overlay_ids"][o_id]["pos_x"] = curr_x
+            self.cfg["overlay_ids"][o_id]["pos_y"] = center_y
+            
+            overlay = self.overlays.get(o_id)
+            if overlay:
+                overlay.move(curr_x, center_y)
+                
+            curr_x += w + gap
+            
+        self.save_config()
+
+    def sanitize_all_overlay_positions(self):
+        """
+        Checks all overlays to ensure they are on-screen and visible.
+        If any overlay is in a dead zone or off-screen, repositions it safely.
+        """
+        for o_id, overlay in self.overlays.items():
+            mon_cfg = self.cfg.get("overlay_ids", {}).get(o_id, {})
+            pos_x = mon_cfg.get("pos_x")
+            pos_y = mon_cfg.get("pos_y")
+            if pos_x is not None and pos_y is not None:
+                new_x, new_y = overlay._sanitize_position(pos_x, pos_y)
+                if new_x != pos_x or new_y != pos_y:
+                    overlay.move(new_x, new_y)
 
     def on_settings_changed(self):
         config.save_config(self.cfg)

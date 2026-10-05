@@ -124,22 +124,83 @@ class OverlayWindow(QWidget):
         
         mon_cfg = self.config.get("overlay_ids", {}).get(self.overlay_id, {})
         if "pos_x" in mon_cfg and "pos_y" in mon_cfg:
-            self.move(mon_cfg["pos_x"], mon_cfg["pos_y"])
+            new_x, new_y = self._sanitize_position(mon_cfg["pos_x"], mon_cfg["pos_y"])
+            self.move(new_x, new_y)
         else:
-            # Fallback: center on primary screen
-            from PyQt6.QtWidgets import QApplication
-            primary_screen = QApplication.primaryScreen()
-            if primary_screen:
-                geom = primary_screen.geometry()
-                offset = 50 * self.numeric_id
-                x = geom.x() + (geom.width() - 200) // 2 + offset
-                y = geom.y() + (geom.height() - 100) // 2 + offset
-                self.move(x, y)
-            else:
-                offset = 50 * self.numeric_id
-                self.move(offset, offset)
+            new_x, new_y = self._get_default_position()
+            self.move(new_x, new_y)
             
         self.update_style()
+
+    def _sanitize_position(self, x, y):
+        """
+        Sanity check: ensures overlay (x, y) is at least partially visible on a connected monitor.
+        If it is off-screen, in a multi-monitor dead zone, or on a disconnected monitor,
+        repositions it safely on the primary monitor side-by-side with other overlays.
+        """
+        from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtCore import QRect
+        
+        app = QApplication.instance()
+        screens = app.screens() if app else []
+        if not screens:
+            return x, y
+            
+        # The top/header area of the overlay (where it can be seen and grabbed) must be on a screen
+        header_rect = QRect(int(x), int(y), 80, 30)
+        
+        for screen in screens:
+            avail = screen.availableGeometry()
+            intersect = avail.intersected(header_rect)
+            if intersect.width() >= 30 and intersect.height() >= 20:
+                return x, y  # Valid and visible
+                
+        # Off-screen or in a dead zone: reposition to primary monitor
+        new_x, new_y = self._get_default_position()
+        
+        # Persist the sanitized position into config
+        if "overlay_ids" not in self.config:
+            self.config["overlay_ids"] = {}
+        if self.overlay_id not in self.config["overlay_ids"]:
+            self.config["overlay_ids"][self.overlay_id] = {}
+        self.config["overlay_ids"][self.overlay_id]["pos_x"] = new_x
+        self.config["overlay_ids"][self.overlay_id]["pos_y"] = new_y
+        if hasattr(self, 'save_callback') and self.save_callback:
+            self.save_callback()
+            
+        return new_x, new_y
+
+    def _get_default_position(self):
+        """
+        Calculates a side-by-side centered position on the primary monitor for this overlay.
+        """
+        from PyQt6.QtWidgets import QApplication
+        
+        app = QApplication.instance()
+        primary = app.primaryScreen() if app else None
+        if not primary and app and app.screens():
+            primary = app.screens()[0]
+            
+        if not primary:
+            offset = 50 * self.numeric_id
+            return offset, offset
+            
+        avail = primary.availableGeometry()
+        gap = 24
+        overlay_w = max(self.width(), 200)
+        overlay_h = max(self.height(), 100)
+        
+        total_w = 4 * overlay_w + 3 * gap
+        start_x = avail.x() + max(0, (avail.width() - total_w) // 2)
+        center_y = avail.y() + max(0, (avail.height() - overlay_h) // 2)
+        
+        idx_offset = (self.numeric_id - 1) * (overlay_w + gap)
+        new_x = start_x + idx_offset
+        new_y = center_y
+        
+        new_x = min(max(new_x, avail.x()), avail.x() + max(0, avail.width() - overlay_w))
+        new_y = min(max(new_y, avail.y()), avail.y() + max(0, avail.height() - overlay_h))
+        return new_x, new_y
         
     def _apply_win32_click_through(self, transparent=True):
         if sys.platform != "win32":
@@ -164,10 +225,11 @@ class OverlayWindow(QWidget):
         super().showEvent(event)
         mon_cfg = self.config.get("overlay_ids", {}).get(self.overlay_id, {})
         if "pos_x" in mon_cfg and "pos_y" in mon_cfg:
-            self.move(mon_cfg["pos_x"], mon_cfg["pos_y"])
+            new_x, new_y = self._sanitize_position(mon_cfg["pos_x"], mon_cfg["pos_y"])
+            self.move(new_x, new_y)
         else:
-            offset = 50 * self.numeric_id
-            self.move(offset, offset)
+            new_x, new_y = self._get_default_position()
+            self.move(new_x, new_y)
         self._apply_win32_click_through(not self.move_mode)
 
     def paintEvent(self, event):
@@ -275,7 +337,7 @@ class OverlayWindow(QWidget):
 
         # Only trigger an update if there is something pending expiration:
         # 1) A user who left and needs to be pruned when history_duration elapses
-        # 2) A user who joined recently and still has '+' displayed that needs to be removed
+        # 2) A user who joined recently and still has '🡅' displayed that needs to be removed
         # 3) A user whose fade duration elapsed in alphabetical_fading_top mode
         has_pending = False
         if history_enabled:
@@ -680,9 +742,9 @@ class OverlayWindow(QWidget):
             clean_name = clean_nickname(name, self.config)
             display_text = clean_name
             if is_left:
-                display_text = "✝ " + clean_name
+                display_text = "🡇 " + clean_name
             elif is_new:
-                display_text = "+ " + clean_name
+                display_text = "🡅 " + clean_name
                 
             # Get talking state
             talking = self.talking_now.get(name, False)

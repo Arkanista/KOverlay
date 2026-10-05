@@ -44,7 +44,15 @@ class TTSManager:
             base_dir = os.getenv("LOCALAPPDATA") or os.path.expanduser("~")
             self.cache_dir = os.path.join(base_dir, "koverlay", "tts_cache")
         else:
-            self.cache_dir = os.path.expanduser("~/.cache/ts3-overlay/tts_cache")
+            self.cache_dir = os.path.expanduser("~/.cache/koverlay/tts_cache")
+            legacy_cache_dir = os.path.expanduser("~/.cache/ts3-overlay/tts_cache")
+            if not os.path.exists(self.cache_dir) and os.path.exists(legacy_cache_dir):
+                try:
+                    os.makedirs(os.path.dirname(self.cache_dir), exist_ok=True)
+                    import shutil
+                    shutil.copytree(legacy_cache_dir, self.cache_dir)
+                except Exception:
+                    pass
         os.makedirs(self.cache_dir, exist_ok=True)
         
         # Cleanup old files

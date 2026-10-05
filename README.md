@@ -20,11 +20,15 @@
 
 
 > [!TIP]
-> **What's New in v1.1.2 (Background State Persistence & Dynamic Overlay Lifecycle):**
+> **What's New in v1.1.2 (Background State Persistence, Sanity Checks & Navigation Enhancements):**
 > - ⚡ **Instant User List Restoration**: Toggling overlays on/off in the system tray or Settings now operates non-destructively. When an overlay is re-enabled, the channel user list and talking states are restored immediately from cache.
 > - 🎧 **Continuous Background TTS & Voice Tracking**: Full voice state tracking and TTS voice announcements continue operating in the background across all platforms (Mumble, TS3, Discord) even when all overlays are hidden or individual overlays are disabled.
 > - 🎯 **Dynamic Primary Overlay Assignment**: TTS announcements are automatically routed through the active enabled overlay (or fallback to background) without missing events.
-> - 🔀 **Customizable User List Sorting**: Choose between fading speakers on top (default), recent speakers on top, or alphabetical listing with disconnected users (`✝`) pinned to the bottom.
+> - 🔄 **Reset Overlay Positions**: A dedicated button in Settings centers all 4 overlays side-by-side on your primary monitor, immediately recovering any moved or overlapping overlays.
+> - 🛡️ **Display Topology Sanity Checks**: Off-screen and multi-monitor dead-zone detection automatically clamps overlays onto visible screen areas, protecting multi-monitor setups with staggered resolutions.
+> - 🏹 **High-Visibility Heavy Arrows**: Replaced legacy indicators with bold, distinct Unicode heavy arrows (`🡅 ` for users entering and `🡇 ` for users leaving).
+> - 📂 **Standard XDG Config Directory**: Linux configuration migrated to standard `~/.config/koverlay/` with automatic one-time migration from legacy directories.
+> - 🔀 **Customizable User List Sorting**: Choose between fading speakers on top (default), recent speakers on top, or alphabetical listing with disconnected users (`🡇`) pinned to the bottom.
 
 > [!IMPORTANT]
 > **KOverlay must remain running in the background (in the system tray)** for the overlay to appear over your game. If KOverlay is closed, the voice overlay will not be visible.
@@ -193,7 +197,7 @@ Since Bazzite, SteamOS, ChimeraOS, and other immutable distributions use a read-
    ```
 
 ### Uninstallation
-To completely remove the application and its shortcuts from your system, simply run `./uninstall.sh`. To clear user settings, delete the `~/.config/ts3-overlay/` folder.
+To completely remove the application and its shortcuts from your system, simply run `./uninstall.sh`. To clear user settings, delete the `~/.config/koverlay/` folder.
 
 ---
 
@@ -268,7 +272,8 @@ The *Settings* window offers highly advanced overlay customization. All options 
 *   **Nick Prefixes...:** Opens a dedicated dialog to configure custom prefix strings to strip (e.g. `[VIP]`, `CLAN |`, etc.) from both overlay labels and TTS announcements.
 
 ### Overlays Section
-*   **Enable Overlay 1 - 4:** KOverlay's architecture allows you to launch up to **four clones** of the overlay. This feature is dedicated to players operating on multiple monitors simultaneously. By checking the respective boxes, you "wake up" the corresponding display identifiers (IDs). For each awakened "ID", the system independently remembers its screen coordinates, allowing you to precisely assign Overlay 2 to the second monitor and Overlay 3 to the third.
+*   **Enable Overlay 1 - 4:** KOverlay's architecture allows you to launch up to **four clones** of the overlay. This feature is dedicated to players operating on multiple monitors simultaneously. By checking the respective boxes, you "wake up" the corresponding display identifiers (IDs). For each awakened "ID", the system independently remembers its screen coordinates, allowing you to precisely assign Overlay 2 to the second monitor and Overlay 3 to the third. Toggling overlays off operates non-destructively: all background processing (TTS, user tracking) remains active, and re-enabling any overlay restores the user list instantly.
+*   **Reset overlay positions:** Instantly relocates all 4 overlays side-by-side in the center of the primary monitor. If overlays have moved off-screen, overlap, or became inaccessible following display rearrangements, this button immediately brings them back cleanly into view.
 
 ### Features
 - Displays the current TeamSpeak 3 channel.
@@ -299,7 +304,7 @@ The *Settings* window offers highly advanced overlay customization. All options 
 *   **Disable border blinking on startup:** By default, KOverlay "blinks" its outer border in an aggressive red color upon invocation (for a 5-second cycle). This functionality was implemented so that the player, amidst cluttered screens, can instantly visually locate where the hidden transparent window spawned. This option permanently disables the blinking signal – maximizing minimalism.
 
 ### Join/Leave History Section
-*   **Enable Join/Leave History (+ / ✝ indicators):** When enabled, KOverlay tracks the presence of users. New users joining the channel will be prefixed with a bold `+ ` for a specified duration. Users who leave the channel will stay on the list for the specified duration but will be pushed to the bottom, prefixed with a `✝ ` symbol, and colored gray (or a custom color of your choice). This allows you to know who just entered or left without looking at the TS3 window!
+*   **Enable Join/Leave History (🡅 / 🡇 indicators):** When enabled, KOverlay tracks the presence of users. New users joining the channel will be prefixed with a bold upward arrow `🡅 ` for a specified duration. Users who leave the channel will stay on the list for the specified duration but will be pushed to the bottom, prefixed with a downward arrow `🡇 ` symbol, and colored gray (or a custom color of your choice). This allows you to know who just entered or left without looking at the TS3 window!
 *   **History Duration:** Defines how long (in seconds) the new/left users keep their visual indicators before fading away (left users) or turning into regular users (new users).
 
 ### Text-to-Speech (TTS) Section

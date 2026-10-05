@@ -37,4 +37,4 @@ if [ -f "$MUMBLE_PLUGIN" ]; then
 fi
 
 echo "Uninstallation complete! The application has been removed from your system."
-echo "Note: The configuration files in ~/.config/ts3-overlay/ were kept intact. If you want to delete them as well, run: rm -rf ~/.config/ts3-overlay"
+echo "Note: The configuration files in ~/.config/koverlay/ were kept intact. If you want to delete them as well, run: rm -rf ~/.config/koverlay"
