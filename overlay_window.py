@@ -343,7 +343,11 @@ class OverlayWindow(QWidget):
             
         self.setWindowFlags(flags)
         self.update_style()
-        self.show()
+        is_enabled = self.config.get("overlay_ids", {}).get(self.overlay_id, {}).get("enabled", False)
+        if self.move_mode or is_enabled:
+            self.show()
+        else:
+            self.hide()
         self._apply_win32_click_through(not self.move_mode)
         
     def update_style(self):
@@ -444,7 +448,12 @@ class OverlayWindow(QWidget):
 
         self.adjustSize()
 
-    def update_clients(self, clients, my_cid=None):
+    def update_clients(self, clients=None, my_cid=None):
+        if clients is None:
+            clients = getattr(self, 'last_clients', [])
+        if my_cid is None:
+            my_cid = getattr(self, 'current_cid', None)
+
         # Filter out unknown/placeholder/User_XX names so they are never displayed or announced
         clean_clients = []
         for c in clients:

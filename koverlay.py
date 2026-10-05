@@ -65,28 +65,29 @@ def show_already_running_message():
             pass
     print("KOverlay is already running. Exiting.")
 
-lock_file_path = os.path.join(tempfile.gettempdir(), 'koverlay.lock')
-lock_file = open(lock_file_path, 'w')
-try:
-    # Ensure single instance
-    from PyQt6.QtCore import QSharedMemory
-    shared_memory = QSharedMemory("KOverlay_TS3_Instance")
-    if shared_memory.attach():
-        shared_memory.detach()
-        
-    if not shared_memory.create(1):
+def ensure_single_instance():
+    global lock_file, shared_memory
+    lock_file_path = os.path.join(tempfile.gettempdir(), 'koverlay.lock')
+    lock_file = open(lock_file_path, 'w')
+    try:
+        from PyQt6.QtCore import QSharedMemory
+        shared_memory = QSharedMemory("KOverlay_TS3_Instance")
+        if shared_memory.attach():
+            shared_memory.detach()
+            
+        if not shared_memory.create(1):
+            show_already_running_message()
+            sys.exit(0)
+
+        if sys.platform != "win32":
+            import fcntl
+            fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        else:
+            import msvcrt
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+    except (IOError, OSError):
         show_already_running_message()
         sys.exit(0)
-
-    if sys.platform != "win32":
-        import fcntl
-        fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    else:
-        import msvcrt
-        msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
-except (IOError, OSError):
-    show_already_running_message()
-    sys.exit(0)
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QTimer
@@ -156,17 +157,21 @@ class MainApp:
                 }
             config.save_config(self.cfg)
         
-        # Setup UI for multiple overlays
+        # Setup UI for multiple overlays (all 4 overlays always created so they function in background)
         self.overlays = {}
         for index in range(1, 5):
             overlay_id = str(index)
-            mon_cfg = self.cfg["overlay_ids"].get(overlay_id, {})
-            is_enabled = mon_cfg.get("enabled", False)
-            if is_enabled:
-                overlay = OverlayWindow(self.cfg, overlay_id, index)
-                overlay.save_callback = self.save_config
+            overlay = OverlayWindow(self.cfg, overlay_id, index)
+            overlay.save_callback = self.save_config
+            overlay.blink_finished.connect(self.on_blink_finished)
+            self.overlays[overlay_id] = overlay
+            if self.is_overlay_enabled(overlay_id):
                 overlay.show()
-                self.overlays[overlay_id] = overlay
+            else:
+                overlay.hide()
+
+        self.last_clients = []
+        self.last_cid = None
         
         self.tray = TrayIcon(
             initial_mute=self.cfg.get("tts_muted", False),
@@ -206,28 +211,41 @@ class MainApp:
         self.tracker.active_window_changed.connect(self.on_active_window_changed)
         self.tracker.start()
         
-        for overlay in self.overlays.values():
-            overlay.blink_finished.connect(self.on_blink_finished)
-        
         # Check if API key is missing (only for TS3 backend)
         if self.cfg.get("voice_backend", "ts3") == "ts3" and not self.cfg.get("api_key"):
             self.show_settings()
             
         # Start the blink effect requested by the user
         if not self.cfg.get("disable_blink", False):
-            for overlay in self.overlays.values():
-                overlay.start_blink()
+            for overlay_id, overlay in self.overlays.items():
+                if self.is_overlay_enabled(overlay_id):
+                    overlay.start_blink()
+
+    def is_overlay_enabled(self, overlay_id):
+        return bool(self.cfg.get("overlay_ids", {}).get(str(overlay_id), {}).get("enabled", False))
 
     def on_clients_updated(self, clients, my_cid=None):
-        first = True
-        for overlay in self.overlays.values():
-            overlay.is_primary = first
-            first = False
+        self.last_clients = clients
+        self.last_cid = my_cid
+        
+        # Choose primary overlay for TTS: first enabled overlay, or "1" if all are hidden
+        primary_id = "1"
+        for idx in ("1", "2", "3", "4"):
+            if self.is_overlay_enabled(idx) and idx in self.overlays:
+                primary_id = idx
+                break
+
+        for overlay_id, overlay in self.overlays.items():
+            overlay.is_primary = (overlay_id == primary_id)
             overlay.update_clients(clients, my_cid)
 
     def on_move_toggled(self, enabled):
-        for overlay in self.overlays.values():
-            overlay.set_move_mode(enabled)
+        for overlay_id, overlay in self.overlays.items():
+            if self.is_overlay_enabled(overlay_id):
+                overlay.set_move_mode(enabled)
+            else:
+                overlay.set_move_mode(False)
+                overlay.hide()
             
         # Force visibility sync after exiting move mode
         if not enabled and hasattr(self, 'tracker') and hasattr(self.tracker, 'last_state'):
@@ -272,8 +290,9 @@ class MainApp:
             self.settings_dialog.activateWindow()
             return
 
-        for overlay in self.overlays.values():
-            overlay.set_move_mode(True)
+        for overlay_id, overlay in self.overlays.items():
+            if self.is_overlay_enabled(overlay_id):
+                overlay.set_move_mode(True)
 
         self.settings_dialog = SettingsWindow(self.cfg)
         self.settings_dialog.config_changed.connect(self.on_settings_changed)
@@ -287,30 +306,43 @@ class MainApp:
     def on_settings_changed(self):
         config.save_config(self.cfg)
         
-        # Add or remove overlays based on checkboxes
+        is_settings_open = hasattr(self, 'settings_dialog') and self.settings_dialog is not None
+        is_move_toggled = self.tray.move_action.isChecked()
+
+        # Update overlay states based on checkboxes (never delete, only hide/show)
         for index in range(1, 5):
             overlay_id = str(index)
-            is_enabled = self.cfg["overlay_ids"].get(overlay_id, {}).get("enabled", False)
+            is_enabled = self.is_overlay_enabled(overlay_id)
             
             # Keep tray icon in sync
             self.tray.update_overlay_state(overlay_id, is_enabled)
+
+            # Keep settings dialog checkboxes in sync if open
+            if hasattr(self, 'settings_dialog') and self.settings_dialog is not None and hasattr(self.settings_dialog, 'monitor_checkboxes'):
+                cb = self.settings_dialog.monitor_checkboxes.get(overlay_id)
+                if cb and cb.isChecked() != is_enabled:
+                    cb.blockSignals(True)
+                    cb.setChecked(is_enabled)
+                    cb.blockSignals(False)
             
-            if is_enabled and overlay_id not in self.overlays:
+            overlay = self.overlays.get(overlay_id)
+            if overlay is None:
                 overlay = OverlayWindow(self.cfg, overlay_id, index)
                 overlay.save_callback = self.save_config
                 overlay.blink_finished.connect(self.on_blink_finished)
-                is_settings_open = hasattr(self, 'settings_dialog') and self.settings_dialog is not None
-                is_move_toggled = self.tray.move_action.isChecked()
-                overlay.set_move_mode(is_settings_open or is_move_toggled)
                 self.overlays[overlay_id] = overlay
-                
-            elif not is_enabled and overlay_id in self.overlays:
-                overlay = self.overlays[overlay_id]
+                if hasattr(self, 'last_clients') and self.last_clients:
+                    overlay.update_clients(self.last_clients, getattr(self, 'last_cid', None))
+
+            if is_enabled:
+                overlay.set_move_mode(is_settings_open or is_move_toggled)
+                overlay.update_clients()
+            else:
+                if getattr(overlay, 'move_mode', False):
+                    overlay.set_move_mode(False)
                 overlay.hide()
-                overlay.deleteLater()
-                del self.overlays[overlay_id]
                 
-        # Update styling for all active overlays
+        # Update styling for all overlays
         for overlay in self.overlays.values():
             overlay.update_style()
             
@@ -339,7 +371,7 @@ class MainApp:
         if need_restart:
             self.start_voice_backend()
 
-        # Force visibility sync for newly added overlays
+        # Force visibility sync for overlays
         if hasattr(self, 'tracker') and hasattr(self.tracker, 'last_state'):
             self.on_active_window_changed(self.tracker.last_state)
 
@@ -387,8 +419,11 @@ class MainApp:
         
     def on_settings_closed(self):
         self.settings_dialog = None
-        for overlay in self.overlays.values():
-            overlay.set_move_mode(False)
+        for overlay_id, overlay in self.overlays.items():
+            if getattr(overlay, 'move_mode', False):
+                overlay.set_move_mode(False)
+            if not self.is_overlay_enabled(overlay_id):
+                overlay.hide()
             
         # Force visibility sync after settings close
         if hasattr(self, 'tracker') and hasattr(self.tracker, 'last_state'):
@@ -402,14 +437,20 @@ class MainApp:
         if hasattr(self, 'settings_dialog') and self.settings_dialog is not None:
             force_show = True
             
-        for overlay in self.overlays.values():
-            if getattr(overlay, 'move_mode', False) or getattr(overlay, 'is_blinking', False):
-                force_show = True
+        for overlay_id, overlay in self.overlays.items():
+            if self.is_overlay_enabled(overlay_id):
+                if getattr(overlay, 'move_mode', False) or getattr(overlay, 'is_blinking', False):
+                    force_show = True
+            else:
+                overlay.hide()
                 
         if force_show or should_show:
             self.hide_timer.stop()
-            for overlay in self.overlays.values():
-                overlay.show()
+            for overlay_id, overlay in self.overlays.items():
+                if self.is_overlay_enabled(overlay_id):
+                    overlay.show()
+                else:
+                    overlay.hide()
         else:
             if self.cfg.get("hide_delay_enabled", False):
                 if not self.hide_timer.isActive():
@@ -418,11 +459,12 @@ class MainApp:
                 self._execute_hide()
 
     def _execute_hide(self):
-        for overlay in self.overlays.values():
-            if getattr(overlay, 'move_mode', False) or getattr(overlay, 'is_blinking', False):
-                continue
-            if hasattr(self, 'settings_dialog') and self.settings_dialog is not None:
-                continue
+        for overlay_id, overlay in self.overlays.items():
+            if self.is_overlay_enabled(overlay_id):
+                if getattr(overlay, 'move_mode', False) or getattr(overlay, 'is_blinking', False):
+                    continue
+                if hasattr(self, 'settings_dialog') and self.settings_dialog is not None:
+                    continue
             overlay.hide()
             
     def on_voice_error(self, err_msg):
@@ -444,6 +486,7 @@ class MainApp:
         sys.exit(self.app.exec())
 
 if __name__ == "__main__":
+    ensure_single_instance()
     import signal
     # This allows Ctrl+C in terminal to kill the Qt app gracefully without a core dump
     signal.signal(signal.SIGINT, signal.SIG_DFL)
