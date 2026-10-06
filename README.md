@@ -20,15 +20,11 @@
 
 
 > [!TIP]
-> **What's New in v1.1.2 (Background State Persistence, Sanity Checks & Navigation Enhancements):**
-> - ⚡ **Instant User List Restoration**: Toggling overlays on/off in the system tray or Settings now operates non-destructively. When an overlay is re-enabled, the channel user list and talking states are restored immediately from cache.
-> - 🎧 **Continuous Background TTS & Voice Tracking**: Full voice state tracking and TTS voice announcements continue operating in the background across all platforms (Mumble, TS3, Discord) even when all overlays are hidden or individual overlays are disabled.
-> - 🎯 **Dynamic Primary Overlay Assignment**: TTS announcements are automatically routed through the active enabled overlay (or fallback to background) without missing events.
-> - 🔄 **Reset Overlay Positions**: A dedicated button in Settings centers all 4 overlays side-by-side on your primary monitor, immediately recovering any moved or overlapping overlays.
-> - 🛡️ **Display Topology Sanity Checks**: Off-screen and multi-monitor dead-zone detection automatically clamps overlays onto visible screen areas, protecting multi-monitor setups with staggered resolutions.
-> - 🏹 **High-Visibility Heavy Arrows**: Replaced legacy indicators with bold, distinct Unicode heavy arrows (`🡅 ` for users entering and `🡇 ` for users leaving).
-> - 📂 **Standard XDG Config Directory**: Linux configuration migrated to standard `~/.config/koverlay/` with automatic one-time migration from legacy directories.
-> - 🔀 **Customizable User List Sorting**: Choose between fading speakers on top (default), recent speakers on top, or alphabetical listing with disconnected users (`🡇`) pinned to the bottom.
+> **What's New in v1.1.3 (Pixel-Perfect Row Alignment & Configurable Line Height):**
+> - 📏 **Pixel-Perfect Row Alignment**: Rewrote overlay rendering using isolated labels in `UserRowWidget`. Status indicators (`🡅` / `🡇`) and username text are now rendered in dedicated sub-widgets, completely eliminating font metric fallback discrepancies, baseline shifts, and vertical row expansion.
+> - 📐 **Configurable Line Height**: Added a dedicated `Line height:` setting with dynamic `Auto (X px)` calculation and full step-by-step pixel adjustment, plus a 1-click `[Auto]` reset button.
+> - ⚡ **Smooth SpinBox Navigation**: Fixed downward stepping from Auto in `LineHeightSpinBox` to allow selecting values smaller than the default font line spacing directly via UI controls.
+> - 🎯 **Package & Installer Updates**: Updated PKGBUILD, pre-compiled Arch Linux packages, and self-contained Windows installers.
 
 > [!IMPORTANT]
 > **KOverlay must remain running in the background (in the system tray)** for the overlay to appear over your game. If KOverlay is closed, the voice overlay will not be visible.
@@ -95,16 +91,16 @@ Building from source automatically handles dependency resolution, including AUR 
 
 #### Method B: Install the Pre-compiled Pacman Package
 1. Download the pre-compiled package from GitHub releases:
-    👉 **[Download KOverlay v1.1.2 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.2/koverlay-1.1.2-1-any.pkg.tar.zst)**
+    👉 **[Download KOverlay v1.1.3 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.3/koverlay-1.1.3-1-any.pkg.tar.zst)**
 2. **Important Note on Dependencies**: The package depends on `kdotool` (which is in the AUR). Standard `pacman` cannot automatically resolve or download AUR dependencies. You must install `kdotool` first:
    ```bash
    yay -S kdotool   # or: paru -S kdotool
    ```
 3. Install the downloaded package:
    ```bash
-   sudo pacman -U koverlay-1.1.2-1-any.pkg.tar.zst
+   sudo pacman -U koverlay-1.1.3-1-any.pkg.tar.zst
    # Alternatively, let your AUR helper resolve dependencies and install the local package:
-   yay -U koverlay-1.1.2-1-any.pkg.tar.zst
+   yay -U koverlay-1.1.3-1-any.pkg.tar.zst
    ```
 
 ### Microsoft Windows (10 / 11)
@@ -116,7 +112,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 1: Setup Wizard (Recommended)
 1. Download the latest installer:
-   👉 **[Download KOverlay_Setup.exe (v1.1.2)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.2/KOverlay_Setup.exe)**
+   👉 **[Download KOverlay_Setup.exe (v1.1.3)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.3/KOverlay_Setup.exe)**
 2. Run `KOverlay_Setup.exe`:
    - Administrator rights are **not** required. The program installs directly into your user profile: `%LOCALAPPDATA%\Programs\KOverlay`.
    - **Mumble Check:** If Mumble is running, the installer will inform you and prompt you to close Mumble so it can safely install the Mumble plugin.
@@ -125,7 +121,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 2: Portable Archive (.zip)
 1. Download the portable package:
-   👉 **[Download KOverlay_Portable.zip (v1.1.2)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.2/KOverlay_Portable.zip)**
+   👉 **[Download KOverlay_Portable.zip (v1.1.3)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.3/KOverlay_Portable.zip)**
 2. Extract the `.zip` archive to any directory you prefer (e.g. `C:\Games\KOverlay` or your Desktop).
 3. **How to Launch KOverlay:**
    - Inside the extracted folder, double-click **`KOverlay.bat`**.

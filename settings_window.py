@@ -1,10 +1,10 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout,
-    QSlider, QCheckBox, QFontComboBox, QSpinBox, QColorDialog, QGroupBox,
+    QSlider, QCheckBox, QFontComboBox, QSpinBox, QAbstractSpinBox, QColorDialog, QGroupBox,
     QComboBox, QScrollArea, QWidget, QMessageBox, QRadioButton, QApplication
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QObject, QEvent, QRegularExpression, QUrl
-from PyQt6.QtGui import QColor, QFont, QRegularExpressionValidator, QDesktopServices, QIntValidator, QPalette
+from PyQt6.QtGui import QColor, QFont, QFontMetrics, QRegularExpressionValidator, QDesktopServices, QIntValidator, QPalette
 import os
 import sys
 import shutil
@@ -14,6 +14,33 @@ import tempfile
 import threading
 import hashlib
 from tts_manager import get_tts_manager
+
+class LineHeightSpinBox(QSpinBox):
+    def __init__(self, get_auto_val, parent=None):
+        super().__init__(parent)
+        self.get_auto_val = get_auto_val
+
+    def stepEnabled(self):
+        flags = QAbstractSpinBox.StepEnabledFlag.StepNone
+        if not self.isReadOnly():
+            if self.value() < self.maximum():
+                flags |= QAbstractSpinBox.StepEnabledFlag.StepUpEnabled
+            if self.value() > 0 or self.get_auto_val() > 1:
+                flags |= QAbstractSpinBox.StepEnabledFlag.StepDownEnabled
+        return flags
+
+    def stepBy(self, steps):
+        auto_h = self.get_auto_val()
+        if self.value() == 0:
+            if steps > 0:
+                self.setValue(auto_h + (steps - 1) if auto_h > 0 else steps)
+            else:
+                self.setValue(max(1, auto_h + steps))
+        else:
+            new_val = self.value() + steps
+            if new_val < 0:
+                new_val = 0
+            self.setValue(new_val)
 
 class ScrollFilter(QObject):
     def eventFilter(self, obj, event):
@@ -694,15 +721,29 @@ class SettingsWindow(QWidget):
         font_layout = QHBoxLayout()
         self.font_combo = QFontComboBox()
         self.font_combo.setCurrentFont(QFont(self.config.get("font_family", "Sans Serif")))
-        self.font_combo.currentFontChanged.connect(self._on_change)
+        self.font_combo.currentFontChanged.connect(self._on_font_changed)
         self.font_size = QSpinBox()
         self.font_size.setRange(6, 72)
         self.font_size.setValue(self.config.get("font_size", 11))
-        self.font_size.valueChanged.connect(self._on_change)
+        self.font_size.valueChanged.connect(self._on_font_changed)
+
+        self.line_height_spin = LineHeightSpinBox(self._get_default_line_height)
+        self.line_height_spin.setRange(0, 150)
+        self.line_height_spin.setSuffix(" px")
+        self._update_line_height_special_value()
+        self.line_height_spin.setValue(self.config.get("line_height", 0))
+        self.line_height_spin.valueChanged.connect(self._on_change)
+
         font_layout.addWidget(QLabel("Font:"))
         font_layout.addWidget(self.font_combo)
         font_layout.addWidget(QLabel("Size:"))
         font_layout.addWidget(self.font_size)
+        font_layout.addWidget(QLabel("Line height:"))
+        font_layout.addWidget(self.line_height_spin)
+        self.line_height_auto_btn = QPushButton("Auto")
+        self.line_height_auto_btn.setToolTip("Reset line height to Auto (calculated dynamically from font size)")
+        self.line_height_auto_btn.clicked.connect(lambda: self.line_height_spin.setValue(0))
+        font_layout.addWidget(self.line_height_auto_btn)
         font_layout.addStretch()
         monitors_group_layout.addLayout(font_layout)
 
@@ -1159,6 +1200,21 @@ class SettingsWindow(QWidget):
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(2000, lambda: self.reset_positions_btn.setText("Reset overlay positions"))
 
+    def _get_default_line_height(self) -> int:
+        font = self.font_combo.currentFont()
+        font.setPointSize(self.font_size.value())
+        font.setBold(True)
+        fm = QFontMetrics(font)
+        return max(fm.lineSpacing(), 12)
+
+    def _update_line_height_special_value(self):
+        def_h = self._get_default_line_height()
+        self.line_height_spin.setSpecialValueText(f"Auto ({def_h} px)")
+
+    def _on_font_changed(self):
+        self._update_line_height_special_value()
+        self._on_change()
+
     def _on_change(self):
         if not hasattr(self, 'monitor_checkboxes'):
             return
@@ -1193,6 +1249,7 @@ class SettingsWindow(QWidget):
             del self.config["opacity"]
         self.config["font_family"] = self.font_combo.currentFont().family()
         self.config["font_size"] = self.font_size.value()
+        self.config["line_height"] = self.line_height_spin.value()
         self.config["bg_color"] = self.current_bg_color
         self.config["text_color_normal"] = self.current_text_color_normal
         self.config["text_color_talking"] = self.current_text_color_talking

@@ -56,7 +56,8 @@ def load_config():
         "limit_users_enabled": False,
         "limit_users_count": "10",
         "strip_bracket_tags": False,
-        "nickname_prefixes": []
+        "nickname_prefixes": [],
+        "line_height": 0
     }
     if not os.path.exists(CONFIG_FILE):
         return default_config
@@ -89,6 +90,8 @@ def load_config():
                 cfg["strip_bracket_tags"] = False
             if "nickname_prefixes" not in cfg:
                 cfg["nickname_prefixes"] = []
+            if "line_height" not in cfg:
+                cfg["line_height"] = 0
             return cfg
     except Exception as e:
         print(f"Error loading config: {e}")

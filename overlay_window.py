@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPoint
-from PyQt6.QtGui import QColor, QPixmap, QPainter, QPen
+from PyQt6.QtGui import QColor, QPixmap, QPainter, QPen, QFont, QFontMetrics
 import time
 import sys
 import os
@@ -20,6 +20,70 @@ def interpolate_color(col_from_str, col_to_str, progress):
     b = int(c_from.blue() + (c_to.blue() - c_from.blue()) * progress)
     a = int(c_from.alpha() + (c_to.alpha() - c_from.alpha()) * progress)
     return QColor.fromRgb(r, g, b, a).name(QColor.NameFormat.HexArgb)
+
+class UserRowWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        
+        self.row_layout = QHBoxLayout(self)
+        self.row_layout.setContentsMargins(0, 0, 0, 0)
+        self.row_layout.setSpacing(4)
+        self.row_layout.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        
+        self.arrow_label = QLabel(self)
+        self.arrow_label.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.arrow_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        self.arrow_label.setVisible(False)
+        
+        self.name_label = QLabel(self)
+        self.name_label.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.name_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        
+        self.row_layout.addWidget(self.arrow_label)
+        self.row_layout.addWidget(self.name_label)
+        self.row_layout.addStretch()
+        
+        self._current_stylesheet = ""
+
+    def set_content(self, clean_name: str, arrow_text: str = ""):
+        self.name_label.setText(clean_name)
+        if arrow_text:
+            self.arrow_label.setText(arrow_text)
+            self.arrow_label.setVisible(True)
+        else:
+            self.arrow_label.setText("")
+            self.arrow_label.setVisible(False)
+            
+    def setText(self, display_text: str):
+        if display_text.startswith("🡅 "):
+            self.set_content(display_text[2:], "🡅")
+        elif display_text.startswith("🡇 "):
+            self.set_content(display_text[2:], "🡇")
+        else:
+            self.set_content(display_text, "")
+
+    def text(self) -> str:
+        if self.arrow_label.isVisible() and self.arrow_label.text():
+            return f"{self.arrow_label.text()} {self.name_label.text()}"
+        return self.name_label.text()
+
+    def setFont(self, font: QFont):
+        super().setFont(font)
+        self.name_label.setFont(font)
+        self.arrow_label.setFont(font)
+
+    def font(self) -> QFont:
+        return self.name_label.font()
+
+    def setStyleSheet(self, style: str):
+        self._current_stylesheet = style
+        self.name_label.setStyleSheet(style)
+        self.arrow_label.setStyleSheet(style)
+
+    def styleSheet(self) -> str:
+        return self._current_stylesheet
 
 class OverlayWindow(QWidget):
     blink_finished = pyqtSignal()
@@ -455,14 +519,17 @@ class OverlayWindow(QWidget):
         # Update fonts and colors on style change
         font_family = self.config.get("font_family", "Sans Serif")
         font_size = self.config.get("font_size", 11)
+        cfg_line_height = self.config.get("line_height", 0)
         col_normal = self.config.get('text_color_normal', '#96ffffff')
         if col_normal.startswith('rgba'): col_normal = '#96ffffff'
         
+        test_font = QFont(font_family, font_size, QFont.Weight.Bold)
+        fm = QFontMetrics(test_font)
+        row_height = cfg_line_height if (cfg_line_height and cfg_line_height > 0) else max(fm.lineSpacing(), 12)
+        
         for lbl in self.labels.values():
-            font = lbl.font()
-            font.setFamily(font_family)
-            font.setPointSize(font_size)
-            lbl.setFont(font)
+            lbl.setFont(test_font)
+            lbl.setFixedHeight(row_height)
             
             # If we don't know talking state here, we just apply normal color or preserve talking color
             # Actually, we can check its current color, but it's better to just wait for next tick or apply normal
@@ -649,6 +716,10 @@ class OverlayWindow(QWidget):
 
         font_family = self.config.get("font_family", "Sans Serif")
         font_size = self.config.get("font_size", 11)
+        cfg_line_height = self.config.get("line_height", 0)
+        overlay_font = QFont(font_family, font_size, QFont.Weight.Bold)
+        fm = QFontMetrics(overlay_font)
+        row_height = cfg_line_height if (cfg_line_height and cfg_line_height > 0) else max(fm.lineSpacing(), 12)
         
         col_normal = self.config.get('text_color_normal', '#96ffffff')
         if col_normal.startswith('rgba'): col_normal = '#96ffffff'
@@ -740,11 +811,11 @@ class OverlayWindow(QWidget):
             # Format text
             from config import clean_nickname
             clean_name = clean_nickname(name, self.config)
-            display_text = clean_name
+            arrow_text = ""
             if is_left:
-                display_text = "🡇 " + clean_name
+                arrow_text = "🡇"
             elif is_new:
-                display_text = "🡅 " + clean_name
+                arrow_text = "🡅"
                 
             # Get talking state
             talking = self.talking_now.get(name, False)
@@ -753,17 +824,16 @@ class OverlayWindow(QWidget):
             
             # Create or update label
             if name not in self.labels:
-                lbl = QLabel(display_text)
-                lbl.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-                font = lbl.font()
-                font.setFamily(font_family)
-                font.setPointSize(font_size)
-                font.setBold(True)
-                lbl.setFont(font)
+                lbl = UserRowWidget()
+                lbl.setFont(overlay_font)
+                lbl.setFixedHeight(row_height)
                 self.labels[name] = lbl
             else:
                 lbl = self.labels[name]
-                lbl.setText(display_text)
+                lbl.setFont(overlay_font)
+                lbl.setFixedHeight(row_height)
+                
+            lbl.set_content(clean_name, arrow_text)
                 
             # Remove from layout and re-add to enforce order
             self.users_container.removeWidget(lbl)
