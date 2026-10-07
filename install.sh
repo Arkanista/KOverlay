@@ -23,20 +23,15 @@ else
     echo "Unsupported package manager. Please install python3, python3-venv, pip, mpv, and a C++ compiler manually."
 fi
 
-echo "Checking for required window tracking tools..."
-if ! command -v kdotool &> /dev/null && ! command -v xdotool &> /dev/null; then
-    echo "CRITICAL ERROR: 'kdotool' (Wayland) or 'xdotool' (X11) is strictly required."
-    
-    if command -v yay &> /dev/null; then
-        echo "Attempting to install kdotool from AUR using yay..."
-        yay -Sy --needed kdotool || exit 1
-    elif command -v paru &> /dev/null; then
-        echo "Attempting to install kdotool from AUR using paru..."
-        paru -Sy --needed kdotool || exit 1
-    else
-        echo "Please install 'kdotool' (from AUR) or 'xdotool' manually to continue."
-        exit 1
-    fi
+echo "Checking for window tracking tools..."
+if [ -f "bin/kdotool" ]; then
+    echo "Bundled kdotool available for KDE Plasma Wayland (active window tracking)."
+elif command -v kdotool &> /dev/null; then
+    echo "System kdotool found."
+elif command -v xdotool &> /dev/null; then
+    echo "System xdotool found."
+else
+    echo "Note: Neither kdotool nor xdotool was found. Active window tracking will be inactive until one is installed."
 fi
 
 # 2. Setup Application Directory
@@ -56,6 +51,12 @@ fi
 cp requirements.txt "$INSTALL_DIR/"
 if [ -d "icons" ]; then
     cp -r icons "$INSTALL_DIR/"
+fi
+if [ -d "bin" ]; then
+    echo "Copying bundled binaries..."
+    mkdir -p "$INSTALL_DIR/bin"
+    cp -r bin/* "$INSTALL_DIR/bin/"
+    chmod +x "$INSTALL_DIR/bin/"*
 fi
 
 # Copy Mumble plugin source and build files
@@ -91,6 +92,7 @@ fi
 cat > start.sh << EOL
 #!/bin/bash
 cd "$INSTALL_DIR"
+export PATH="\$PATH:$INSTALL_DIR/bin"
 if [ -d "venv" ]; then
     exec ./venv/bin/python koverlay.py "\$@"
 else

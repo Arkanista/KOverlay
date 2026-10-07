@@ -1,11 +1,11 @@
 pkgname=koverlay
-pkgver=1.1.3
+pkgver=1.1.4
 pkgrel=1
 pkgdesc="A modern, universal Wayland/X11 TeamSpeak 3, Mumble and Discord overlay with TTS voice announcements."
-arch=('any')
+arch=('x86_64')
 url="https://github.com/Arkanista/KOverlay"
 license=('GPL-3.0-or-later')
-depends=('python' 'python-pyqt6' 'qt6-svg' 'kdotool' 'xdotool' 'mpv')
+depends=('python' 'python-pyqt6' 'qt6-svg' 'xdotool' 'mpv')
 makedepends=('python-pip')
 source=()
 
@@ -27,6 +27,12 @@ package() {
     fi
     if [ -d "$startdir/icons" ]; then
         cp -r "$startdir/icons" "$pkgdir/opt/koverlay/"
+    fi
+
+    if [ -d "$startdir/bin" ]; then
+        mkdir -p "$pkgdir/opt/koverlay/bin"
+        cp -r "$startdir/bin/"* "$pkgdir/opt/koverlay/bin/"
+        chmod 755 "$pkgdir/opt/koverlay/bin/"*
     fi
 
     if [ -d "$startdir/mumble_plugin" ]; then
@@ -60,6 +66,7 @@ EOF
     # Create wrapper executable
     cat > "$pkgdir/usr/bin/koverlay" << EOF
 #!/bin/bash
+export PATH="\$PATH:/opt/koverlay/bin"
 export PYTHONPATH="/opt/koverlay/lib:\$PYTHONPATH"
 cd /opt/koverlay || exit 1
 exec python3 koverlay.py "\$@"

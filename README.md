@@ -20,11 +20,11 @@
 
 
 > [!TIP]
-> **What's New in v1.1.3 (Pixel-Perfect Row Alignment & Configurable Line Height):**
-> - 📏 **Pixel-Perfect Row Alignment**: Rewrote overlay rendering using isolated labels in `UserRowWidget`. Status indicators (`🡅` / `🡇`) and username text are now rendered in dedicated sub-widgets, completely eliminating font metric fallback discrepancies, baseline shifts, and vertical row expansion.
-> - 📐 **Configurable Line Height**: Added a dedicated `Line height:` setting with dynamic `Auto (X px)` calculation and full step-by-step pixel adjustment, plus a 1-click `[Auto]` reset button.
-> - ⚡ **Smooth SpinBox Navigation**: Fixed downward stepping from Auto in `LineHeightSpinBox` to allow selecting values smaller than the default font line spacing directly via UI controls.
-> - 🎯 **Package & Installer Updates**: Updated PKGBUILD, pre-compiled Arch Linux packages, and self-contained Windows installers.
+> **What's New in v1.1.4 (Bundled kdotool & Streamlined Wayland Installation):**
+> - 📦 **Bundled `kdotool` for KDE Plasma Wayland**: Included pre-compiled `kdotool` (v0.3.0) directly within the package and installer. Installing on Arch Linux no longer requires AUR helpers (`yay` or `paru`).
+> - 🔄 **Smart Dual-Mode Resolution**: KOverlay automatically uses the system-wide `kdotool` if you installed one, and seamlessly falls back to the bundled binary if not present.
+> - 🚀 **Effortless `pacman -U` Installation**: Arch-based systems can install the pre-compiled package with a single `sudo pacman -U` command without AUR dependency resolution issues.
+> - 📏 **Inherited from v1.1.3**: Pixel-perfect row geometry with isolated status indicators (`🡅` / `🡇`), dynamic line height calculation with `Auto (X px)` mode, and full pixel stepping in Settings.
 
 > [!IMPORTANT]
 > **KOverlay must remain running in the background (in the system tray)** for the overlay to appear over your game. If KOverlay is closed, the voice overlay will not be visible.
@@ -75,32 +75,23 @@ Choose the appropriate installation method for your distribution below.
 For Arch-based systems, an official `PKGBUILD` and a pre-compiled package are provided for clean system integration.
 
 #### Method A: Build and Install from Source (Recommended)
-Building from source automatically handles dependency resolution, including AUR packages:
+Building from source automatically handles dependency resolution:
 1. Open a terminal in the cloned `koverlay` directory.
 2. Build and install using the following commands:
    ```bash
    # Install dependencies from official repositories
    sudo pacman -S --needed python python-pyqt6 qt6-svg mpv xdotool
    
-   # Install kdotool from the AUR (required for active window tracking on Wayland)
-   yay -S kdotool   # or: paru -S kdotool
-   
-   # Build and install the koverlay package
+   # Build and install the koverlay package (kdotool is bundled automatically)
    makepkg -si
    ```
 
 #### Method B: Install the Pre-compiled Pacman Package
 1. Download the pre-compiled package from GitHub releases:
-    👉 **[Download KOverlay v1.1.3 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.3/koverlay-1.1.3-1-any.pkg.tar.zst)**
-2. **Important Note on Dependencies**: The package depends on `kdotool` (which is in the AUR). Standard `pacman` cannot automatically resolve or download AUR dependencies. You must install `kdotool` first:
+    👉 **[Download KOverlay v1.1.4 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.4/koverlay-1.1.4-1-x86_64.pkg.tar.zst)**
+2. Install the downloaded package directly with `pacman`:
    ```bash
-   yay -S kdotool   # or: paru -S kdotool
-   ```
-3. Install the downloaded package:
-   ```bash
-   sudo pacman -U koverlay-1.1.3-1-any.pkg.tar.zst
-   # Alternatively, let your AUR helper resolve dependencies and install the local package:
-   yay -U koverlay-1.1.3-1-any.pkg.tar.zst
+   sudo pacman -U koverlay-1.1.4-1-x86_64.pkg.tar.zst
    ```
 
 ### Microsoft Windows (10 / 11)
@@ -162,14 +153,8 @@ For other distributions, a robust, universal installer script is provided:
 > 
 > If you are using standard **Ubuntu with GNOME Wayland**, the display server strictly prevents apps from reading the active window. To use tracking on GNOME, you must log out and select **"Ubuntu on Xorg" (X11)**.
 > 
-> **How to install `kdotool` on Debian/Ubuntu (if using KDE Plasma Wayland):**
-> Since Ubuntu/Debian do not have AUR, you can download the pre-compiled binary manually from the author's GitHub:
-> ```bash
-> wget https://github.com/jinliu/kdotool/releases/latest/download/kdotool-0.2.3-x86_64-unknown-linux-gnu.tar.gz
-> tar -xzf kdotool-0.2.3-x86_64-unknown-linux-gnu.tar.gz
-> sudo mv kdotool /usr/local/bin/
-> sudo chmod +x /usr/local/bin/kdotool
-> ```
+> **Note on `kdotool` on Debian/Ubuntu (KDE Plasma Wayland):**
+> KOverlay comes with a pre-compiled `kdotool` binary bundled directly in `bin/kdotool`. The installer script `./install.sh` automatically deploys it into `~/.local/share/koverlay/bin/`, providing active window tracking immediately with no extra manual setup needed.
 
 ### Bazzite / SteamOS / ChimeraOS (Immutable Systems)
 

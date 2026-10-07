@@ -1,5 +1,6 @@
 import sys
 import os
+import shutil
 import subprocess
 import time
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -27,21 +28,66 @@ class WindowTracker(QThread):
             self.active_tool = "win32"
             return True
 
+        # Strategy B for Wayland (kdotool):
+        # 1. Prefer system-wide kdotool if installed by user/distro
+        # 2. Fall back to bundled kdotool (/opt/koverlay/bin, ~/.local/share/koverlay/bin, or project bin/)
+        # 3. Fall back to xdotool for X11 sessions
+
+        # Step 1: System kdotool (exclude bundled paths if already in PATH)
+        system_kdotool = shutil.which("kdotool")
+        if system_kdotool:
+            # Check if this isn't pointing to our bundled dir
+            bundled_markers = ["/opt/koverlay/bin", ".local/share/koverlay/bin"]
+            is_bundled = any(marker in system_kdotool for marker in bundled_markers)
+            if not is_bundled:
+                try:
+                    subprocess.run([system_kdotool, "--help"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    self.active_tool = system_kdotool
+                    print(f"[WindowTracker] Active window tracking using system kdotool: {system_kdotool}")
+                    return True
+                except Exception:
+                    pass
+
+        # Step 2: Bundled kdotool
+        candidate_dirs = [
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "bin"),
+            "/opt/koverlay/bin",
+            os.path.expanduser("~/.local/share/koverlay/bin"),
+        ]
+        for c_dir in candidate_dirs:
+            bundled_kdotool = os.path.join(c_dir, "kdotool")
+            if os.path.isfile(bundled_kdotool) and os.access(bundled_kdotool, os.X_OK):
+                try:
+                    subprocess.run([bundled_kdotool, "--help"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    self.active_tool = bundled_kdotool
+                    print(f"[WindowTracker] Active window tracking using bundled kdotool: {bundled_kdotool}")
+                    return True
+                except Exception:
+                    pass
+
+        # If system kdotool was in PATH (even in bundled path) and works, use it
+        if system_kdotool:
+            try:
+                subprocess.run([system_kdotool, "--help"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                self.active_tool = system_kdotool
+                print(f"[WindowTracker] Active window tracking using kdotool from PATH: {system_kdotool}")
+                return True
+            except Exception:
+                pass
+
+        self.kdotool_missing = True
+
+        # Step 3: Fallback to xdotool for X11 sessions
+        system_xdotool = shutil.which("xdotool") or "xdotool"
         try:
-            subprocess.run(["kdotool", "--help"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            self.active_tool = "kdotool"
+            subprocess.run([system_xdotool, "--help"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.active_tool = system_xdotool
+            print(f"[WindowTracker] Active window tracking using xdotool: {system_xdotool}")
             return True
-        except FileNotFoundError:
-            self.kdotool_missing = True
-            
-        try:
-            subprocess.run(["xdotool", "--help"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            self.active_tool = "xdotool"
-            return True
-        except FileNotFoundError:
+        except (FileNotFoundError, Exception):
             self.xdotool_missing = True
-            
-        print("Warning: Neither kdotool nor xdotool found. Active window tracking will be disabled (overlay always visible).")
+
+        print("Warning: Neither kdotool (system or bundled) nor xdotool found. Active window tracking will be disabled (overlay always visible).")
         return False
 
     def _get_active_window_info_win32(self):
