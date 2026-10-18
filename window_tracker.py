@@ -12,7 +12,7 @@ if sys.platform == "win32":
 class WindowTracker(QThread):
     active_window_changed = pyqtSignal(bool)
 
-    def __init__(self, target_keywords=None, polling_interval_ms=50, parent=None):
+    def __init__(self, target_keywords=None, polling_interval_ms=250, parent=None):
         super().__init__(parent)
         # Usually EVE Online window contains "EVE - " or "exefile.exe"
         self.target_keywords = target_keywords or ["EVE - ", "exefile.exe"]
@@ -22,6 +22,7 @@ class WindowTracker(QThread):
         self.kdotool_missing = False
         self.xdotool_missing = False
         self.active_tool = None
+        self._empty_focus_count = 0
 
     def check_tools(self):
         if sys.platform == "win32":
@@ -136,32 +137,50 @@ class WindowTracker(QThread):
             try:
                 if self.active_tool == "win32":
                     window_info = self._get_active_window_info_win32()
-                    for kw in self.target_keywords:
-                        if kw.lower() in window_info.lower():
+                    if window_info:
+                        self._empty_focus_count = 0
+                        for kw in self.target_keywords:
+                            if kw.lower() in window_info.lower():
+                                is_active = True
+                                break
+                    else:
+                        self._empty_focus_count += 1
+                        if self.last_state and self._empty_focus_count < 3:
                             is_active = True
-                            break
                 else:
                     # getactivewindow returns the window ID, getwindowname gets the title of that ID
                     result = subprocess.run(
                         [self.active_tool, "getactivewindow", "getwindowname"],
                         capture_output=True, text=True, timeout=0.5
                     )
-                    if result.returncode == 0:
-                        window_name = result.stdout.strip()
+                    window_name = result.stdout.strip() if result.returncode == 0 else ""
+                    if window_name:
+                        self._empty_focus_count = 0
                         for kw in self.target_keywords:
                             if kw.lower() in window_name.lower():
                                 is_active = True
                                 break
-            except Exception as e:
+                    else:
+                        # Transient RootWindow (0x200000) or focus handoff between Wine subwindows:
+                        # do not immediately drop active state on a single empty/failed poll
+                        self._empty_focus_count += 1
+                        if self.last_state and self._empty_focus_count < 3:
+                            is_active = True
+            except Exception:
                 # On timeout or broken display server after suspend, assume not active
-                pass
+                self._empty_focus_count += 1
                 
             if is_active != self.last_state:
                 self.active_window_changed.emit(is_active)
                 self.last_state = is_active
                 
-            # Safely get interval in seconds, fallback to 50ms if missing or invalid
-            interval_sec = getattr(self, 'polling_interval_ms', 50) / 1000.0
+            # Safely get interval in seconds; enforce >= 200ms floor for Linux CLI subprocesses
+            # to avoid 20Hz XWayland/KWin IPC noise.
+            raw_ms = int(getattr(self, 'polling_interval_ms', 250) or 250)
+            if self.active_tool != "win32":
+                interval_sec = max(200, raw_ms) / 1000.0
+            else:
+                interval_sec = max(50, raw_ms) / 1000.0
             time.sleep(interval_sec)
 
     def stop(self):

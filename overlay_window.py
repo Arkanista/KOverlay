@@ -114,22 +114,26 @@ class OverlayWindow(QWidget):
                 Qt.WindowType.WindowStaysOnTopHint |
                 Qt.WindowType.Tool |
                 Qt.WindowType.WindowTransparentForInput |
+                Qt.WindowType.WindowDoesNotAcceptFocus |
                 Qt.WindowType.NoDropShadowWindowHint
             )
         else:
-            # With X11 bypass, ToolTip correctly prevents taskbar entry and maps perfectly
+            # With X11 bypass, Tool + WindowDoesNotAcceptFocus prevents taskbar entry and XWayland/KWin focus stealing
             flags = (
-                Qt.WindowType.SplashScreen |
+                Qt.WindowType.Tool |
                 Qt.WindowType.FramelessWindowHint |
                 Qt.WindowType.WindowStaysOnTopHint |
                 Qt.WindowType.BypassWindowManagerHint |
                 Qt.WindowType.WindowTransparentForInput |
+                Qt.WindowType.WindowDoesNotAcceptFocus |
                 Qt.WindowType.NoDropShadowWindowHint
             )
         self.setWindowFlags(flags)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         
         self.layout = QVBoxLayout()
         self.layout.setContentsMargins(22, 22, 22, 22)
@@ -299,18 +303,19 @@ class OverlayWindow(QWidget):
                 GWL_EXSTYLE = -20
                 WS_EX_LAYERED = 0x00080000
                 WS_EX_TRANSPARENT = 0x00000020
+                WS_EX_NOACTIVATE = 0x08000000
                 user32 = ctypes.windll.user32
                 style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
                 if transparent:
-                    user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED | WS_EX_TRANSPARENT)
+                    user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE)
                 else:
-                    user32.SetWindowLongW(hwnd, GWL_EXSTYLE, (style | WS_EX_LAYERED) & ~WS_EX_TRANSPARENT)
+                    user32.SetWindowLongW(hwnd, GWL_EXSTYLE, (style | WS_EX_LAYERED | WS_EX_NOACTIVATE) & ~WS_EX_TRANSPARENT)
         except Exception:
             pass
 
     def showEvent(self, event):
         super().showEvent(event)
-        self.apply_configured_position(force=True)
+        self.apply_configured_position(force=False)
         self._apply_win32_click_through(not self.move_mode)
 
     def paintEvent(self, event):
@@ -471,14 +476,16 @@ class OverlayWindow(QWidget):
                 Qt.WindowType.FramelessWindowHint |
                 Qt.WindowType.WindowStaysOnTopHint |
                 Qt.WindowType.Tool |
+                Qt.WindowType.WindowDoesNotAcceptFocus |
                 Qt.WindowType.NoDropShadowWindowHint
             )
         else:
             flags = (
-                Qt.WindowType.SplashScreen |
+                Qt.WindowType.Tool |
                 Qt.WindowType.FramelessWindowHint |
                 Qt.WindowType.WindowStaysOnTopHint |
                 Qt.WindowType.BypassWindowManagerHint |
+                Qt.WindowType.WindowDoesNotAcceptFocus |
                 Qt.WindowType.NoDropShadowWindowHint
             )
 
@@ -507,11 +514,14 @@ class OverlayWindow(QWidget):
             
         if was_move_mode != self.move_mode:
             self.setWindowFlags(flags)
+            self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+            self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.update_style()
         is_enabled = self.config.get("overlay_ids", {}).get(self.overlay_id, {}).get("enabled", False)
         if self.move_mode or is_enabled:
-            self.show()
-            self.apply_configured_position(force=True)
+            if not self.isVisible():
+                self.show()
+            self.apply_configured_position(force=False)
         else:
             self.hide()
         self._apply_win32_click_through(not self.move_mode)

@@ -225,7 +225,7 @@ class MainApp:
         # Window Tracker (for kdotool/EVE focus)
         self.tracker = WindowTracker(
             target_keywords=self.cfg.get("target_keywords", ["EVE - ", "exefile.exe"]),
-            polling_interval_ms=self.cfg.get("polling_interval_ms", 50)
+            polling_interval_ms=self.cfg.get("polling_interval_ms", 250)
         )
         self.tracker.active_window_changed.connect(self.on_active_window_changed)
         self.tracker.start()
@@ -455,7 +455,7 @@ class MainApp:
         if self.tracker.target_keywords != new_keywords:
             self.tracker.target_keywords = new_keywords
             
-        new_interval = self.cfg.get("polling_interval_ms", 50)
+        new_interval = self.cfg.get("polling_interval_ms", 250)
         if hasattr(self.tracker, 'polling_interval_ms') and self.tracker.polling_interval_ms != new_interval:
             self.tracker.polling_interval_ms = new_interval
 
@@ -526,7 +526,7 @@ class MainApp:
         for overlay_id, overlay in self.overlays.items():
             if getattr(overlay, 'move_mode', False):
                 overlay.set_move_mode(False)
-            if not self.is_overlay_enabled(overlay_id):
+            if not self.is_overlay_enabled(overlay_id) and overlay.isVisible():
                 overlay.hide()
             
         # Force visibility sync after settings close
@@ -546,15 +546,18 @@ class MainApp:
                 if getattr(overlay, 'move_mode', False) or getattr(overlay, 'is_blinking', False):
                     force_show = True
             else:
-                overlay.hide()
+                if overlay.isVisible():
+                    overlay.hide()
                 
         if force_show or should_show:
             self.hide_timer.stop()
             for overlay_id, overlay in self.overlays.items():
                 if self.is_overlay_enabled(overlay_id):
-                    overlay.show()
+                    if not overlay.isVisible():
+                        overlay.show()
                 else:
-                    overlay.hide()
+                    if overlay.isVisible():
+                        overlay.hide()
         else:
             if self.cfg.get("hide_delay_enabled", False):
                 if not self.hide_timer.isActive():
@@ -569,7 +572,8 @@ class MainApp:
                     continue
                 if hasattr(self, 'settings_dialog') and self.settings_dialog is not None:
                     continue
-            overlay.hide()
+            if overlay.isVisible():
+                overlay.hide()
             
     def on_voice_error(self, err_msg):
         # Just print for now, maybe add tray notification later

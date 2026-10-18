@@ -57,7 +57,8 @@ def load_config():
         "limit_users_count": "10",
         "strip_bracket_tags": False,
         "nickname_prefixes": [],
-        "line_height": 0
+        "line_height": 0,
+        "polling_interval_ms": 250
     }
     if not os.path.exists(CONFIG_FILE):
         return default_config
@@ -92,6 +93,8 @@ def load_config():
                 cfg["nickname_prefixes"] = []
             if "line_height" not in cfg:
                 cfg["line_height"] = 0
+            if "polling_interval_ms" not in cfg or (sys.platform != "win32" and cfg.get("polling_interval_ms", 250) < 200):
+                cfg["polling_interval_ms"] = 250
             return cfg
     except Exception as e:
         print(f"Error loading config: {e}")

@@ -639,14 +639,15 @@ class SettingsWindow(QWidget):
         # Poll interval
         self.poll_label = QLabel("Active Window Check Interval:")
         self.poll_slider = QSlider(Qt.Orientation.Horizontal)
-        self.poll_slider.setMinimum(50)
+        min_poll = 50 if sys.platform == "win32" else 200
+        self.poll_slider.setMinimum(min_poll)
         self.poll_slider.setMaximum(1000)
         self.poll_slider.setSingleStep(50)
         self.poll_slider.setTickInterval(50)
         self.poll_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         
         def on_poll_slider_changed(val):
-            snapped = round(val / 50) * 50
+            snapped = max(min_poll, round(val / 50) * 50)
             if snapped != val:
                 self.poll_slider.blockSignals(True)
                 self.poll_slider.setValue(snapped)
@@ -656,7 +657,7 @@ class SettingsWindow(QWidget):
             
         self.poll_slider.valueChanged.connect(on_poll_slider_changed)
         
-        current_poll = self.config.get("polling_interval_ms", 50)
+        current_poll = max(min_poll, self.config.get("polling_interval_ms", 250))
         self.poll_val_label = QLabel(f"{current_poll} ms")
         self.poll_val_label.setMinimumWidth(60)
         self.poll_slider.blockSignals(True)
