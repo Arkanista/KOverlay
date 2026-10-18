@@ -20,11 +20,12 @@
 
 
 > [!TIP]
-> **What's New in v1.1.4 (Bundled kdotool & Streamlined Wayland Installation):**
-> - 📦 **Bundled `kdotool` for KDE Plasma Wayland**: Included pre-compiled `kdotool` (v0.3.0) directly within the package and installer. Installing on Arch Linux no longer requires AUR helpers (`yay` or `paru`).
-> - 🔄 **Smart Dual-Mode Resolution**: KOverlay automatically uses the system-wide `kdotool` if you installed one, and seamlessly falls back to the bundled binary if not present.
-> - 🚀 **Effortless `pacman -U` Installation**: Arch-based systems can install the pre-compiled package with a single `sudo pacman -U` command without AUR dependency resolution issues.
-> - 📏 **Inherited from v1.1.3**: Pixel-perfect row geometry with isolated status indicators (`🡅` / `🡇`), dynamic line height calculation with `Auto (X px)` mode, and full pixel stepping in Settings.
+> **What's New in v1.1.5 (KDE Plasma 6.8 & Suspend/Wake Geometry Fixes):**
+> - 🖥️ **Persistent Overlay Position Across Suspend/Sleep**: Resolved coordinate resets on KDE Plasma 6.8 (and multi-monitor environments) where overlays would jump to the screen center or lose positioning upon system wake or DPMS display sleep.
+> - 🛡️ **Non-destructive Screen Sanitation**: Monitor disconnects and transient sleep modes no longer overwrite saved coordinates in `config.json`.
+> - ⏱️ **Debounced Post-Wake Realignment**: Staggered realignment timers and wall-clock jump detection re-verify and enforce configured coordinates as monitors come back online.
+> - 🪟 **X11 / XWayland Native Displacement Synchronization**: Bypasses Qt cached-position optimizations to ensure KWin window management respects saved user coordinates.
+> - 📦 **Bundled `kdotool`**: Continued full integration of bundled `kdotool` (v0.3.0) for zero-dependency Wayland active window tracking on Arch/CachyOS/Manjaro.
 
 > [!IMPORTANT]
 > **KOverlay must remain running in the background (in the system tray)** for the overlay to appear over your game. If KOverlay is closed, the voice overlay will not be visible.
@@ -88,10 +89,10 @@ Building from source automatically handles dependency resolution:
 
 #### Method B: Install the Pre-compiled Pacman Package
 1. Download the pre-compiled package from GitHub releases:
-    👉 **[Download KOverlay v1.1.4 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.4/koverlay-1.1.4-1-x86_64.pkg.tar.zst)**
+    👉 **[Download KOverlay v1.1.5 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.5/koverlay-1.1.5-1-x86_64.pkg.tar.zst)**
 2. Install the downloaded package directly with `pacman`:
    ```bash
-   sudo pacman -U koverlay-1.1.4-1-x86_64.pkg.tar.zst
+   sudo pacman -U koverlay-1.1.5-1-x86_64.pkg.tar.zst
    ```
 
 ### Microsoft Windows (10 / 11)
@@ -103,7 +104,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 1: Setup Wizard (Recommended)
 1. Download the latest installer:
-   👉 **[Download KOverlay_Setup.exe (v1.1.3)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.3/KOverlay_Setup.exe)**
+   👉 **[Download KOverlay_Setup.exe (v1.1.5)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.5/KOverlay_Setup.exe)**
 2. Run `KOverlay_Setup.exe`:
    - Administrator rights are **not** required. The program installs directly into your user profile: `%LOCALAPPDATA%\Programs\KOverlay`.
    - **Mumble Check:** If Mumble is running, the installer will inform you and prompt you to close Mumble so it can safely install the Mumble plugin.
@@ -112,7 +113,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 2: Portable Archive (.zip)
 1. Download the portable package:
-   👉 **[Download KOverlay_Portable.zip (v1.1.3)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.3/KOverlay_Portable.zip)**
+   👉 **[Download KOverlay_Portable.zip (v1.1.5)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.5/KOverlay_Portable.zip)**
 2. Extract the `.zip` archive to any directory you prefer (e.g. `C:\Games\KOverlay` or your Desktop).
 3. **How to Launch KOverlay:**
    - Inside the extracted folder, double-click **`KOverlay.bat`**.

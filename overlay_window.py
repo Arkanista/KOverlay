@@ -185,22 +185,19 @@ class OverlayWindow(QWidget):
         self.refresh_timer.start()
         
         self.setMinimumSize(50, 20)
+        self._user_moved = False
+        self._last_refresh_tick_time = time.time()
+        self._wake_timers = []
         
-        mon_cfg = self.config.get("overlay_ids", {}).get(self.overlay_id, {})
-        if "pos_x" in mon_cfg and "pos_y" in mon_cfg:
-            new_x, new_y = self._sanitize_position(mon_cfg["pos_x"], mon_cfg["pos_y"])
-            self.move(new_x, new_y)
-        else:
-            new_x, new_y = self._get_default_position()
-            self.move(new_x, new_y)
+        self.apply_configured_position()
             
         self.update_style()
 
     def _sanitize_position(self, x, y):
         """
         Sanity check: ensures overlay (x, y) is at least partially visible on a connected monitor.
-        If it is off-screen, in a multi-monitor dead zone, or on a disconnected monitor,
-        repositions it safely on the primary monitor side-by-side with other overlays.
+        If it is off-screen, in a multi-monitor dead zone, or on a sleeping/disconnected monitor,
+        returns a temporary safe position on the primary monitor WITHOUT overwriting config.json.
         """
         from PyQt6.QtWidgets import QApplication
         from PyQt6.QtCore import QRect
@@ -208,31 +205,55 @@ class OverlayWindow(QWidget):
         app = QApplication.instance()
         screens = app.screens() if app else []
         if not screens:
-            return x, y
+            return int(x), int(y)
             
-        # The top/header area of the overlay (where it can be seen and grabbed) must be on a screen
+        # The top/header area of the overlay (where it can be seen and grabbed) must be on a screen.
+        # Use full screen.geometry() so panel/layer-shell startup delays after sleep in KDE Plasma 6.8
+        # do not invalidate valid monitor coordinates.
         header_rect = QRect(int(x), int(y), 80, 30)
         
         for screen in screens:
-            avail = screen.availableGeometry()
-            intersect = avail.intersected(header_rect)
+            geom = screen.geometry()
+            if not geom.isValid() or geom.width() <= 0 or geom.height() <= 0:
+                continue
+            intersect = geom.intersected(header_rect)
             if intersect.width() >= 30 and intersect.height() >= 20:
-                return x, y  # Valid and visible
+                return int(x), int(y)  # Valid and visible
                 
-        # Off-screen or in a dead zone: reposition to primary monitor
-        new_x, new_y = self._get_default_position()
-        
-        # Persist the sanitized position into config
-        if "overlay_ids" not in self.config:
-            self.config["overlay_ids"] = {}
-        if self.overlay_id not in self.config["overlay_ids"]:
-            self.config["overlay_ids"][self.overlay_id] = {}
-        self.config["overlay_ids"][self.overlay_id]["pos_x"] = new_x
-        self.config["overlay_ids"][self.overlay_id]["pos_y"] = new_y
-        if hasattr(self, 'save_callback') and self.save_callback:
-            self.save_callback()
-            
-        return new_x, new_y
+        # Off-screen or on a currently sleeping/disconnected monitor:
+        # return temporary fallback position on primary monitor without overwriting config
+        return self._get_default_position()
+
+    def apply_configured_position(self, force=False):
+        """
+        Moves the overlay to its saved position from config (or temporary fallback if target screen
+        is currently unavailable). When force=True on Linux/XWayland, nudges the widget by 1px first
+        if needed so Qt is guaranteed to emit a native ConfigureWindow to KWin.
+        """
+        if self.move_mode:
+            return
+        mon_cfg = self.config.get("overlay_ids", {}).get(self.overlay_id, {})
+        if "pos_x" in mon_cfg and "pos_y" in mon_cfg:
+            new_x, new_y = self._sanitize_position(mon_cfg["pos_x"], mon_cfg["pos_y"])
+        else:
+            new_x, new_y = self._get_default_position()
+
+        new_x, new_y = int(new_x), int(new_y)
+        if force and sys.platform != "win32" and self.pos().x() == new_x and self.pos().y() == new_y:
+            self.move(new_x + 1, new_y)
+
+        self.move(new_x, new_y)
+        win_handle = self.windowHandle()
+        if win_handle is not None:
+            win_handle.setPosition(new_x, new_y)
+
+    def _schedule_post_wake_restore(self):
+        """
+        Schedules multiple staggered position restorations after system sleep/resume or monitor wake
+        to handle asynchronous DisplayPort/HDMI re-initialization in Plasma 6.8 and Windows.
+        """
+        for delay_ms in (500, 1500, 3000, 5000):
+            QTimer.singleShot(delay_ms, lambda: self.apply_configured_position(force=True))
 
     def _get_default_position(self):
         """
@@ -250,6 +271,8 @@ class OverlayWindow(QWidget):
             return offset, offset
             
         avail = primary.availableGeometry()
+        if not avail.isValid() or avail.width() <= 0 or avail.height() <= 0:
+            avail = primary.geometry()
         gap = 24
         overlay_w = max(self.width(), 200)
         overlay_h = max(self.height(), 100)
@@ -287,13 +310,7 @@ class OverlayWindow(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
-        mon_cfg = self.config.get("overlay_ids", {}).get(self.overlay_id, {})
-        if "pos_x" in mon_cfg and "pos_y" in mon_cfg:
-            new_x, new_y = self._sanitize_position(mon_cfg["pos_x"], mon_cfg["pos_y"])
-            self.move(new_x, new_y)
-        else:
-            new_x, new_y = self._get_default_position()
-            self.move(new_x, new_y)
+        self.apply_configured_position(force=True)
         self._apply_win32_click_through(not self.move_mode)
 
     def paintEvent(self, event):
@@ -392,12 +409,26 @@ class OverlayWindow(QWidget):
             self.fade_timer.stop()
 
     def _on_refresh_tick(self):
+        current_time = time.time()
+        last_tick = getattr(self, '_last_refresh_tick_time', current_time)
+        self._last_refresh_tick_time = current_time
+
+        # Detect system wake from suspend/sleep (1s timer jumped by > 3s)
+        if current_time - last_tick > 3.0:
+            self._schedule_post_wake_restore()
+
+        if not self.move_mode and self.isVisible():
+            mon_cfg = self.config.get("overlay_ids", {}).get(self.overlay_id, {})
+            if "pos_x" in mon_cfg and "pos_y" in mon_cfg:
+                target_x, target_y = self._sanitize_position(mon_cfg["pos_x"], mon_cfg["pos_y"])
+                if self.pos().x() != target_x or self.pos().y() != target_y:
+                    self.apply_configured_position(force=True)
+
         if not hasattr(self, 'last_clients') or self.last_clients is None:
             return
             
         history_enabled = self.config.get("history_enabled", False)
         history_duration = float(self.config.get("history_duration", 60))
-        current_time = time.time()
 
         # Only trigger an update if there is something pending expiration:
         # 1) A user who left and needs to be pruned when history_duration elapses
@@ -432,6 +463,7 @@ class OverlayWindow(QWidget):
             self.update_clients(self.last_clients, getattr(self, 'current_cid', None))
 
     def set_move_mode(self, enabled):
+        was_move_mode = getattr(self, 'move_mode', False)
         self.move_mode = enabled
         
         if sys.platform == "win32":
@@ -454,24 +486,32 @@ class OverlayWindow(QWidget):
             flags |= Qt.WindowType.WindowTransparentForInput
             self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             
-            # Save position when exiting move mode (backup)
-            if "overlay_ids" not in self.config:
-                self.config["overlay_ids"] = {}
-            if self.overlay_id not in self.config["overlay_ids"]:
-                self.config["overlay_ids"][self.overlay_id] = {}
-                
-            self.config["overlay_ids"][self.overlay_id]["pos_x"] = self.pos().x()
-            self.config["overlay_ids"][self.overlay_id]["pos_y"] = self.pos().y()
-            if hasattr(self, 'save_callback'):
-                self.save_callback()
+            # Only save position when exiting move mode if the user actually dragged the window
+            # or if this overlay had no saved position in config yet.
+            if was_move_mode:
+                if "overlay_ids" not in self.config:
+                    self.config["overlay_ids"] = {}
+                if self.overlay_id not in self.config["overlay_ids"]:
+                    self.config["overlay_ids"][self.overlay_id] = {}
+                mon_cfg = self.config["overlay_ids"][self.overlay_id]
+                if getattr(self, '_user_moved', False) or "pos_x" not in mon_cfg or "pos_y" not in mon_cfg:
+                    new_x, new_y = self._sanitize_position(self.pos().x(), self.pos().y())
+                    mon_cfg["pos_x"] = new_x
+                    mon_cfg["pos_y"] = new_y
+                    if hasattr(self, 'save_callback') and self.save_callback:
+                        self.save_callback()
+                self._user_moved = False
         else:
+            self._user_moved = False
             self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
             
-        self.setWindowFlags(flags)
+        if was_move_mode != self.move_mode:
+            self.setWindowFlags(flags)
         self.update_style()
         is_enabled = self.config.get("overlay_ids", {}).get(self.overlay_id, {}).get("enabled", False)
         if self.move_mode or is_enabled:
             self.show()
+            self.apply_configured_position(force=True)
         else:
             self.hide()
         self._apply_win32_click_through(not self.move_mode)
@@ -879,18 +919,24 @@ class OverlayWindow(QWidget):
         if self.move_mode and event.buttons() == Qt.MouseButton.LeftButton:
             if hasattr(self, 'drag_start_pos') and hasattr(self, 'window_start_pos'):
                 delta = event.globalPosition().toPoint() - self.drag_start_pos
+                if delta.manhattanLength() > 0:
+                    self._user_moved = True
                 self.move(self.window_start_pos + delta)
             event.accept()
 
     def mouseReleaseEvent(self, event):
         if self.move_mode and event.button() == Qt.MouseButton.LeftButton:
-            if "overlay_ids" not in self.config:
-                self.config["overlay_ids"] = {}
-            if self.overlay_id not in self.config["overlay_ids"]:
-                self.config["overlay_ids"][self.overlay_id] = {}
-                
-            self.config["overlay_ids"][self.overlay_id]["pos_x"] = self.pos().x()
-            self.config["overlay_ids"][self.overlay_id]["pos_y"] = self.pos().y()
-            if hasattr(self, 'save_callback'):
-                self.save_callback()
+            if getattr(self, '_user_moved', False):
+                if "overlay_ids" not in self.config:
+                    self.config["overlay_ids"] = {}
+                if self.overlay_id not in self.config["overlay_ids"]:
+                    self.config["overlay_ids"][self.overlay_id] = {}
+                    
+                new_x, new_y = self._sanitize_position(self.pos().x(), self.pos().y())
+                if new_x != self.pos().x() or new_y != self.pos().y():
+                    self.move(new_x, new_y)
+                self.config["overlay_ids"][self.overlay_id]["pos_x"] = new_x
+                self.config["overlay_ids"][self.overlay_id]["pos_y"] = new_y
+                if hasattr(self, 'save_callback') and self.save_callback:
+                    self.save_callback()
             event.accept()

@@ -199,9 +199,24 @@ class MainApp:
         self.tray.settings_requested.connect(self.show_settings)
         self.tray.quit_requested.connect(self.quit)
         
-        # Screen changes connection to prevent overlays from being lost off-screen
-        self.app.screenRemoved.connect(lambda _: self.sanitize_all_overlay_positions())
-        self.app.primaryScreenChanged.connect(lambda _: self.sanitize_all_overlay_positions())
+        # Screen changes connection to restore overlay positions after monitor sleep/wake or hotplug
+        self.screen_sync_timer = QTimer(self.app)
+        self.screen_sync_timer.setSingleShot(True)
+        self.screen_sync_timer.timeout.connect(self.sanitize_all_overlay_positions)
+
+        self.screen_sync_followup_timer = QTimer(self.app)
+        self.screen_sync_followup_timer.setSingleShot(True)
+        self.screen_sync_followup_timer.timeout.connect(self.sanitize_all_overlay_positions)
+
+        self.screen_sync_late_timer = QTimer(self.app)
+        self.screen_sync_late_timer.setSingleShot(True)
+        self.screen_sync_late_timer.timeout.connect(self.sanitize_all_overlay_positions)
+
+        for screen in self.app.screens():
+            self._connect_screen_signals(screen)
+        self.app.screenAdded.connect(self._on_screen_added)
+        self.app.screenRemoved.connect(self._on_screen_configuration_changed)
+        self.app.primaryScreenChanged.connect(self._on_screen_configuration_changed)
         
         # Voice Client Backend (TS3 or Mumble)
         self.voice_thread = None
@@ -359,19 +374,38 @@ class MainApp:
             
         self.save_config()
 
+    def _connect_screen_signals(self, screen):
+        if screen is None:
+            return
+        try:
+            screen.geometryChanged.connect(self._on_screen_configuration_changed)
+            screen.availableGeometryChanged.connect(self._on_screen_configuration_changed)
+        except Exception:
+            pass
+
+    def _on_screen_added(self, screen):
+        self._connect_screen_signals(screen)
+        self._on_screen_configuration_changed()
+
+    def _on_screen_configuration_changed(self, *_args):
+        """
+        Debounces screen hotplug/DPMS/resume events and triggers multi-stage overlay position
+        restoration so positions are restored once all monitors finish waking up.
+        """
+        if hasattr(self, 'screen_sync_timer'):
+            self.screen_sync_timer.start(500)
+        if hasattr(self, 'screen_sync_followup_timer'):
+            self.screen_sync_followup_timer.start(2000)
+        if hasattr(self, 'screen_sync_late_timer'):
+            self.screen_sync_late_timer.start(4000)
+
     def sanitize_all_overlay_positions(self):
         """
-        Checks all overlays to ensure they are on-screen and visible.
-        If any overlay is in a dead zone or off-screen, repositions it safely.
+        Restores all overlays to their saved positions from config (or temporary fallback on
+        primary monitor if the target monitor is currently disconnected) without overwriting config.
         """
-        for o_id, overlay in self.overlays.items():
-            mon_cfg = self.cfg.get("overlay_ids", {}).get(o_id, {})
-            pos_x = mon_cfg.get("pos_x")
-            pos_y = mon_cfg.get("pos_y")
-            if pos_x is not None and pos_y is not None:
-                new_x, new_y = overlay._sanitize_position(pos_x, pos_y)
-                if new_x != pos_x or new_y != pos_y:
-                    overlay.move(new_x, new_y)
+        for overlay in self.overlays.values():
+            overlay.apply_configured_position(force=True)
 
     def on_settings_changed(self):
         config.save_config(self.cfg)
