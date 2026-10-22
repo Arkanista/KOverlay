@@ -1,5 +1,6 @@
 import os
 import sys
+import glob
 import tempfile
 import hashlib
 import shutil
@@ -7,8 +8,100 @@ import subprocess
 import threading
 import queue
 import time
+import importlib
 import importlib.util
 import re
+
+def find_executable(name):
+    """Finds an executable in PATH or common Linux/Homebrew/KOverlay directories."""
+    found = shutil.which(name)
+    if found:
+        return found
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    candidate_dirs = [
+        app_dir,
+        os.path.join(app_dir, "bin"),
+        os.path.expanduser("~/.local/share/koverlay/venv/bin"),
+        os.path.expanduser("~/.local/share/koverlay/bin"),
+        os.path.expanduser("~/.local/bin"),
+        "/opt/koverlay/bin",
+        "/opt/koverlay/lib/bin",
+        "/home/linuxbrew/.linuxbrew/bin",
+        os.path.expanduser("~/.linuxbrew/bin"),
+        "/usr/local/bin",
+        "/usr/bin",
+    ]
+    for d in candidate_dirs:
+        candidate = os.path.join(d, name)
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+def ensure_edge_tts_available():
+    """
+    Checks if edge_tts Python module or edge-tts CLI is available.
+    Dynamically attaches local KOverlay venv/lib site-packages if needed.
+    Returns (has_module: bool, cli_path: str | None).
+    """
+    has_module = importlib.util.find_spec("edge_tts") is not None
+    if not has_module and sys.platform != "win32":
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+        extra_site_dirs = (
+            glob.glob(os.path.join(app_dir, "venv", "lib", "python*", "site-packages"))
+            + glob.glob(os.path.expanduser("~/.local/share/koverlay/venv/lib/python*/site-packages"))
+            + ["/opt/koverlay/lib"]
+            + glob.glob(os.path.expanduser("~/.local/lib/python*/site-packages"))
+        )
+        added = False
+        for sp in extra_site_dirs:
+            if os.path.isdir(os.path.join(sp, "edge_tts")) and sp not in sys.path:
+                sys.path.insert(0, sp)
+                added = True
+        if added:
+            importlib.invalidate_caches()
+            try:
+                has_module = importlib.util.find_spec("edge_tts") is not None
+            except Exception:
+                has_module = False
+
+    cli_name = "edge-tts.exe" if sys.platform == "win32" else "edge-tts"
+    cli_path = find_executable(cli_name)
+    return has_module, cli_path
+
+def find_audio_player():
+    """
+    Finds the best available audio player capable of playing MP3 files.
+    Returns (player_type: str | None, player_bin: str | None).
+    """
+    mpv_name = "mpv.exe" if sys.platform == "win32" else "mpv"
+    mpv_bin = find_executable(mpv_name)
+    if mpv_bin:
+        return "mpv", mpv_bin
+
+    if sys.platform == "win32":
+        return "win32_mci", "winmm"
+
+    for player in ("ffplay", "pw-play", "paplay", "gst-play-1.0", "cvlc"):
+        bin_path = find_executable(player)
+        if bin_path:
+            return player, bin_path
+
+    return None, None
+
+def check_tts_status():
+    """Returns a dictionary with detailed TTS availability and backend info."""
+    has_module, cli_path = ensure_edge_tts_available()
+    edge_tts_ok = has_module or (cli_path is not None)
+    player_type, player_bin = find_audio_player()
+    player_ok = player_type is not None
+    return {
+        "available": edge_tts_ok and player_ok,
+        "edge_tts": edge_tts_ok,
+        "has_module": has_module,
+        "edge_tts_cli": cli_path,
+        "player_type": player_type,
+        "player_bin": player_bin,
+    }
 
 def apply_tts_aliases(name, aliases):
     if not aliases:
@@ -37,7 +130,7 @@ class TTSManager:
             
         self.message_queue = queue.Queue(maxsize=5)
         self.is_running = True
-        self.edge_tts_installed = importlib.util.find_spec("edge_tts") is not None
+        self.refresh_capabilities()
         
         # Setup persistent cache directory
         if sys.platform == "win32":
@@ -61,6 +154,13 @@ class TTSManager:
         
         self.worker_thread = threading.Thread(target=self._process_queue, daemon=True)
         self.worker_thread.start()
+
+    def refresh_capabilities(self):
+        status = check_tts_status()
+        self.edge_tts_installed = status["edge_tts"]
+        self.has_edge_tts_module = status["has_module"]
+        self.edge_tts_cli = status["edge_tts_cli"]
+        return status
 
     def _cleanup_old_cache(self, retention_days):
         if retention_days <= 0:
@@ -183,6 +283,63 @@ class TTSManager:
             print(f"Windows MCI playback error: {e}")
             return False
 
+    def _play_mp3_file(self, filepath, player_type, player_bin, vol):
+        c_env = {**os.environ, "LC_NUMERIC": "C"}
+        if player_type == "mpv":
+            subprocess.run([
+                player_bin,
+                "--no-video",
+                "--no-terminal",
+                f"--volume={vol}",
+                "--af=silenceremove=stop_periods=-1:stop_duration=0:stop_threshold=-70dB",
+                filepath
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=c_env)
+        elif player_type == "ffplay":
+            subprocess.run([
+                player_bin,
+                "-nodisp",
+                "-autoexit",
+                "-loglevel", "quiet",
+                "-volume", str(max(0, min(100, int(vol)))),
+                "-af", "silenceremove=stop_periods=-1:stop_duration=0:stop_threshold=-70dB",
+                filepath
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=c_env)
+        elif player_type == "pw-play":
+            vol_float = max(0.0, min(1.0, float(vol) / 100.0))
+            subprocess.run([
+                player_bin,
+                f"--volume={vol_float:.2f}",
+                filepath
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=c_env)
+        elif player_type == "paplay":
+            vol_pa = max(0, min(65536, int((float(vol) / 100.0) * 65536)))
+            subprocess.run([
+                player_bin,
+                f"--volume={vol_pa}",
+                filepath
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=c_env)
+        elif player_type == "gst-play-1.0":
+            vol_float = max(0.0, min(1.0, float(vol) / 100.0))
+            subprocess.run([
+                player_bin,
+                "--no-interactive",
+                "--quiet",
+                f"--volume={vol_float:.2f}",
+                filepath
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=c_env)
+        elif player_type == "cvlc":
+            vol_float = max(0.0, min(2.0, float(vol) / 100.0))
+            subprocess.run([
+                player_bin,
+                "--play-and-exit",
+                "--no-video",
+                "--quiet",
+                f"--gain={vol_float:.2f}",
+                filepath
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=c_env)
+        elif player_type == "win32_mci":
+            self._play_win32_mci(filepath, vol)
+
     def _play_sync(self, item):
         text = item["text"]
         voice = item["voice"]
@@ -190,14 +347,11 @@ class TTSManager:
         rate = item["rate"]
         safe_text = "".join(c for c in text if c.isalnum() or c in " _-.")
 
-        mpv_bin = shutil.which("mpv")
-        if not mpv_bin:
-            app_dir = os.path.dirname(os.path.abspath(__file__))
-            candidate = os.path.join(app_dir, "mpv.exe" if sys.platform == "win32" else "mpv")
-            if os.path.isfile(candidate):
-                mpv_bin = candidate
+        if not self.edge_tts_installed:
+            self.refresh_capabilities()
 
-        can_play_mp3 = bool(mpv_bin) or (sys.platform == "win32")
+        player_type, player_bin = find_audio_player()
+        can_play_mp3 = player_type is not None
 
         if self.edge_tts_installed and can_play_mp3:
             try:
@@ -211,25 +365,22 @@ class TTSManager:
                 tmp_file = os.path.join(self.cache_dir, f"{safe_filename}.mp3")
                 
                 if not os.path.exists(tmp_file):
-                    import edge_tts
-                    import asyncio
-                    communicate = edge_tts.Communicate(text, voice, rate=rate)
-                    asyncio.run(communicate.save(tmp_file))
+                    if getattr(self, "has_edge_tts_module", False) or importlib.util.find_spec("edge_tts") is not None:
+                        import edge_tts
+                        import asyncio
+                        communicate = edge_tts.Communicate(text, voice, rate=rate)
+                        asyncio.run(communicate.save(tmp_file))
+                    elif getattr(self, "edge_tts_cli", None):
+                        subprocess.run([
+                            self.edge_tts_cli,
+                            "--text", text,
+                            "--voice", voice,
+                            f"--rate={rate}",
+                            "--write-media", tmp_file
+                        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
                     
-                if mpv_bin:
-                    # Use subprocess.run to BLOCK until mpv finishes playing the audio
-                    # Added silenceremove filter to strip generated silence at the end
-                    subprocess.run([
-                        mpv_bin, 
-                        "--no-video", 
-                        "--no-terminal", 
-                        f"--volume={vol}", 
-                        # Using -70dB to prevent clipping the soft attack of the first consonant
-                        "--af=silenceremove=stop_periods=-1:stop_duration=0:stop_threshold=-70dB",
-                        tmp_file
-                    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                elif sys.platform == "win32":
-                    self._play_win32_mci(tmp_file, vol)
+                if os.path.exists(tmp_file):
+                    self._play_mp3_file(tmp_file, player_type, player_bin, vol)
             except Exception as e:
                 print(f"Edge TTS error: {e}")
                 

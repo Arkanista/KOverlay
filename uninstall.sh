@@ -13,9 +13,15 @@ echo "Removing Desktop Shortcut and Icons..."
 rm -f ~/.local/share/applications/koverlay.desktop
 
 for size in 16 32 48 64 128 256 512; do
-    sudo rm -f "/usr/share/icons/hicolor/${size}x${size}/apps/koverlay.png"
+    rm -f "$HOME/.local/share/icons/hicolor/${size}x${size}/apps/koverlay.png"
+    if [ ! -f /run/ostree-booted ] && [ -f "/usr/share/icons/hicolor/${size}x${size}/apps/koverlay.png" ]; then
+        sudo rm -f "/usr/share/icons/hicolor/${size}x${size}/apps/koverlay.png" 2>/dev/null || true
+    fi
 done
-sudo gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
+gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+if [ ! -f /run/ostree-booted ] && [ -w /usr/share/icons ]; then
+    sudo gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+fi
 
 # Update desktop database
 if command -v update-desktop-database &> /dev/null; then

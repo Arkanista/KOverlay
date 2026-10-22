@@ -20,12 +20,11 @@
 
 
 > [!TIP]
-> **What's New in v1.1.6 (Wine/Proton Focus Loss & Window Tracker Optimization):**
-> - 🎮 **Fixed Keyboard Focus Loss in Wine / Proton Games**: Resolved an issue where XWayland/KWin would drop keyboard focus to Root Window (`0x200000`), breaking low-level hotkeys (Enter, Esc, shortcuts) in games such as EVE Online running via Wine/Proton.
-> - 🚫 **Window Focus Immunity**: Applied `Qt.WindowType.Tool`, `WindowDoesNotAcceptFocus`, `WA_ShowWithoutActivating`, `NoFocus`, and Windows `WS_EX_NOACTIVATE` across normal and move-mode states.
-> - ⚡ **Throttled Active Window IPC Polling**: Optimized polling frequency from 50ms (20Hz) to 250ms (4Hz) with a 200ms floor for Linux subprocesses (`kdotool`/`xdotool`), reducing display server IPC noise.
-> - 🛡️ **Debounced Wine Subwindow State Transitions**: Prevented rapid overlay hide/show cycling during transient window focus handoffs.
-> - 🖥️ **Plasma 6.8 & Suspend/Wake Reliability**: Retained all coordinate retention and geometry stability improvements from v1.1.5.
+> **What's New in v1.1.7 (Bazzite / Immutable Linux TTS & Audio Player Fallbacks):**
+> - 🔊 **Multi-Player Audio Support on Linux (Bazzite / SteamOS / Fedora Atomic)**: TTS announcements no longer strictly require `/usr/bin/mpv`. KOverlay now automatically detects and uses `mpv`, `ffplay`, **`pw-play`** (PipeWire), **`paplay`** (PulseAudio / PipeWire-Pulse), **`gst-play-1.0`** (GStreamer), or `cvlc`, including binaries installed in `~/.local/bin` or Homebrew/Linuxbrew (`/home/linuxbrew/.linuxbrew/bin`).
+> - 📦 **Smart `edge-tts` Detection & One-Click Install**: Automatically attaches local `venv` / `/opt/koverlay/lib` `site-packages` and provides an in-app **`Install edge-tts`** button in Settings if the module is missing.
+> - 🐧 **Immutable Distro (`rpm-ostree`) Installer Fixes**: `install.sh` and `uninstall.sh` now detect `ostree` systems and install icons into `~/.local/share/icons/hicolor` instead of failing on read-only `/usr`.
+> - 🎮 **Wine / Proton Focus Immunity (from v1.1.6)**: Prevents XWayland/KWin keyboard focus loss in games like EVE Online (`WindowDoesNotAcceptFocus`, `WA_ShowWithoutActivating`, `WS_EX_NOACTIVATE`) and throttles window tracking IPC polling.
 
 > [!IMPORTANT]
 > **KOverlay must remain running in the background (in the system tray)** for the overlay to appear over your game. If KOverlay is closed, the voice overlay will not be visible.
@@ -89,10 +88,10 @@ Building from source automatically handles dependency resolution:
 
 #### Method B: Install the Pre-compiled Pacman Package
 1. Download the pre-compiled package from GitHub releases:
-    👉 **[Download KOverlay v1.1.6 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.6/koverlay-1.1.6-1-x86_64.pkg.tar.zst)**
+    👉 **[Download KOverlay v1.1.7 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.7/koverlay-1.1.7-1-x86_64.pkg.tar.zst)**
 2. Install the downloaded package directly with `pacman`:
    ```bash
-   sudo pacman -U koverlay-1.1.6-1-x86_64.pkg.tar.zst
+   sudo pacman -U koverlay-1.1.7-1-x86_64.pkg.tar.zst
    ```
 
 ### Microsoft Windows (10 / 11)
@@ -104,7 +103,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 1: Setup Wizard (Recommended)
 1. Download the latest installer:
-   👉 **[Download KOverlay_Setup.exe (v1.1.6)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.6/KOverlay_Setup.exe)**
+   👉 **[Download KOverlay_Setup.exe (v1.1.7)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.7/KOverlay_Setup.exe)**
 2. Run `KOverlay_Setup.exe`:
    - Administrator rights are **not** required. The program installs directly into your user profile: `%LOCALAPPDATA%\Programs\KOverlay`.
    - **Mumble Check:** If Mumble is running, the installer will inform you and prompt you to close Mumble so it can safely install the Mumble plugin.
@@ -113,7 +112,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 2: Portable Archive (.zip)
 1. Download the portable package:
-   👉 **[Download KOverlay_Portable.zip (v1.1.6)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.6/KOverlay_Portable.zip)**
+   👉 **[Download KOverlay_Portable.zip (v1.1.7)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.7/KOverlay_Portable.zip)**
 2. Extract the `.zip` archive to any directory you prefer (e.g. `C:\Games\KOverlay` or your Desktop).
 3. **How to Launch KOverlay:**
    - Inside the extracted folder, double-click **`KOverlay.bat`**.

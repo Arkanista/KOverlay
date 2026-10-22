@@ -6,7 +6,13 @@ set -e
 echo "Starting KOverlay installation..."
 
 # 1. Detect package manager and install dependencies
-if command -v apt &> /dev/null; then
+if [ -f /run/ostree-booted ] || command -v rpm-ostree &> /dev/null; then
+    echo "Detected immutable ostree system (Bazzite / Fedora Atomic / Silverblue / Kinoite)..."
+    echo "Skipping root filesystem package installation (using built-in Python/PipeWire/GStreamer environment)."
+    if command -v brew &> /dev/null && ! command -v mpv &> /dev/null; then
+        echo "Tip: Using built-in system audio player (pw-play / paplay / gst-play-1.0). You can also optionally install mpv via: brew install mpv"
+    fi
+elif command -v apt &> /dev/null; then
     echo "Detected apt (Debian/Ubuntu/Mint)..."
     sudo apt update
     sudo apt install -y python3 python3-venv python3-pip mpv xdotool build-essential g++
@@ -20,7 +26,7 @@ elif command -v zypper &> /dev/null; then
     echo "Detected zypper (openSUSE)..."
     sudo zypper install -y python3 python3-pip mpv xdotool gcc-c++ make
 else
-    echo "Unsupported package manager. Please install python3, python3-venv, pip, mpv, and a C++ compiler manually."
+    echo "Unsupported package manager. Please install python3, python3-venv, pip, and an audio player (mpv/pw-play/paplay/ffplay) manually."
 fi
 
 echo "Checking for window tracking tools..."
@@ -72,27 +78,34 @@ if [ -d "mumble_plugin" ]; then
     fi
 fi
 
-echo "Installing icon sizes to /usr/share/icons/hicolor..."
+echo "Installing icon sizes to ~/.local/share/icons/hicolor..."
 for size in 16 32 48 64 128 256 512; do
     if [ -f "icons/koverlay-${size}.png" ]; then
-        sudo mkdir -p "/usr/share/icons/hicolor/${size}x${size}/apps"
-        sudo cp "icons/koverlay-${size}.png" "/usr/share/icons/hicolor/${size}x${size}/apps/koverlay.png"
+        mkdir -p "$HOME/.local/share/icons/hicolor/${size}x${size}/apps"
+        cp "icons/koverlay-${size}.png" "$HOME/.local/share/icons/hicolor/${size}x${size}/apps/koverlay.png"
+        if [ ! -f /run/ostree-booted ] && [ -w /usr/share/icons ]; then
+            sudo mkdir -p "/usr/share/icons/hicolor/${size}x${size}/apps" 2>/dev/null || true
+            sudo cp "icons/koverlay-${size}.png" "/usr/share/icons/hicolor/${size}x${size}/apps/koverlay.png" 2>/dev/null || true
+        fi
     fi
 done
-sudo gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+if [ ! -f /run/ostree-booted ] && [ -w /usr/share/icons ]; then
+    sudo gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+fi
 
 # 3. Setup Python Virtual Environment
 echo "Setting up Python virtual environment..."
 cd "$INSTALL_DIR"
 if [ ! -d "venv" ]; then
-    python3 -m venv venv
+    python3 -m venv venv || python3 -m venv --system-site-packages venv
 fi
 
 # Generate start script
 cat > start.sh << EOL
 #!/bin/bash
 cd "$INSTALL_DIR"
-export PATH="\$PATH:$INSTALL_DIR/bin"
+export PATH="\$PATH:$INSTALL_DIR/bin:\$HOME/.local/bin:/home/linuxbrew/.linuxbrew/bin:\$HOME/.linuxbrew/bin"
 if [ -d "venv" ]; then
     exec ./venv/bin/python koverlay.py "\$@"
 else
@@ -103,6 +116,7 @@ chmod +x start.sh
 
 echo "Activating virtual environment and installing requirements..."
 source venv/bin/activate
+pip install --upgrade pip 2>/dev/null || true
 pip install -r requirements.txt
 deactivate
 
@@ -118,7 +132,7 @@ Type=Application
 Name=KOverlay
 GenericName=Voice Overlay
 Comment=Universal TeamSpeak 3, Mumble and Discord Overlay with TTS
-Exec="$INSTALL_DIR/venv/bin/python" "$INSTALL_DIR/koverlay.py"
+Exec="$INSTALL_DIR/start.sh"
 Path=$INSTALL_DIR
 Icon=koverlay
 Terminal=false

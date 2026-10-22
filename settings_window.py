@@ -342,33 +342,84 @@ class SettingsWindow(QWidget):
         layout.addWidget(self.speakers_group)
         
         # TTS Settings
-        edge_tts_installed = importlib.util.find_spec("edge_tts") is not None
-        app_dir = os.path.dirname(os.path.abspath(__file__))
-        mpv_installed = (shutil.which("mpv") is not None) or os.path.isfile(os.path.join(app_dir, "mpv.exe" if sys.platform == "win32" else "mpv"))
-        if sys.platform == "win32":
-            tts_available = edge_tts_installed
-        else:
-            tts_available = edge_tts_installed and mpv_installed
+        from tts_manager import check_tts_status, get_tts_manager
+        tts_status = check_tts_status()
+        tts_available = tts_status["available"]
         
         self.tts_group = QGroupBox("Text-to-Speech (TTS)")
         tts_layout = QVBoxLayout()
         
+        tts_header_layout = QHBoxLayout()
         self.tts_checkbox = QCheckBox("Enable TTS Voice Announcements")
         self.tts_checkbox.setChecked(self.config.get("tts_enabled", False))
+        
+        self.install_tts_btn = QPushButton("Install edge-tts")
+        self.install_tts_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.install_tts_btn.setVisible(False)
         
         if not tts_available:
             self.tts_checkbox.setChecked(False)
             self.tts_checkbox.setEnabled(False)
             self.config["tts_enabled"] = False
-            self.tts_checkbox.setText("Enable TTS Announcements (Unavailable)")
-            
+            missing_parts = []
+            if not tts_status["edge_tts"]:
+                missing_parts.append("edge-tts")
+                self.install_tts_btn.setVisible(True)
+            if not tts_status["player_type"]:
+                missing_parts.append("audio player")
+            reason = f" - missing {', '.join(missing_parts)}" if missing_parts else ""
+            self.tts_checkbox.setText(f"Enable TTS Announcements (Unavailable{reason})")
+
+        def on_install_edge_tts():
+            self.install_tts_btn.setEnabled(False)
+            self.install_tts_btn.setText("Installing...")
+            QApplication.processEvents()
+            success = False
+            commands = [
+                [sys.executable, "-m", "pip", "install", "edge-tts"],
+                [sys.executable, "-m", "pip", "install", "--user", "edge-tts"],
+                [sys.executable, "-m", "pip", "install", "--user", "--break-system-packages", "edge-tts"],
+            ]
+            for cmd in commands:
+                try:
+                    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+                    if res.returncode == 0:
+                        success = True
+                        break
+                except Exception:
+                    pass
+            if not success and sys.platform != "win32":
+                try:
+                    venv_dir = os.path.expanduser("~/.local/share/koverlay/venv")
+                    if not os.path.exists(os.path.join(venv_dir, "bin", "pip")):
+                        subprocess.run([sys.executable, "-m", "venv", venv_dir], check=True, timeout=30)
+                    res = subprocess.run([os.path.join(venv_dir, "bin", "pip"), "install", "edge-tts"], timeout=60)
+                    if res.returncode == 0:
+                        success = True
+                except Exception:
+                    pass
+            new_status = get_tts_manager().refresh_capabilities()
+            if new_status["available"]:
+                self.install_tts_btn.setVisible(False)
+                self.tts_checkbox.setText("Enable TTS Voice Announcements")
+                self.tts_checkbox.setEnabled(True)
+                self.tts_checkbox.setChecked(True)
+            else:
+                self.install_tts_btn.setEnabled(True)
+                self.install_tts_btn.setText("Retry Install edge-tts")
+
+        self.install_tts_btn.clicked.connect(on_install_edge_tts)
         self.tts_checkbox.toggled.connect(self._on_change)
-        tts_layout.addWidget(self.tts_checkbox)
+        tts_header_layout.addWidget(self.tts_checkbox)
+        tts_header_layout.addWidget(self.install_tts_btn)
+        tts_header_layout.addStretch()
+        tts_layout.addLayout(tts_header_layout)
         
         if sys.platform == "win32":
             note_text = "Note: Uses high-quality voices over the internet. Requires 'edge-tts' Python module (supports built-in Windows audio or mpv.exe)."
         else:
-            note_text = "Note: Uses high-quality voices over the internet. Requires 'edge-tts' Python module and 'mpv' player."
+            player_info = f" (active player: {tts_status['player_type']})" if tts_status.get("player_type") else ""
+            note_text = f"Note: Uses high-quality voices over the internet. Requires 'edge-tts' and an audio player (mpv, ffplay, pw-play, paplay, or gst-play-1.0){player_info}."
         info_label = QLabel(note_text)
         font = info_label.font()
         font.setPointSize(font.pointSize() - 2)
