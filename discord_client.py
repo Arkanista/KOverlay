@@ -32,10 +32,18 @@ class DiscordIpcTransport:
     def _connect_unix(self):
         candidates = []
         runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}" if hasattr(os, "getuid") else "/tmp")
-        for i in range(10):
-            candidates.append(os.path.join(runtime_dir, f"discord-ipc-{i}"))
-        for i in range(10):
-            candidates.append(os.path.join("/tmp", f"discord-ipc-{i}"))
+        ipc_dirs = [
+            runtime_dir,
+            os.path.join(runtime_dir, "app", "com.discordapp.Discord"),
+            os.path.join(runtime_dir, "app", "com.discordapp.DiscordCanary"),
+            os.path.join(runtime_dir, "app", "com.discordapp.DiscordPTB"),
+            os.path.join(runtime_dir, "app", "dev.vencord.Vesktop"),
+            os.path.join(runtime_dir, "snap.discord"),
+            "/tmp",
+        ]
+        for d in ipc_dirs:
+            for i in range(10):
+                candidates.append(os.path.join(d, f"discord-ipc-{i}"))
 
         for path in candidates:
             if os.path.exists(path):

@@ -31,6 +31,15 @@ mkdir -p "$PLUGINS_DIR"
 cp -f "$TARGET_SO" "$PLUGINS_DIR/koverlay_mumble.so"
 chmod 755 "$PLUGINS_DIR/koverlay_mumble.so"
 
+# Also install into Flatpak Mumble plugin directory if Flatpak Mumble data exists
+FLATPAK_MUMBLE_DIR="$HOME/.var/app/info.mumble.Mumble/data/Mumble/Mumble/Plugins"
+if [ -d "$HOME/.var/app/info.mumble.Mumble" ]; then
+    mkdir -p "$FLATPAK_MUMBLE_DIR"
+    cp -f "$TARGET_SO" "$FLATPAK_MUMBLE_DIR/koverlay_mumble.so"
+    chmod 755 "$FLATPAK_MUMBLE_DIR/koverlay_mumble.so"
+    echo "Also installed to Flatpak Mumble: $FLATPAK_MUMBLE_DIR/koverlay_mumble.so"
+fi
+
 # If SCRIPT_DIR is writable (e.g. git development directory), also update the local copy
 if [ -w "$SCRIPT_DIR" ]; then
     cp -f "$TARGET_SO" "$SCRIPT_DIR/koverlay_mumble.so" 2>/dev/null || true

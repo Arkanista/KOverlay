@@ -5,28 +5,33 @@ set -e
 
 echo "Starting KOverlay installation..."
 
-# 1. Detect package manager and install dependencies
-if [ -f /run/ostree-booted ] || command -v rpm-ostree &> /dev/null; then
-    echo "Detected immutable ostree system (Bazzite / Fedora Atomic / Silverblue / Kinoite)..."
-    echo "Skipping root filesystem package installation (using built-in Python/PipeWire/GStreamer environment)."
+# 1. Detect environment (Immutable Host vs Container vs Standard Distro)
+IS_CONTAINER=0
+if [ -f /run/.containerenv ] || [ -f /.dockerenv ] || [ -n "$CONTAINER_ID" ]; then
+    IS_CONTAINER=1
+fi
+
+if [ "$IS_CONTAINER" -eq 0 ] && { [ -f /run/ostree-booted ] || command -v rpm-ostree &> /dev/null; }; then
+    echo "Detected immutable ostree host (Bazzite / Fedora Atomic / Silverblue / Kinoite / SteamOS)..."
+    echo "Skipping root filesystem package installation (installing entirely into ~/.local with isolated Python venv)."
     if command -v brew &> /dev/null && ! command -v mpv &> /dev/null; then
         echo "Tip: Using built-in system audio player (pw-play / paplay / gst-play-1.0). You can also optionally install mpv via: brew install mpv"
     fi
 elif command -v apt &> /dev/null; then
-    echo "Detected apt (Debian/Ubuntu/Mint)..."
+    echo "Detected apt (Debian/Ubuntu/Mint/Pop!_OS)..."
     sudo apt update
-    sudo apt install -y python3 python3-venv python3-pip mpv xdotool build-essential g++
+    sudo apt install -y python3 python3-venv python3-pip mpv xdotool build-essential g++ libxcb-cursor0
 elif command -v pacman &> /dev/null; then
-    echo "Detected pacman (Arch/Manjaro/CachyOS)..."
-    sudo pacman -Sy --needed python python-pip mpv xdotool base-devel gcc
+    echo "Detected pacman (Arch/Manjaro/CachyOS/Garuda)..."
+    sudo pacman -Sy --needed python python-pip python-pyqt6 qt6-svg mpv xdotool base-devel gcc
 elif command -v dnf &> /dev/null; then
-    echo "Detected dnf (Fedora)..."
-    sudo dnf install -y python3 python3-pip mpv xdotool gcc-c++ make
+    echo "Detected dnf (Fedora/Nobara/Distrobox)..."
+    sudo dnf install -y python3 python3-pip python3-pyqt6 qt6-qtsvg mpv xdotool gcc-c++ make xcb-util-cursor
 elif command -v zypper &> /dev/null; then
     echo "Detected zypper (openSUSE)..."
-    sudo zypper install -y python3 python3-pip mpv xdotool gcc-c++ make
+    sudo zypper install -y python3 python3-pip mpv xdotool gcc-c++ make libxcb-cursor0
 else
-    echo "Unsupported package manager. Please install python3, python3-venv, pip, and an audio player (mpv/pw-play/paplay/ffplay) manually."
+    echo "No standard mutable package manager detected. Proceeding with local user-space installation (~/.local)..."
 fi
 
 echo "Checking for window tracking tools..."
@@ -120,8 +125,10 @@ pip install --upgrade pip 2>/dev/null || true
 pip install -r requirements.txt
 deactivate
 
-# 4. Setup Desktop Integration
-echo "Setting up Desktop Shortcut..."
+# 4. Setup CLI Symlink and Desktop Integration
+echo "Setting up ~/.local/bin/koverlay command and Desktop Shortcut..."
+mkdir -p "$HOME/.local/bin"
+ln -sf "$INSTALL_DIR/start.sh" "$HOME/.local/bin/koverlay"
 mkdir -p ~/.local/share/applications/
 
 # Generate desktop file dynamically with absolute path

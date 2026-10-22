@@ -9,8 +9,9 @@ echo "Stopping KOverlay if running..."
 killall koverlay &> /dev/null || true
 
 # 1. Remove Desktop Integration
-echo "Removing Desktop Shortcut and Icons..."
+echo "Removing Desktop Shortcut, CLI Symlink, and Icons..."
 rm -f ~/.local/share/applications/koverlay.desktop
+rm -f "$HOME/.local/bin/koverlay"
 
 for size in 16 32 48 64 128 256 512; do
     rm -f "$HOME/.local/share/icons/hicolor/${size}x${size}/apps/koverlay.png"
