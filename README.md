@@ -20,11 +20,11 @@
 
 
 > [!TIP]
-> **What's New in v1.1.7 (Bazzite / Immutable Linux TTS & Audio Player Fallbacks):**
-> - 🔊 **Multi-Player Audio Support on Linux (Bazzite / SteamOS / Fedora Atomic)**: TTS announcements no longer strictly require `/usr/bin/mpv`. KOverlay now automatically detects and uses `mpv`, `ffplay`, **`pw-play`** (PipeWire), **`paplay`** (PulseAudio / PipeWire-Pulse), **`gst-play-1.0`** (GStreamer), or `cvlc`, including binaries installed in `~/.local/bin` or Homebrew/Linuxbrew (`/home/linuxbrew/.linuxbrew/bin`).
+> **What's New in v1.1.8 (Linux TTS Audio Engine Switcher, Diagnostics & Bazzite / Immutable Linux Support):**
+> - 🎛️ **Linux TTS Audio Engine Switcher & Recommendations**: Added an **Audio Engine** selector in Settings (Linux) when multiple players are detected (`Auto`, `mpv`, `ffplay`, `pw-play`, `paplay`, `gst-play-1.0`, `cvlc`), active engine status indicator, exact `Unavailable` cause diagnostics, and a **`Which engine is best?`** guide comparing Tier 1 gapless engines (`mpv`, `ffplay` with real-time `silenceremove`) vs. Tier 2/3 fallbacks (`pw-play`, `paplay`, `gst-play-1.0`, `cvlc`).
+> - 🔊 **Multi-Player Audio Support on Linux (Bazzite / SteamOS / Fedora Atomic)**: TTS announcements no longer strictly require `/usr/bin/mpv`. KOverlay automatically detects and uses `mpv`, `ffplay`, **`pw-play`** (PipeWire), **`paplay`** (PulseAudio / PipeWire-Pulse), **`gst-play-1.0`** (GStreamer), or `cvlc`, including binaries installed in `~/.local/bin` or Homebrew/Linuxbrew (`/home/linuxbrew/.linuxbrew/bin`).
 > - 📦 **Smart `edge-tts` Detection & One-Click Install**: Automatically attaches local `venv` / `/opt/koverlay/lib` `site-packages` and provides an in-app **`Install edge-tts`** button in Settings if the module is missing.
-> - 🐧 **Immutable Distro (`rpm-ostree`) Installer Fixes**: `install.sh` and `uninstall.sh` now detect `ostree` systems and install icons into `~/.local/share/icons/hicolor` instead of failing on read-only `/usr`.
-> - 🎮 **Wine / Proton Focus Immunity (from v1.1.6)**: Prevents XWayland/KWin keyboard focus loss in games like EVE Online (`WindowDoesNotAcceptFocus`, `WA_ShowWithoutActivating`, `WS_EX_NOACTIVATE`) and throttles window tracking IPC polling.
+> - 🐧 **Immutable Distro (`rpm-ostree`), Distrobox & Flatpak Support**: `install.sh` and `uninstall.sh` detect `ostree` systems and Distrobox containers, install icons into `~/.local/share/icons/hicolor`, and support Flatpak Discord/Vesktop IPC sockets as well as Flatpak Mumble plugins.
 
 > [!IMPORTANT]
 > **KOverlay must remain running in the background (in the system tray)** for the overlay to appear over your game. If KOverlay is closed, the voice overlay will not be visible.
@@ -88,10 +88,10 @@ Building from source automatically handles dependency resolution:
 
 #### Method B: Install the Pre-compiled Pacman Package
 1. Download the pre-compiled package from GitHub releases:
-    👉 **[Download KOverlay v1.1.7 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.7/koverlay-1.1.7-1-x86_64.pkg.tar.zst)**
+    👉 **[Download KOverlay v1.1.8 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.8/koverlay-1.1.8-1-x86_64.pkg.tar.zst)**
 2. Install the downloaded package directly with `pacman`:
    ```bash
-   sudo pacman -U koverlay-1.1.7-1-x86_64.pkg.tar.zst
+   sudo pacman -U koverlay-1.1.8-1-x86_64.pkg.tar.zst
    ```
 
 ### Microsoft Windows (10 / 11)
@@ -103,7 +103,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 1: Setup Wizard (Recommended)
 1. Download the latest installer:
-   👉 **[Download KOverlay_Setup.exe (v1.1.7)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.7/KOverlay_Setup.exe)**
+   👉 **[Download KOverlay_Setup.exe (v1.1.8)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.8/KOverlay_Setup.exe)**
 2. Run `KOverlay_Setup.exe`:
    - Administrator rights are **not** required. The program installs directly into your user profile: `%LOCALAPPDATA%\Programs\KOverlay`.
    - **Mumble Check:** If Mumble is running, the installer will inform you and prompt you to close Mumble so it can safely install the Mumble plugin.
@@ -112,7 +112,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 2: Portable Archive (.zip)
 1. Download the portable package:
-   👉 **[Download KOverlay_Portable.zip (v1.1.7)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.7/KOverlay_Portable.zip)**
+   👉 **[Download KOverlay_Portable.zip (v1.1.8)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.8/KOverlay_Portable.zip)**
 2. Extract the `.zip` archive to any directory you prefer (e.g. `C:\Games\KOverlay` or your Desktop).
 3. **How to Launch KOverlay:**
    - Inside the extracted folder, double-click **`KOverlay.bat`**.
@@ -249,9 +249,9 @@ KOverlay connects to Mumble via a high-performance native plugin and a local IPC
 
 > [!TIP]
 > You can also download the standalone plugin or unified bundle directly from GitHub releases:
-> - **[koverlay_mumble.mumble_plugin (Universal Bundle)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.7/koverlay_mumble.mumble_plugin)** (Double-click or import via Mumble's "Install plugin" button)
-> - **[koverlay_mumble.dll (Windows x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.7/koverlay_mumble.dll)**
-> - **[koverlay_mumble.so (Linux x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.7/koverlay_mumble.so)**
+> - **[koverlay_mumble.mumble_plugin (Universal Bundle)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.8/koverlay_mumble.mumble_plugin)** (Double-click or import via Mumble's "Install plugin" button)
+> - **[koverlay_mumble.dll (Windows x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.8/koverlay_mumble.dll)**
+> - **[koverlay_mumble.so (Linux x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.8/koverlay_mumble.so)**
 
 ### Option C: Connecting to Discord (Local IPC / StreamKit)
 KOverlay connects directly to your running Discord desktop application using Discord's native local IPC RPC protocol:

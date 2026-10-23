@@ -58,7 +58,8 @@ def load_config():
         "strip_bracket_tags": False,
         "nickname_prefixes": [],
         "line_height": 0,
-        "polling_interval_ms": 250
+        "polling_interval_ms": 250,
+        "tts_audio_player": "auto"
     }
     if not os.path.exists(CONFIG_FILE):
         return default_config
@@ -95,6 +96,8 @@ def load_config():
                 cfg["line_height"] = 0
             if "polling_interval_ms" not in cfg or (sys.platform != "win32" and cfg.get("polling_interval_ms", 250) < 200):
                 cfg["polling_interval_ms"] = 250
+            if "tts_audio_player" not in cfg:
+                cfg["tts_audio_player"] = "auto"
             return cfg
     except Exception as e:
         print(f"Error loading config: {e}")

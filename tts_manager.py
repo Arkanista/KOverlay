@@ -68,31 +68,51 @@ def ensure_edge_tts_available():
     cli_path = find_executable(cli_name)
     return has_module, cli_path
 
-def find_audio_player():
+def find_available_audio_players():
     """
-    Finds the best available audio player capable of playing MP3 files.
-    Returns (player_type: str | None, player_bin: str | None).
+    Returns a list of all detected audio players as (player_type, player_bin) tuples,
+    ordered from most recommended to fallback.
     """
+    players = []
     mpv_name = "mpv.exe" if sys.platform == "win32" else "mpv"
     mpv_bin = find_executable(mpv_name)
     if mpv_bin:
-        return "mpv", mpv_bin
+        players.append(("mpv", mpv_bin))
 
     if sys.platform == "win32":
-        return "win32_mci", "winmm"
+        players.append(("win32_mci", "winmm"))
+        return players
 
     for player in ("ffplay", "pw-play", "paplay", "gst-play-1.0", "cvlc"):
         bin_path = find_executable(player)
         if bin_path:
-            return player, bin_path
+            players.append((player, bin_path))
 
-    return None, None
+    return players
 
-def check_tts_status():
+def find_audio_player(preferred=None):
+    """
+    Finds the best available audio player capable of playing MP3 files,
+    or the user's preferred player if specified and available.
+    Returns (player_type: str | None, player_bin: str | None).
+    """
+    available = find_available_audio_players()
+    if not available:
+        return None, None
+
+    if preferred and preferred != "auto":
+        for p_type, p_bin in available:
+            if p_type == preferred:
+                return p_type, p_bin
+
+    return available[0]
+
+def check_tts_status(preferred_player=None):
     """Returns a dictionary with detailed TTS availability and backend info."""
     has_module, cli_path = ensure_edge_tts_available()
     edge_tts_ok = has_module or (cli_path is not None)
-    player_type, player_bin = find_audio_player()
+    available_players = find_available_audio_players()
+    player_type, player_bin = find_audio_player(preferred_player)
     player_ok = player_type is not None
     return {
         "available": edge_tts_ok and player_ok,
@@ -101,6 +121,7 @@ def check_tts_status():
         "edge_tts_cli": cli_path,
         "player_type": player_type,
         "player_bin": player_bin,
+        "available_players": available_players,
     }
 
 def apply_tts_aliases(name, aliases):
@@ -122,11 +143,14 @@ class TTSManager:
             if cls._instance is None:
                 cls._instance = super(TTSManager, cls).__new__(cls)
                 cls._instance._init_once(config)
+            elif config is not None:
+                cls._instance.config = config
             return cls._instance
 
     def _init_once(self, config):
         if config is None:
             config = {}
+        self.config = config
             
         self.message_queue = queue.Queue(maxsize=5)
         self.is_running = True
@@ -155,8 +179,10 @@ class TTSManager:
         self.worker_thread = threading.Thread(target=self._process_queue, daemon=True)
         self.worker_thread.start()
 
-    def refresh_capabilities(self):
-        status = check_tts_status()
+    def refresh_capabilities(self, preferred_player=None):
+        if preferred_player is None and isinstance(getattr(self, "config", None), dict):
+            preferred_player = self.config.get("tts_audio_player", "auto")
+        status = check_tts_status(preferred_player)
         self.edge_tts_installed = status["edge_tts"]
         self.has_edge_tts_module = status["has_module"]
         self.edge_tts_cli = status["edge_tts_cli"]
@@ -350,7 +376,8 @@ class TTSManager:
         if not self.edge_tts_installed:
             self.refresh_capabilities()
 
-        player_type, player_bin = find_audio_player()
+        preferred = self.config.get("tts_audio_player", "auto") if isinstance(getattr(self, "config", None), dict) else "auto"
+        player_type, player_bin = find_audio_player(preferred)
         can_play_mp3 = player_type is not None
 
         if self.edge_tts_installed and can_play_mp3:

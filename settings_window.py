@@ -1,10 +1,10 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout,
     QSlider, QCheckBox, QFontComboBox, QSpinBox, QAbstractSpinBox, QColorDialog, QGroupBox,
-    QComboBox, QScrollArea, QWidget, QMessageBox, QRadioButton, QApplication
+    QComboBox, QScrollArea, QWidget, QMessageBox, QRadioButton, QApplication, QStyle
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QObject, QEvent, QRegularExpression, QUrl
-from PyQt6.QtGui import QColor, QFont, QFontMetrics, QRegularExpressionValidator, QDesktopServices, QIntValidator, QPalette
+from PyQt6.QtGui import QColor, QFont, QFontMetrics, QRegularExpressionValidator, QDesktopServices, QIntValidator, QPalette, QIcon
 import os
 import sys
 import shutil
@@ -343,8 +343,8 @@ class SettingsWindow(QWidget):
         
         # TTS Settings
         from tts_manager import check_tts_status, get_tts_manager
-        tts_status = check_tts_status()
-        tts_available = tts_status["available"]
+        preferred_player = self.config.get("tts_audio_player", "auto")
+        tts_status = check_tts_status(preferred_player)
         
         self.tts_group = QGroupBox("Text-to-Speech (TTS)")
         tts_layout = QVBoxLayout()
@@ -353,22 +353,83 @@ class SettingsWindow(QWidget):
         self.tts_checkbox = QCheckBox("Enable TTS Voice Announcements")
         self.tts_checkbox.setChecked(self.config.get("tts_enabled", False))
         
+        self.tts_status_label = QLabel()
         self.install_tts_btn = QPushButton("Install edge-tts")
         self.install_tts_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.install_tts_btn.setVisible(False)
-        
-        if not tts_available:
-            self.tts_checkbox.setChecked(False)
-            self.tts_checkbox.setEnabled(False)
-            self.config["tts_enabled"] = False
-            missing_parts = []
-            if not tts_status["edge_tts"]:
-                missing_parts.append("edge-tts")
-                self.install_tts_btn.setVisible(True)
-            if not tts_status["player_type"]:
-                missing_parts.append("audio player")
-            reason = f" - missing {', '.join(missing_parts)}" if missing_parts else ""
-            self.tts_checkbox.setText(f"Enable TTS Announcements (Unavailable{reason})")
+
+        player_descriptions = {
+            "mpv": "mpv ★ Recommended (gapless silence removal)",
+            "ffplay": "ffplay ★ Recommended (gapless silence removal)",
+            "pw-play": "pw-play ● Standard (PipeWire native, no silence trim)",
+            "paplay": "paplay ○ Fallback (PulseAudio, no silence trim)",
+            "gst-play-1.0": "gst-play-1.0 ○ Fallback (GStreamer, higher latency)",
+            "cvlc": "cvlc ○ Fallback (VLC CLI, higher overhead)",
+            "win32_mci": "Windows MCI (built-in)",
+        }
+
+        player_short_names = {
+            "mpv": "mpv (gapless silence removal)",
+            "ffplay": "ffplay / FFmpeg (gapless silence removal)",
+            "pw-play": "pw-play (PipeWire native)",
+            "paplay": "paplay (PulseAudio / PipeWire-Pulse)",
+            "gst-play-1.0": "gst-play-1.0 (GStreamer)",
+            "cvlc": "cvlc (VLC CLI)",
+            "win32_mci": "Windows MCI (built-in)",
+        }
+
+        def update_tts_status_ui(status, auto_enable_on_ready=False):
+            available = status["available"]
+            p_type = status.get("player_type")
+            p_bin = status.get("player_bin") or ""
+            p_desc = player_short_names.get(p_type, p_type or "none")
+
+            if available:
+                self.install_tts_btn.setVisible(False)
+                self.tts_checkbox.setText("Enable TTS Voice Announcements")
+                self.tts_checkbox.setEnabled(True)
+                if auto_enable_on_ready:
+                    self.tts_checkbox.setChecked(True)
+                is_recommended = p_type in ("mpv", "ffplay", "win32_mci")
+                badge_color = "#4caf50" if is_recommended else "#ffb74d"
+                rec_note = " ★ Recommended" if p_type in ("mpv", "ffplay") else (" (Fallback)" if sys.platform != "win32" else "")
+                self.tts_status_label.setText(f"✓ Ready — Active engine: <b>{p_desc}</b>{rec_note}")
+                self.tts_status_label.setStyleSheet(f"color: {badge_color}; font-size: 11px;")
+                if p_bin and p_bin != "win32_mci":
+                    self.tts_status_label.setToolTip(f"Executable: {p_bin}")
+                else:
+                    self.tts_status_label.setToolTip("")
+            else:
+                self.tts_checkbox.setChecked(False)
+                self.tts_checkbox.setEnabled(False)
+                self.config["tts_enabled"] = False
+                missing_parts = []
+                if not status["edge_tts"]:
+                    missing_parts.append("edge-tts module")
+                    self.install_tts_btn.setVisible(True)
+                else:
+                    self.install_tts_btn.setVisible(False)
+                if not p_type:
+                    missing_parts.append("audio player")
+                reason = f": missing {', '.join(missing_parts)}" if missing_parts else ""
+                self.tts_checkbox.setText(f"Enable TTS Announcements (Unavailable{reason})")
+
+                if not status["edge_tts"] and p_type:
+                    self.tts_status_label.setText(
+                        f"⚠ Cause: missing <b>edge-tts</b> Python module (Audio player ready: <b>{p_desc}</b>)"
+                    )
+                elif status["edge_tts"] and not p_type:
+                    self.tts_status_label.setText(
+                        "⚠ Cause: no supported audio player found (install <b>mpv</b>, <b>pw-play</b>, <b>paplay</b>, or <b>ffplay</b>)"
+                    )
+                else:
+                    self.tts_status_label.setText(
+                        "⚠ Cause: missing <b>edge-tts</b> module and audio player (<b>mpv</b> / <b>pw-play</b> / <b>paplay</b>)"
+                    )
+                self.tts_status_label.setStyleSheet("color: #e57373; font-size: 11px;")
+                self.tts_status_label.setToolTip("")
+
+        update_tts_status_ui(tts_status)
 
         def on_install_edge_tts():
             self.install_tts_btn.setEnabled(False)
@@ -398,13 +459,10 @@ class SettingsWindow(QWidget):
                         success = True
                 except Exception:
                     pass
-            new_status = get_tts_manager().refresh_capabilities()
-            if new_status["available"]:
-                self.install_tts_btn.setVisible(False)
-                self.tts_checkbox.setText("Enable TTS Voice Announcements")
-                self.tts_checkbox.setEnabled(True)
-                self.tts_checkbox.setChecked(True)
-            else:
+            cur_pref = self.tts_player_combo.currentData() if hasattr(self, "tts_player_combo") else self.config.get("tts_audio_player", "auto")
+            new_status = get_tts_manager(self.config).refresh_capabilities(cur_pref)
+            update_tts_status_ui(new_status, auto_enable_on_ready=True)
+            if not new_status["available"]:
                 self.install_tts_btn.setEnabled(True)
                 self.install_tts_btn.setText("Retry Install edge-tts")
 
@@ -412,14 +470,105 @@ class SettingsWindow(QWidget):
         self.tts_checkbox.toggled.connect(self._on_change)
         tts_header_layout.addWidget(self.tts_checkbox)
         tts_header_layout.addWidget(self.install_tts_btn)
+        tts_header_layout.addSpacing(10)
+        tts_header_layout.addWidget(self.tts_status_label)
         tts_header_layout.addStretch()
         tts_layout.addLayout(tts_header_layout)
+
+        # Linux-only Audio Engine Switcher & Recommendations Info Popup
+        if sys.platform != "win32":
+            available_players = tts_status.get("available_players", [])
+            player_row_layout = QHBoxLayout()
+            player_row_layout.addWidget(QLabel("Audio Engine (Linux):"))
+
+            self.tts_player_combo = QComboBox()
+            best_auto = available_players[0][0] if available_players else "none"
+            self.tts_player_combo.addItem(f"Auto (Best detected: {best_auto})", "auto")
+            for p_type, p_bin in available_players:
+                label = player_descriptions.get(p_type, p_type)
+                self.tts_player_combo.addItem(f"{label}  [{p_bin}]", p_type)
+
+            idx_p = self.tts_player_combo.findData(preferred_player)
+            if idx_p >= 0:
+                self.tts_player_combo.setCurrentIndex(idx_p)
+            else:
+                self.tts_player_combo.setCurrentIndex(0)
+
+            # Enable switcher when more than 1 engine is available (or if user had a non-auto selection)
+            self.tts_player_combo.setEnabled(len(available_players) > 1)
+            if len(available_players) <= 1:
+                self.tts_player_combo.setToolTip("Only one audio player was detected on this system.")
+            else:
+                self.tts_player_combo.setToolTip("Select which detected Linux audio player KOverlay should use for TTS playback.")
+
+            def on_player_combo_changed():
+                chosen = self.tts_player_combo.currentData()
+                self.config["tts_audio_player"] = chosen
+                new_st = get_tts_manager(self.config).refresh_capabilities(chosen)
+                update_tts_status_ui(new_st)
+                self._on_change()
+
+            self.tts_player_combo.currentIndexChanged.connect(on_player_combo_changed)
+            player_row_layout.addWidget(self.tts_player_combo)
+
+            self.tts_player_info_btn = QPushButton("Which engine is best?")
+            info_icon = QIcon.fromTheme(
+                "dialog-information",
+                self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation),
+            )
+            if not info_icon.isNull():
+                self.tts_player_info_btn.setIcon(info_icon)
+            self.tts_player_info_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+
+            def show_player_recommendations():
+                cur_st = check_tts_status(self.tts_player_combo.currentData())
+                det_list = cur_st.get("available_players", [])
+                active_p = cur_st.get("player_type")
+                if det_list:
+                    detected_html = "".join(
+                        f"&bull; <b>{pt}</b> (<code>{pb}</code>)"
+                        + (" &mdash; <span style='color:#4caf50;'><b>[ACTIVE]</b></span>" if pt == active_p else "")
+                        + "<br>"
+                        for pt, pb in det_list
+                    )
+                else:
+                    detected_html = "<i>No supported audio players detected!</i><br>"
+
+                msg = (
+                    "<h3>Linux TTS Audio Engines — Comparison & Recommendations</h3>"
+                    "<b>Currently Detected on Your System:</b><br>"
+                    f"{detected_html}<br>"
+                    "<hr>"
+                    "<b>★ Tier 1 — Recommended: <code>mpv</code> &amp; <code>ffplay</code></b><br>"
+                    "&bull; <b>Why recommended:</b> Both support real-time hardware-accelerated audio filtering "
+                    "(<code>silenceremove</code>). Microsoft Edge TTS audio files include ~200–400ms of leading and trailing silence. "
+                    "<code>mpv</code> and <code>ffplay</code> strip this silence on the fly, delivering <b>instant, gapless voice announcements</b> "
+                    "with zero delay when multiple users join/leave rapidly, and very low CPU overhead.<br><br>"
+                    "<b>● Tier 2 — Standard Native Fallback: <code>pw-play</code> (PipeWire)</b><br>"
+                    "&bull; <b>Why worse than mpv/ffplay:</b> Pre-installed out-of-the-box on modern and immutable Linux distributions "
+                    "(such as <b>Bazzite, SteamOS, Fedora Silverblue/Kinoite</b>), allowing TTS to work immediately without extra packages. "
+                    "However, <code>pw-play</code> does <b>not</b> support real-time silence trimming, so announcements have a slight natural pause "
+                    "before and after each phrase.<br><br>"
+                    "<b>○ Tier 3 — Secondary Fallbacks: <code>paplay</code>, <code>gst-play-1.0</code>, <code>cvlc</code></b><br>"
+                    "&bull; <b><code>paplay</code> (PulseAudio):</b> No silence trimming and routes audio through the PulseAudio compatibility layer "
+                    "(<code>pipewire-pulse</code>) instead of native PipeWire.<br>"
+                    "&bull; <b><code>gst-play-1.0</code> (GStreamer) &amp; <code>cvlc</code> (VLC):</b> No silence trimming and noticeably higher process "
+                    "startup latency when initializing the GStreamer/VLC pipeline for every short TTS clip.<br><br>"
+                    "<i><b>Tip for Bazzite / Immutable Linux users:</b> If only <code>pw-play</code>/<code>paplay</code> are detected and you want "
+                    "gapless <code>mpv</code> playback without modifying your read-only root system, you can install <code>mpv</code> in user-space via "
+                    "Homebrew: <code>brew install mpv</code> (then reopen Settings).</i>"
+                )
+                QMessageBox.information(self, "TTS Audio Engines — Recommendations", msg)
+
+            self.tts_player_info_btn.clicked.connect(show_player_recommendations)
+            player_row_layout.addWidget(self.tts_player_info_btn)
+            player_row_layout.addStretch()
+            tts_layout.addLayout(player_row_layout)
         
         if sys.platform == "win32":
             note_text = "Note: Uses high-quality voices over the internet. Requires 'edge-tts' Python module (supports built-in Windows audio or mpv.exe)."
         else:
-            player_info = f" (active player: {tts_status['player_type']})" if tts_status.get("player_type") else ""
-            note_text = f"Note: Uses high-quality voices over the internet. Requires 'edge-tts' and an audio player (mpv, ffplay, pw-play, paplay, or gst-play-1.0){player_info}."
+            note_text = "Note: Uses high-quality voices over the internet. Requires 'edge-tts' and an audio player (mpv, ffplay, pw-play, paplay, or gst-play-1.0)."
         info_label = QLabel(note_text)
         font = info_label.font()
         font.setPointSize(font.pointSize() - 2)
@@ -617,7 +766,7 @@ class SettingsWindow(QWidget):
         # Cache controls
         tts_cache_layout = QHBoxLayout()
         from tts_manager import get_tts_manager
-        tts_manager = get_tts_manager()
+        tts_manager = get_tts_manager(self.config)
         size_mb = tts_manager.get_cache_size()
         
         self.cache_size_label = QLabel(f"Cache size: {size_mb:.2f} MB")
@@ -1320,6 +1469,8 @@ class SettingsWindow(QWidget):
         self.config["tts_rate"] = self.tts_rate_combo.currentData()
         self.config["tts_delay_ms"] = self.tts_delay_slider.value()
         self.config["tts_volume"] = self.tts_vol_slider.value()
+        if hasattr(self, 'tts_player_combo'):
+            self.config["tts_audio_player"] = self.tts_player_combo.currentData()
         
         if self.cache_retention_checkbox.isChecked():
             self.config["tts_cache_retention_days"] = self.cache_retention_spin.value()

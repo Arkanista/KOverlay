@@ -1,5 +1,5 @@
 pkgname=koverlay
-pkgver=1.1.7
+pkgver=1.1.8
 pkgrel=1
 pkgdesc="A modern, universal Wayland/X11 TeamSpeak 3, Mumble and Discord overlay with TTS voice announcements."
 arch=('x86_64')
