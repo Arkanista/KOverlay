@@ -55,6 +55,8 @@ class UserRowWidget(QWidget):
         else:
             self.arrow_label.setText("")
             self.arrow_label.setVisible(False)
+        self.row_layout.invalidate()
+        self.updateGeometry()
             
     def setText(self, display_text: str):
         if display_text.startswith("🡅 "):
@@ -73,6 +75,8 @@ class UserRowWidget(QWidget):
         super().setFont(font)
         self.name_label.setFont(font)
         self.arrow_label.setFont(font)
+        self.row_layout.invalidate()
+        self.updateGeometry()
 
     def font(self) -> QFont:
         return self.name_label.font()
@@ -190,14 +194,18 @@ class OverlayWindow(QWidget):
         
         self.setMinimumSize(50, 20)
         self._user_moved = False
+        self._dragging = False
+        self._was_right_anchored = self._is_right_anchored()
         self._last_refresh_tick_time = time.time()
         self._wake_timers = []
         
-        self.apply_configured_position()
-            
         self.update_style()
+        self.apply_configured_position()
 
-    def _sanitize_position(self, x, y):
+    def _is_right_anchored(self) -> bool:
+        return bool(self.config.get("dynamic_width", True) and self.config.get("dynamic_width_right_anchor", False))
+
+    def _sanitize_position(self, x, y, width=None):
         """
         Sanity check: ensures overlay (x, y) is at least partially visible on a connected monitor.
         If it is off-screen, in a multi-monitor dead zone, or on a sleeping/disconnected monitor,
@@ -214,7 +222,8 @@ class OverlayWindow(QWidget):
         # The top/header area of the overlay (where it can be seen and grabbed) must be on a screen.
         # Use full screen.geometry() so panel/layer-shell startup delays after sleep in KDE Plasma 6.8
         # do not invalidate valid monitor coordinates.
-        header_rect = QRect(int(x), int(y), 80, 30)
+        check_w = max(int(width if width is not None else self.width()), 80)
+        header_rect = QRect(int(x), int(y), check_w, 30)
         
         for screen in screens:
             geom = screen.geometry()
@@ -228,19 +237,44 @@ class OverlayWindow(QWidget):
         # return temporary fallback position on primary monitor without overwriting config
         return self._get_default_position()
 
+    def _get_configured_target_pos(self, width=None):
+        """
+        Returns the sanitized target (x, y) position for the overlay given its target width.
+        When right-anchored dynamic width is enabled, keeps the right edge fixed at pos_right.
+        """
+        if width is None:
+            width = max(self.width(), 50)
+        width = max(int(width), 50)
+        mon_cfg = self.config.get("overlay_ids", {}).get(self.overlay_id, {})
+        if "pos_x" in mon_cfg and "pos_y" in mon_cfg:
+            if self._is_right_anchored():
+                pos_right = mon_cfg.get("pos_right")
+                if pos_right is None:
+                    pos_right = int(mon_cfg["pos_x"]) + width
+                    mon_cfg["pos_right"] = pos_right
+                raw_x = int(pos_right) - width
+            else:
+                raw_x = int(mon_cfg["pos_x"])
+            raw_y = int(mon_cfg["pos_y"])
+            return self._sanitize_position(raw_x, raw_y, width)
+        return self._get_default_position()
+
     def apply_configured_position(self, force=False):
         """
         Moves the overlay to its saved position from config (or temporary fallback if target screen
         is currently unavailable). When force=True on Linux/XWayland, nudges the widget by 1px first
         if needed so Qt is guaranteed to emit a native ConfigureWindow to KWin.
         """
-        if self.move_mode:
+        if getattr(self, '_dragging', False):
             return
-        mon_cfg = self.config.get("overlay_ids", {}).get(self.overlay_id, {})
-        if "pos_x" in mon_cfg and "pos_y" in mon_cfg:
-            new_x, new_y = self._sanitize_position(mon_cfg["pos_x"], mon_cfg["pos_y"])
+        if self.move_mode:
+            mon_cfg = self.config.get("overlay_ids", {}).get(self.overlay_id, {})
+            if "pos_x" not in mon_cfg or "pos_y" not in mon_cfg:
+                new_x, new_y = self._get_default_position()
+            else:
+                new_x, new_y = self._get_configured_target_pos(self.width())
         else:
-            new_x, new_y = self._get_default_position()
+            new_x, new_y = self._get_configured_target_pos(self.width())
 
         new_x, new_y = int(new_x), int(new_y)
         if force and sys.platform != "win32" and self.pos().x() == new_x and self.pos().y() == new_y:
@@ -425,7 +459,7 @@ class OverlayWindow(QWidget):
         if not self.move_mode and self.isVisible():
             mon_cfg = self.config.get("overlay_ids", {}).get(self.overlay_id, {})
             if "pos_x" in mon_cfg and "pos_y" in mon_cfg:
-                target_x, target_y = self._sanitize_position(mon_cfg["pos_x"], mon_cfg["pos_y"])
+                target_x, target_y = self._get_configured_target_pos(self.width())
                 if self.pos().x() != target_x or self.pos().y() != target_y:
                     self.apply_configured_position(force=True)
 
@@ -496,20 +530,23 @@ class OverlayWindow(QWidget):
             # Only save position when exiting move mode if the user actually dragged the window
             # or if this overlay had no saved position in config yet.
             if was_move_mode:
+                self._dragging = False
                 if "overlay_ids" not in self.config:
                     self.config["overlay_ids"] = {}
                 if self.overlay_id not in self.config["overlay_ids"]:
                     self.config["overlay_ids"][self.overlay_id] = {}
                 mon_cfg = self.config["overlay_ids"][self.overlay_id]
                 if getattr(self, '_user_moved', False) or "pos_x" not in mon_cfg or "pos_y" not in mon_cfg:
-                    new_x, new_y = self._sanitize_position(self.pos().x(), self.pos().y())
+                    new_x, new_y = self._sanitize_position(self.pos().x(), self.pos().y(), self.width())
                     mon_cfg["pos_x"] = new_x
                     mon_cfg["pos_y"] = new_y
+                    mon_cfg["pos_right"] = new_x + self.width()
                     if hasattr(self, 'save_callback') and self.save_callback:
                         self.save_callback()
                 self._user_moved = False
         else:
             self._user_moved = False
+            self._dragging = False
             self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
             
         if was_move_mode != self.move_mode:
@@ -591,22 +628,71 @@ class OverlayWindow(QWidget):
                     pass # We will let update_clients handle the color toggle
 
             
-        # Update width settings
-        dynamic_width = self.config.get("dynamic_width", True)
-        fixed_width = self.config.get("fixed_width", 200)
-        
-        if dynamic_width:
-            self.layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetFixedSize)
-            self.setMinimumWidth(50)
-            self.setMaximumWidth(16777215)
-        else:
-            self.layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetDefaultConstraint)
-            self.setMinimumWidth(50)
-            self.setMaximumWidth(16777215)
-            self.setFixedWidth(fixed_width)
+        # Update width & geometry settings
+        self.layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetNoConstraint)
         
         if hasattr(self, 'last_clients') and self.last_clients:
             self.update_clients(self.last_clients, getattr(self, 'current_cid', None))
+        else:
+            self._update_overlay_geometry()
+
+    def _update_overlay_geometry(self):
+        """
+        Synchronously recalculates and applies the exact width, height, and (when right-anchored)
+        horizontal position of the overlay window so height always shrinks immediately when a user
+        leaves and the right edge remains fixed when dynamic_width_right_anchor is enabled.
+        """
+        self.layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetNoConstraint)
+        self.setMinimumSize(50, 20)
+        self.setMaximumSize(16777215, 16777215)
+
+        for lbl in self.labels.values():
+            lbl.row_layout.invalidate()
+            lbl.updateGeometry()
+        if self.header_widget.layout() is not None:
+            self.header_widget.layout().invalidate()
+        self.header_widget.updateGeometry()
+        self.users_container.invalidate()
+        self.layout.invalidate()
+        self.layout.activate()
+
+        hint = self.layout.totalSizeHint()
+        target_h = max(20, hint.height())
+        if self.config.get("dynamic_width", True):
+            target_w = max(50, hint.width())
+        else:
+            target_w = max(50, int(self.config.get("fixed_width", 200)))
+
+        is_right_anchored = self._is_right_anchored()
+        was_right_anchored = getattr(self, "_was_right_anchored", None)
+        mon_cfg = self.config.get("overlay_ids", {}).get(self.overlay_id)
+        if mon_cfg is not None and "pos_x" in mon_cfg and "pos_y" in mon_cfg:
+            if is_right_anchored:
+                if not was_right_anchored or "pos_right" not in mon_cfg:
+                    current_w = self.width() if self.width() >= 50 else target_w
+                    mon_cfg["pos_right"] = int(mon_cfg["pos_x"]) + current_w
+            elif was_right_anchored and "pos_right" in mon_cfg:
+                current_w = self.width() if self.width() >= 50 else target_w
+                mon_cfg["pos_x"] = int(mon_cfg["pos_right"]) - current_w
+        self._was_right_anchored = is_right_anchored
+
+        win_handle = self.windowHandle()
+        if not getattr(self, "_dragging", False):
+            if self.move_mode and (mon_cfg is None or "pos_x" not in mon_cfg or "pos_y" not in mon_cfg):
+                target_x, target_y = self.pos().x(), self.pos().y()
+            else:
+                target_x, target_y = self._get_configured_target_pos(target_w)
+            target_x, target_y = int(target_x), int(target_y)
+            self.setGeometry(target_x, target_y, target_w, target_h)
+            if win_handle is not None:
+                win_handle.setGeometry(target_x, target_y, target_w, target_h)
+        else:
+            self.resize(target_w, target_h)
+            if win_handle is not None:
+                win_handle.resize(target_w, target_h)
+
+        self.setFixedSize(target_w, target_h)
+        self.update()
 
     def reset_voice_state(self):
         """Cleanly resets all user history, labels, and state without triggering leave/join events or TTS."""
@@ -619,13 +705,15 @@ class OverlayWindow(QWidget):
 
         for name, lbl in list(self.labels.items()):
             self.users_container.removeWidget(lbl)
+            lbl.hide()
+            lbl.setParent(None)
             lbl.deleteLater()
         self.labels.clear()
 
         if hasattr(self, 'fade_timer') and self.fade_timer.isActive():
             self.fade_timer.stop()
 
-        self.adjustSize()
+        self._update_overlay_geometry()
 
     def update_clients(self, clients=None, my_cid=None):
         if clients is None:
@@ -846,6 +934,8 @@ class OverlayWindow(QWidget):
         for name, lbl in self.labels.items():
             if name not in display_names:
                 self.users_container.removeWidget(lbl)
+                lbl.hide()
+                lbl.setParent(None)
                 lbl.deleteLater()
                 to_remove.append(name)
                 
@@ -874,7 +964,7 @@ class OverlayWindow(QWidget):
             
             # Create or update label
             if name not in self.labels:
-                lbl = UserRowWidget()
+                lbl = UserRowWidget(self)
                 lbl.setFont(overlay_font)
                 lbl.setFixedHeight(row_height)
                 self.labels[name] = lbl
@@ -884,6 +974,7 @@ class OverlayWindow(QWidget):
                 lbl.setFixedHeight(row_height)
                 
             lbl.set_content(clean_name, arrow_text)
+            lbl.setVisible(True)
                 
             # Remove from layout and re-add to enforce order
             self.users_container.removeWidget(lbl)
@@ -911,22 +1002,18 @@ class OverlayWindow(QWidget):
             if any_fading and not self.fade_timer.isActive():
                 self.fade_timer.start(40)
 
-                
-        if self.config.get("dynamic_width", True):
-            # Layout constraint will automatically resize the window
-            pass
-        else:
-            self.adjustSize()
+        self._update_overlay_geometry()
 
     # Mouse events for dragging when in move mode
     def mousePressEvent(self, event):
         if self.move_mode and event.button() == Qt.MouseButton.LeftButton:
+            self._dragging = True
             self.drag_start_pos = event.globalPosition().toPoint()
             self.window_start_pos = self.pos()
             event.accept()
 
     def mouseMoveEvent(self, event):
-        if self.move_mode and event.buttons() == Qt.MouseButton.LeftButton:
+        if self.move_mode and (event.buttons() & Qt.MouseButton.LeftButton):
             if hasattr(self, 'drag_start_pos') and hasattr(self, 'window_start_pos'):
                 delta = event.globalPosition().toPoint() - self.drag_start_pos
                 if delta.manhattanLength() > 0:
@@ -936,17 +1023,19 @@ class OverlayWindow(QWidget):
 
     def mouseReleaseEvent(self, event):
         if self.move_mode and event.button() == Qt.MouseButton.LeftButton:
+            self._dragging = False
             if getattr(self, '_user_moved', False):
                 if "overlay_ids" not in self.config:
                     self.config["overlay_ids"] = {}
                 if self.overlay_id not in self.config["overlay_ids"]:
                     self.config["overlay_ids"][self.overlay_id] = {}
                     
-                new_x, new_y = self._sanitize_position(self.pos().x(), self.pos().y())
+                new_x, new_y = self._sanitize_position(self.pos().x(), self.pos().y(), self.width())
                 if new_x != self.pos().x() or new_y != self.pos().y():
                     self.move(new_x, new_y)
                 self.config["overlay_ids"][self.overlay_id]["pos_x"] = new_x
                 self.config["overlay_ids"][self.overlay_id]["pos_y"] = new_y
+                self.config["overlay_ids"][self.overlay_id]["pos_right"] = new_x + self.width()
                 if hasattr(self, 'save_callback') and self.save_callback:
                     self.save_callback()
             event.accept()

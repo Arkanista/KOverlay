@@ -367,8 +367,11 @@ class MainApp:
             self.cfg["overlay_ids"][o_id]["pos_y"] = center_y
             
             overlay = self.overlays.get(o_id)
+            actual_w = overlay.width() if (overlay and overlay.width() >= 50) else w
+            self.cfg["overlay_ids"][o_id]["pos_right"] = curr_x + actual_w
             if overlay:
                 overlay.move(curr_x, center_y)
+                overlay._update_overlay_geometry()
                 
             curr_x += w + gap
             
@@ -449,6 +452,7 @@ class MainApp:
         # Update styling for all overlays
         for overlay in self.overlays.values():
             overlay.update_style()
+        config.save_config(self.cfg)
             
         # Update WindowTracker keywords and polling interval
         new_keywords = self.cfg.get("target_keywords", ["EVE - ", "exefile.exe"])

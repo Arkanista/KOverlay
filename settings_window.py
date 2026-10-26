@@ -869,10 +869,32 @@ class SettingsWindow(QWidget):
         width_layout.addWidget(self.poll_val_label)
         width_layout.addSpacing(20)
         
-        # Dynamic width
+        # Dynamic width + right-anchor sub-option
+        dyn_width_col = QVBoxLayout()
+        dyn_width_col.setContentsMargins(0, 0, 0, 0)
+        dyn_width_col.setSpacing(2)
+
         self.dynamic_width_checkbox = QCheckBox("Dynamic Width (fit to text)")
         self.dynamic_width_checkbox.setChecked(self.config.get("dynamic_width", True))
         self.dynamic_width_checkbox.toggled.connect(self._on_change)
+
+        self.dynamic_width_right_anchor_checkbox = QCheckBox("Anchor right edge (shift left)")
+        self.dynamic_width_right_anchor_checkbox.setToolTip(
+            "Keep the right edge of the overlay fixed while keeping nicknames left-aligned.\n"
+            "The entire text block shifts left/right depending on the width of the longest nickname."
+        )
+        self.dynamic_width_right_anchor_checkbox.setChecked(self.config.get("dynamic_width_right_anchor", False))
+        self.dynamic_width_right_anchor_checkbox.setEnabled(self.dynamic_width_checkbox.isChecked())
+        self.dynamic_width_right_anchor_checkbox.toggled.connect(self._on_change)
+        self.dynamic_width_checkbox.toggled.connect(self.dynamic_width_right_anchor_checkbox.setEnabled)
+
+        sub_opt_layout = QHBoxLayout()
+        sub_opt_layout.setContentsMargins(18, 0, 0, 0)
+        sub_opt_layout.setSpacing(0)
+        sub_opt_layout.addWidget(self.dynamic_width_right_anchor_checkbox)
+
+        dyn_width_col.addWidget(self.dynamic_width_checkbox)
+        dyn_width_col.addLayout(sub_opt_layout)
         
         self.fixed_width_slider = QSlider(Qt.Orientation.Horizontal)
         self.fixed_width_slider.setRange(50, 1000)
@@ -884,7 +906,7 @@ class SettingsWindow(QWidget):
         self.fixed_width_slider.setEnabled(not self.dynamic_width_checkbox.isChecked())
         self.dynamic_width_checkbox.toggled.connect(lambda checked: self.fixed_width_slider.setEnabled(not checked))
         
-        width_layout.addWidget(self.dynamic_width_checkbox)
+        width_layout.addLayout(dyn_width_col)
         width_layout.addWidget(QLabel("Fixed Width:"))
         width_layout.addWidget(self.fixed_width_slider)
         width_layout.addWidget(self.fixed_width_val_label)
@@ -1445,6 +1467,8 @@ class SettingsWindow(QWidget):
         self.config["opacity_normal"] = self.opacity_normal_slider.value() / 100.0
         self.config["opacity_move"] = self.opacity_move_slider.value() / 100.0
         self.config["dynamic_width"] = self.dynamic_width_checkbox.isChecked()
+        if hasattr(self, 'dynamic_width_right_anchor_checkbox'):
+            self.config["dynamic_width_right_anchor"] = self.dynamic_width_right_anchor_checkbox.isChecked()
         self.config["fixed_width"] = self.fixed_width_slider.value()
         if "opacity" in self.config:
             del self.config["opacity"]

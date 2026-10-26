@@ -20,11 +20,11 @@
 
 
 > [!TIP]
-> **What's New in v1.1.8 (Linux TTS Audio Engine Switcher, Diagnostics & Bazzite / Immutable Linux Support):**
-> - 🎛️ **Linux TTS Audio Engine Switcher & Recommendations**: Added an **Audio Engine** selector in Settings (Linux) when multiple players are detected (`Auto`, `mpv`, `ffplay`, `pw-play`, `paplay`, `gst-play-1.0`, `cvlc`), active engine status indicator, exact `Unavailable` cause diagnostics, and a **`Which engine is best?`** guide comparing Tier 1 gapless engines (`mpv`, `ffplay` with real-time `silenceremove`) vs. Tier 2/3 fallbacks (`pw-play`, `paplay`, `gst-play-1.0`, `cvlc`).
-> - 🔊 **Multi-Player Audio Support on Linux (Bazzite / SteamOS / Fedora Atomic)**: TTS announcements no longer strictly require `/usr/bin/mpv`. KOverlay automatically detects and uses `mpv`, `ffplay`, **`pw-play`** (PipeWire), **`paplay`** (PulseAudio / PipeWire-Pulse), **`gst-play-1.0`** (GStreamer), or `cvlc`, including binaries installed in `~/.local/bin` or Homebrew/Linuxbrew (`/home/linuxbrew/.linuxbrew/bin`).
-> - 📦 **Smart `edge-tts` Detection & One-Click Install**: Automatically attaches local `venv` / `/opt/koverlay/lib` `site-packages` and provides an in-app **`Install edge-tts`** button in Settings if the module is missing.
-> - 🐧 **Immutable Distro (`rpm-ostree`), Distrobox & Flatpak Support**: `install.sh` and `uninstall.sh` detect `ostree` systems and Distrobox containers, install icons into `~/.local/share/icons/hicolor`, and support Flatpak Discord/Vesktop IPC sockets as well as Flatpak Mumble plugins.
+> **What's New in v1.1.9 (Right-Anchored Dynamic Width, Instant Height Shrink & Mumble User List Sync Fixes):**
+> - ↔️ **Right-Anchored Dynamic Width (`Anchor right edge (shift left)`)**: Added a new sub-option under **Dynamic Width (fit to text)**. When enabled, the overlay dynamically expands and shrinks to fit the longest nickname while keeping its **right edge fixed** — nicknames remain cleanly left-aligned inside the box, and the entire overlay block shifts left or right according to the longest nickname width.
+> - 📐 **Instant Overlay Height Shrink Fix**: Fixed an issue on Windows and Linux where the overlay window height did not immediately shrink by the height of a departed user after they left the channel (or after the join/leave history timer expired).
+> - 🎙️ **Mumble Plugin Initial & Mid-Session User List Sync**: Fixed an issue where enabling the Mumble plugin while already connected to a server—or starting Mumble/KOverlay in certain orders—only displayed users who spoke. The plugin (`koverlay_mumble.dll` / `.so` / `.mumble_plugin`) now actively probes active connections on initialization and synchronizes the full channel roster immediately.
+> - 🎛️ **Linux TTS Audio Engine Switcher & Bazzite Support (from v1.1.8)**: Includes multi-player Linux TTS support (`mpv`, `ffplay`, `pw-play`, `paplay`, `gst-play-1.0`, `cvlc`), audio engine recommendations, one-click `edge-tts` installer, and immutable distro (`ostree` / Bazzite / SteamOS) compatibility.
 
 > [!IMPORTANT]
 > **KOverlay must remain running in the background (in the system tray)** for the overlay to appear over your game. If KOverlay is closed, the voice overlay will not be visible.
@@ -88,10 +88,10 @@ Building from source automatically handles dependency resolution:
 
 #### Method B: Install the Pre-compiled Pacman Package
 1. Download the pre-compiled package from GitHub releases:
-    👉 **[Download KOverlay v1.1.8 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.8/koverlay-1.1.8-1-x86_64.pkg.tar.zst)**
+    👉 **[Download KOverlay v1.1.9 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.9/koverlay-1.1.9-1-x86_64.pkg.tar.zst)**
 2. Install the downloaded package directly with `pacman`:
    ```bash
-   sudo pacman -U koverlay-1.1.8-1-x86_64.pkg.tar.zst
+   sudo pacman -U koverlay-1.1.9-1-x86_64.pkg.tar.zst
    ```
 
 ### Microsoft Windows (10 / 11)
@@ -103,7 +103,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 1: Setup Wizard (Recommended)
 1. Download the latest installer:
-   👉 **[Download KOverlay_Setup.exe (v1.1.8)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.8/KOverlay_Setup.exe)**
+   👉 **[Download KOverlay_Setup.exe (v1.1.9)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.9/KOverlay_Setup.exe)**
 2. Run `KOverlay_Setup.exe`:
    - Administrator rights are **not** required. The program installs directly into your user profile: `%LOCALAPPDATA%\Programs\KOverlay`.
    - **Mumble Check:** If Mumble is running, the installer will inform you and prompt you to close Mumble so it can safely install the Mumble plugin.
@@ -112,7 +112,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 2: Portable Archive (.zip)
 1. Download the portable package:
-   👉 **[Download KOverlay_Portable.zip (v1.1.8)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.8/KOverlay_Portable.zip)**
+   👉 **[Download KOverlay_Portable.zip (v1.1.9)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.9/KOverlay_Portable.zip)**
 2. Extract the `.zip` archive to any directory you prefer (e.g. `C:\Games\KOverlay` or your Desktop).
 3. **How to Launch KOverlay:**
    - Inside the extracted folder, double-click **`KOverlay.bat`**.
@@ -249,9 +249,9 @@ KOverlay connects to Mumble via a high-performance native plugin and a local IPC
 
 > [!TIP]
 > You can also download the standalone plugin or unified bundle directly from GitHub releases:
-> - **[koverlay_mumble.mumble_plugin (Universal Bundle)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.8/koverlay_mumble.mumble_plugin)** (Double-click or import via Mumble's "Install plugin" button)
-> - **[koverlay_mumble.dll (Windows x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.8/koverlay_mumble.dll)**
-> - **[koverlay_mumble.so (Linux x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.8/koverlay_mumble.so)**
+> - **[koverlay_mumble.mumble_plugin (Universal Bundle)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.9/koverlay_mumble.mumble_plugin)** (Double-click or import via Mumble's "Install plugin" button)
+> - **[koverlay_mumble.dll (Windows x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.9/koverlay_mumble.dll)**
+> - **[koverlay_mumble.so (Linux x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.9/koverlay_mumble.so)**
 
 ### Option C: Connecting to Discord (Local IPC / StreamKit)
 KOverlay connects directly to your running Discord desktop application using Discord's native local IPC RPC protocol:
@@ -299,6 +299,7 @@ The *Settings* window offers highly advanced overlay customization. All options 
 
 ### Width Settings Section
 *   **Dynamic Width (fit to text):** Automatic corset. The window naturally reacts to what's happening inside it. If you have people with short nicknames on the channel, the window stays extremely narrow. It only expands wider when a person with a long nickname enters.
+    *   **Anchor right edge (shift left):** Sub-option under *Dynamic Width*. When checked, the right edge of the overlay remains anchored at a fixed screen X coordinate while nicknames stay left-aligned inside the box—expanding or shrinking shifts the entire block left or right based on the longest nickname.
 *   **Fixed Width:** Manual frame. If you uncheck *Dynamic Width*, the *Fixed* slider activates. It allows you to impose an absolute, rock-solid width in pixels on the program (from 50px to 1000px). Regardless of the length of the players' nicknames, the frame will strictly stick to this dimension. This prevents the UI layout from "jumping" around.
 
 ### Background & Colors Section

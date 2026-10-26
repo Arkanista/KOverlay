@@ -59,7 +59,10 @@ def load_config():
         "nickname_prefixes": [],
         "line_height": 0,
         "polling_interval_ms": 250,
-        "tts_audio_player": "auto"
+        "tts_audio_player": "auto",
+        "dynamic_width": True,
+        "dynamic_width_right_anchor": False,
+        "fixed_width": 200
     }
     if not os.path.exists(CONFIG_FILE):
         return default_config
@@ -98,6 +101,12 @@ def load_config():
                 cfg["polling_interval_ms"] = 250
             if "tts_audio_player" not in cfg:
                 cfg["tts_audio_player"] = "auto"
+            if "dynamic_width" not in cfg:
+                cfg["dynamic_width"] = True
+            if "dynamic_width_right_anchor" not in cfg:
+                cfg["dynamic_width_right_anchor"] = False
+            if "fixed_width" not in cfg:
+                cfg["fixed_width"] = 200
             return cfg
     except Exception as e:
         print(f"Error loading config: {e}")

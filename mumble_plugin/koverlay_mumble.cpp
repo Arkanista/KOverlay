@@ -243,11 +243,19 @@ void updateUserLocked(mumble_connection_t connection, mumble_userid_t userID) {
     mumble_userid_t localUID = 0;
     if (g_mumbleAPI.getLocalUserID && g_mumbleAPI.getLocalUserID(g_pluginID, connection, &localUID) == MUMBLE_STATUS_OK) {
         g_localUserID = localUID;
+        if (g_localChannel == -1 && g_mumbleAPI.getChannelOfUser) {
+            mumble_channelid_t localCid = -1;
+            if (g_mumbleAPI.getChannelOfUser(g_pluginID, connection, localUID, &localCid) == MUMBLE_STATUS_OK) {
+                g_localChannel = localCid;
+            }
+        }
     }
 
     // Get user channel
     mumble_channelid_t cid = -1;
+    bool hasCid = false;
     if (g_mumbleAPI.getChannelOfUser && g_mumbleAPI.getChannelOfUser(g_pluginID, connection, userID, &cid) == MUMBLE_STATUS_OK) {
+        hasCid = true;
         if (userID == g_localUserID) {
             g_localChannel = cid;
         }
@@ -267,7 +275,9 @@ void updateUserLocked(mumble_connection_t connection, mumble_userid_t userID) {
     // Never fallback to "User_" + userID. If the name is unknown, leave it empty
     // so the overlay silently ignores it until a valid name is resolved.
 
-    info.channel_id = cid;
+    if (hasCid) {
+        info.channel_id = cid;
+    }
 }
 
 void syncAllUsersLocked(mumble_connection_t connection) {
@@ -300,6 +310,29 @@ void syncAllUsersLocked(mumble_connection_t connection) {
         }
         if (g_mumbleAPI.freeMemory) {
             g_mumbleAPI.freeMemory(g_pluginID, users);
+        }
+    } else if (g_localChannel != -1 && g_mumbleAPI.getUsersInChannel) {
+        mumble_userid_t *chUsers = nullptr;
+        size_t chCount = 0;
+        if (g_mumbleAPI.getUsersInChannel(g_pluginID, connection, g_localChannel, &chUsers, &chCount) == MUMBLE_STATUS_OK && chUsers) {
+            for (size_t i = 0; i < chCount; ++i) {
+                updateUserLocked(connection, chUsers[i]);
+                g_users[chUsers[i]].channel_id = g_localChannel;
+            }
+            if (g_mumbleAPI.freeMemory) {
+                g_mumbleAPI.freeMemory(g_pluginID, chUsers);
+            }
+        }
+    }
+}
+
+void trySyncActiveConnectionLocked() {
+    if (!g_hasAPI || g_pluginID == 0) return;
+    if (g_mumbleAPI.getActiveServerConnection) {
+        mumble_connection_t conn = -1;
+        if (g_mumbleAPI.getActiveServerConnection(g_pluginID, &conn) == MUMBLE_STATUS_OK && conn >= 0) {
+            syncAllUsersLocked(conn);
+            notifyStateChangedLocked();
         }
     }
 }
@@ -404,6 +437,11 @@ MUMBLE_PLUGIN_EXPORT mumble_error_t MUMBLE_PLUGIN_CALLING_CONVENTION mumble_init
         return MUMBLE_EC_GENERIC_ERROR;
     }
 
+    {
+        std::lock_guard<std::mutex> lock(g_stateMutex);
+        trySyncActiveConnectionLocked();
+    }
+
     return MUMBLE_STATUS_OK;
 }
 
@@ -422,7 +460,10 @@ MUMBLE_PLUGIN_EXPORT void MUMBLE_PLUGIN_CALLING_CONVENTION mumble_shutdown() {
         std::lock_guard<std::mutex> lock(g_stateMutex);
         g_users.clear();
         g_localChannel = -1;
+        g_localUserID = 0;
         g_activeConnection = -1;
+        g_pluginID = 0;
+        g_hasAPI = false;
     }
 
     {
@@ -452,8 +493,10 @@ MUMBLE_PLUGIN_EXPORT mumble_version_t MUMBLE_PLUGIN_CALLING_CONVENTION mumble_ge
 
 MUMBLE_PLUGIN_EXPORT void MUMBLE_PLUGIN_CALLING_CONVENTION mumble_registerAPIFunctions(void *apiStruct) {
     if (apiStruct) {
+        std::lock_guard<std::mutex> lock(g_stateMutex);
         g_mumbleAPI = MUMBLE_API_CAST(apiStruct);
         g_hasAPI = true;
+        trySyncActiveConnectionLocked();
     }
 }
 
@@ -498,13 +541,18 @@ MUMBLE_PLUGIN_EXPORT void MUMBLE_PLUGIN_CALLING_CONVENTION mumble_onUserTalkingS
                       talkingState == MUMBLE_TS_SHOUTING);
 
     std::lock_guard<std::mutex> lock(g_stateMutex);
+    if (g_localChannel == -1 || g_users.empty()) {
+        syncAllUsersLocked(connection);
+    }
+
     auto it = g_users.find(userID);
-    if (it != g_users.end()) {
+    if (it != g_users.end() && !it->second.name.empty() && it->second.channel_id != -1) {
         if (it->second.talking != isTalking) {
             it->second.talking = isTalking;
             notifyStateChangedLocked();
         }
     } else {
+        syncAllUsersLocked(connection);
         updateUserLocked(connection, userID);
         g_users[userID].talking = isTalking;
         notifyStateChangedLocked();
@@ -514,6 +562,9 @@ MUMBLE_PLUGIN_EXPORT void MUMBLE_PLUGIN_CALLING_CONVENTION mumble_onUserTalkingS
 MUMBLE_PLUGIN_EXPORT void MUMBLE_PLUGIN_CALLING_CONVENTION mumble_onUserAdded(
     mumble_connection_t connection, mumble_userid_t userID) {
     std::lock_guard<std::mutex> lock(g_stateMutex);
+    if (g_localChannel == -1) {
+        syncAllUsersLocked(connection);
+    }
     updateUserLocked(connection, userID);
     notifyStateChangedLocked();
 }
@@ -535,6 +586,7 @@ MUMBLE_PLUGIN_EXPORT void MUMBLE_PLUGIN_CALLING_CONVENTION mumble_onServerDiscon
     std::lock_guard<std::mutex> lock(g_stateMutex);
     g_activeConnection = -1;
     g_localChannel = -1;
+    g_localUserID = 0;
     g_users.clear();
     notifyStateChangedLocked();
 }
@@ -548,16 +600,25 @@ MUMBLE_PLUGIN_EXPORT void MUMBLE_PLUGIN_CALLING_CONVENTION mumble_onServerSynchr
 MUMBLE_PLUGIN_EXPORT void MUMBLE_PLUGIN_CALLING_CONVENTION mumble_onChannelEntered(
     mumble_connection_t connection, mumble_userid_t userID, mumble_channelid_t, mumble_channelid_t newChannelID) {
     std::lock_guard<std::mutex> lock(g_stateMutex);
+    if (g_localUserID == 0 && g_hasAPI && g_mumbleAPI.getLocalUserID) {
+        mumble_userid_t localUID = 0;
+        if (g_mumbleAPI.getLocalUserID(g_pluginID, connection, &localUID) == MUMBLE_STATUS_OK) {
+            g_localUserID = localUID;
+        }
+    }
     if (userID == g_localUserID) {
         g_localChannel = newChannelID;
         syncAllUsersLocked(connection);
     }
     auto it = g_users.find(userID);
-    if (it != g_users.end()) {
+    if (it != g_users.end() && !it->second.name.empty()) {
         it->second.channel_id = newChannelID;
     } else {
         updateUserLocked(connection, userID);
         g_users[userID].channel_id = newChannelID;
+    }
+    if (g_localChannel == -1) {
+        syncAllUsersLocked(connection);
     }
     notifyStateChangedLocked();
 }
