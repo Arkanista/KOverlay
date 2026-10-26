@@ -20,11 +20,11 @@
 
 
 > [!TIP]
-> **What's New in v1.1.9 (Right-Anchored Dynamic Width, Instant Height Shrink & Mumble User List Sync Fixes):**
-> - ↔️ **Right-Anchored Dynamic Width (`Anchor right edge (shift left)`)**: Added a new sub-option under **Dynamic Width (fit to text)**. When enabled, the overlay dynamically expands and shrinks to fit the longest nickname while keeping its **right edge fixed** — nicknames remain cleanly left-aligned inside the box, and the entire overlay block shifts left or right according to the longest nickname width.
-> - 📐 **Instant Overlay Height Shrink Fix**: Fixed an issue on Windows and Linux where the overlay window height did not immediately shrink by the height of a departed user after they left the channel (or after the join/leave history timer expired).
-> - 🎙️ **Mumble Plugin Initial & Mid-Session User List Sync**: Fixed an issue where enabling the Mumble plugin while already connected to a server—or starting Mumble/KOverlay in certain orders—only displayed users who spoke. The plugin (`koverlay_mumble.dll` / `.so` / `.mumble_plugin`) now actively probes active connections on initialization and synchronizes the full channel roster immediately.
-> - 🎛️ **Linux TTS Audio Engine Switcher & Bazzite Support (from v1.1.8)**: Includes multi-player Linux TTS support (`mpv`, `ffplay`, `pw-play`, `paplay`, `gst-play-1.0`, `cvlc`), audio engine recommendations, one-click `edge-tts` installer, and immutable distro (`ostree` / Bazzite / SteamOS) compatibility.
+> **What's New in v1.2.0 & v1.1.9 (Cross-Channel Whisper Support, Right-Anchored Dynamic Width, Instant Height Shrink & Mumble Sync Fixes):**
+> - 📣 **Cross-Channel & In-Channel Whisper / Shout Support (TeamSpeak 3 & Mumble)**: Users whispering or shouting to you (or your channel) from **other channels** now dynamically appear on the overlay while speaking, highlighted with a dedicated **Whisper Text Color** (`Choose Text Color (Whisper)`, default `#ff9900` orange). When they stop whispering, they smoothly fade out using your global **Keep recent speakers highlighted (Fade duration)** setting and automatically disappear once the fade ends—without triggering Join/Leave TTS or `🡅`/`🡇` history arrows. In-channel whispers also use the dedicated whisper color and fade smoothly back to normal text color.
+> - ↔️ **Right-Anchored Dynamic Width (`Anchor right edge (shift left)`) (from v1.1.9)**: Added a new sub-option under **Dynamic Width (fit to text)**. When enabled, the overlay dynamically expands and shrinks to fit the longest nickname while keeping its **right edge fixed** — nicknames remain cleanly left-aligned inside the box, and the entire overlay block shifts left or right according to the longest nickname width.
+> - 📐 **Instant Overlay Height Shrink Fix (from v1.1.9)**: Fixed an issue on Windows and Linux where the overlay window height did not immediately shrink by the height of a departed user after they left the channel (or after the join/leave history timer or cross-channel whisper fade expired).
+> - 🎙️ **Mumble Plugin Initial & Mid-Session User List Sync (from v1.1.9)**: Fixed an issue where enabling the Mumble plugin while already connected to a server—or starting Mumble/KOverlay in certain orders—only displayed users who spoke. The plugin (`koverlay_mumble.dll` / `.so` / `.mumble_plugin`) now actively probes active connections on initialization and synchronizes the full channel roster immediately.
 
 > [!IMPORTANT]
 > **KOverlay must remain running in the background (in the system tray)** for the overlay to appear over your game. If KOverlay is closed, the voice overlay will not be visible.
@@ -88,10 +88,10 @@ Building from source automatically handles dependency resolution:
 
 #### Method B: Install the Pre-compiled Pacman Package
 1. Download the pre-compiled package from GitHub releases:
-    👉 **[Download KOverlay v1.1.9 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.9/koverlay-1.1.9-1-x86_64.pkg.tar.zst)**
+    👉 **[Download KOverlay v1.2.0 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.0/koverlay-1.2.0-1-x86_64.pkg.tar.zst)**
 2. Install the downloaded package directly with `pacman`:
    ```bash
-   sudo pacman -U koverlay-1.1.9-1-x86_64.pkg.tar.zst
+   sudo pacman -U koverlay-1.2.0-1-x86_64.pkg.tar.zst
    ```
 
 ### Microsoft Windows (10 / 11)
@@ -103,7 +103,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 1: Setup Wizard (Recommended)
 1. Download the latest installer:
-   👉 **[Download KOverlay_Setup.exe (v1.1.9)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.9/KOverlay_Setup.exe)**
+   👉 **[Download KOverlay_Setup.exe (v1.2.0)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.0/KOverlay_Setup.exe)**
 2. Run `KOverlay_Setup.exe`:
    - Administrator rights are **not** required. The program installs directly into your user profile: `%LOCALAPPDATA%\Programs\KOverlay`.
    - **Mumble Check:** If Mumble is running, the installer will inform you and prompt you to close Mumble so it can safely install the Mumble plugin.
@@ -112,7 +112,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 2: Portable Archive (.zip)
 1. Download the portable package:
-   👉 **[Download KOverlay_Portable.zip (v1.1.9)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.9/KOverlay_Portable.zip)**
+   👉 **[Download KOverlay_Portable.zip (v1.2.0)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.0/KOverlay_Portable.zip)**
 2. Extract the `.zip` archive to any directory you prefer (e.g. `C:\Games\KOverlay` or your Desktop).
 3. **How to Launch KOverlay:**
    - Inside the extracted folder, double-click **`KOverlay.bat`**.
@@ -249,9 +249,9 @@ KOverlay connects to Mumble via a high-performance native plugin and a local IPC
 
 > [!TIP]
 > You can also download the standalone plugin or unified bundle directly from GitHub releases:
-> - **[koverlay_mumble.mumble_plugin (Universal Bundle)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.9/koverlay_mumble.mumble_plugin)** (Double-click or import via Mumble's "Install plugin" button)
-> - **[koverlay_mumble.dll (Windows x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.9/koverlay_mumble.dll)**
-> - **[koverlay_mumble.so (Linux x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.1.9/koverlay_mumble.so)**
+> - **[koverlay_mumble.mumble_plugin (Universal Bundle)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.0/koverlay_mumble.mumble_plugin)** (Double-click or import via Mumble's "Install plugin" button)
+> - **[koverlay_mumble.dll (Windows x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.0/koverlay_mumble.dll)**
+> - **[koverlay_mumble.so (Linux x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.0/koverlay_mumble.so)**
 
 ### Option C: Connecting to Discord (Local IPC / StreamKit)
 KOverlay connects directly to your running Discord desktop application using Discord's native local IPC RPC protocol:
@@ -308,6 +308,7 @@ The *Settings* window offers highly advanced overlay customization. All options 
 *   **Choose Background Color:** The primary color of the frame/background window. Supports alpha transparency (you can choose the tint of the glass frame).
 *   **Choose Text Color (Normal):** Imposes the selected color on the letters identifying the nickname of a player who is currently on the channel with you, but is silent and not transmitting voice.
 *   **Choose Text Color (Talking):** Speaker highlight. This defines the intense color that a player's nickname entry will "flash" when they press their push-to-talk button or activate their microphone via voice activation in TS3.
+*   **Choose Text Color (Whisper):** Whisper / Shout highlight (default `#ff9900`). Highlights users who are whispering or shouting to you (either from another channel or within your current channel) in TeamSpeak 3 and Mumble. Cross-channel whisperers fade out smoothly over the global *Fade duration* after they finish speaking and then disappear without triggering Join/Leave history or TTS.
 *   **Choose Text Color (Left):** Ghost highlight. Defines the color for users who have recently left the channel but are still displayed on the screen due to the "History Duration" setting.
 
 ### Typography Section

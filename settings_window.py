@@ -994,6 +994,14 @@ class SettingsWindow(QWidget):
         self.text_color_talking_btn.clicked.connect(self._choose_text_color_talking)
         color_layout.addWidget(self.text_color_talking_btn)
         
+        self.text_color_whisper_btn = QPushButton("Choose Text Color (Whisper)")
+        val_whisper = self.config.get("text_color_whisper", "#ff9900")
+        if val_whisper.startswith("rgba"): val_whisper = "#ff9900"
+        self.current_text_color_whisper = val_whisper
+        self._update_text_color_whisper_btn()
+        self.text_color_whisper_btn.clicked.connect(self._choose_text_color_whisper)
+        color_layout.addWidget(self.text_color_whisper_btn)
+        
         self.text_color_left_btn = QPushButton("Choose Text Color (Left)")
         val_left = self.config.get("text_color_left", "#808080")
         if val_left.startswith("rgba"): val_left = "#808080"
@@ -1178,6 +1186,11 @@ class SettingsWindow(QWidget):
         text_col = 'white' if c.lightness() < 128 else 'black'
         self.text_color_talking_btn.setStyleSheet(f"background-color: {self.current_text_color_talking}; color: {text_col};")
 
+    def _update_text_color_whisper_btn(self):
+        c = QColor(self.current_text_color_whisper)
+        text_col = 'white' if c.lightness() < 128 else 'black'
+        self.text_color_whisper_btn.setStyleSheet(f"background-color: {self.current_text_color_whisper}; color: {text_col};")
+
     def _update_text_color_left_btn(self):
         c = QColor(self.current_text_color_left)
         text_col = 'white' if c.lightness() < 128 else 'black'
@@ -1202,6 +1215,13 @@ class SettingsWindow(QWidget):
         if color.isValid():
             self.current_text_color_talking = color.name(QColor.NameFormat.HexArgb)
             self._update_text_color_talking_btn()
+            self._on_change()
+            
+    def _choose_text_color_whisper(self):
+        color = QColorDialog.getColor(QColor(self.current_text_color_whisper), self, "Select Text Color (Whisper)", QColorDialog.ColorDialogOption.ShowAlphaChannel)
+        if color.isValid():
+            self.current_text_color_whisper = color.name(QColor.NameFormat.HexArgb)
+            self._update_text_color_whisper_btn()
             self._on_change()
             
     def _choose_text_color_left(self):
@@ -1478,6 +1498,7 @@ class SettingsWindow(QWidget):
         self.config["bg_color"] = self.current_bg_color
         self.config["text_color_normal"] = self.current_text_color_normal
         self.config["text_color_talking"] = self.current_text_color_talking
+        self.config["text_color_whisper"] = self.current_text_color_whisper
         self.config["text_color_left"] = self.current_text_color_left
         self.config["show_header"] = self.header_checkbox.isChecked()
         self.config["show_three_dots"] = self.three_dots_checkbox.isChecked()

@@ -13,6 +13,9 @@ class TS3ClientThread(QThread):
         self.running = True
         self.sock = None
         self.buf = ""
+        self.talking_clids = set()
+        self.whispering_clids = set()
+        self._notify_registered = False
 
     def connect_ts3(self):
         if self.sock:
@@ -20,6 +23,9 @@ class TS3ClientThread(QThread):
             except: pass
         
         self.buf = ""
+        self.talking_clids.clear()
+        self.whispering_clids.clear()
+        self._notify_registered = False
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.settimeout(5.0)
         self.sock.connect(("127.0.0.1", 25639))
@@ -36,10 +42,36 @@ class TS3ClientThread(QThread):
         if "error id=0" not in resp:
             raise Exception(f"Use failed: {resp}")
 
+        self._send_cmd("clientnotifyregister schandlerid=0 event=notifytalkstatuschange")
+        resp_notify = self._read_until("error id=")
+        if "error id=0" in resp_notify:
+            self._notify_registered = True
+
     def _send_cmd(self, cmd):
         self.sock.sendall((cmd + "\n").encode('utf-8'))
 
-    def _read_until(self, target, max_lines=100):
+    def _handle_notify_line(self, line: str):
+        kv = {}
+        for part in line.split(' '):
+            if '=' in part:
+                k, v = part.split('=', 1)
+                kv[k] = v
+        clid = kv.get('clid')
+        if not clid:
+            return
+        status = kv.get('status') == '1'
+        is_whisper = kv.get('isreceivedwhisper') == '1'
+        if status:
+            self.talking_clids.add(clid)
+            if is_whisper:
+                self.whispering_clids.add(clid)
+            else:
+                self.whispering_clids.discard(clid)
+        else:
+            self.talking_clids.discard(clid)
+            self.whispering_clids.discard(clid)
+
+    def _read_until(self, target, max_lines=200):
         lines = []
         for _ in range(max_lines):
             while '\n' not in self.buf:
@@ -53,6 +85,10 @@ class TS3ClientThread(QThread):
             
             line, self.buf = self.buf.split('\n', 1)
             line = line.strip()
+            if line.startswith("notifytalkstatuschange"):
+                self._handle_notify_line(line)
+                if target not in line:
+                    continue
             lines.append(line)
             if target in line:
                 return "\n".join(lines)
@@ -61,9 +97,13 @@ class TS3ClientThread(QThread):
     def _parse_clientlist(self, data, filter_cid=None):
         clients = []
         for line in data.split('\n'):
+            line = line.strip()
             if line.startswith("error id="):
                 continue
             if not line:
+                continue
+            if line.startswith("notifytalkstatuschange"):
+                self._handle_notify_line(line)
                 continue
             
             users = line.split('|')
@@ -80,16 +120,41 @@ class TS3ClientThread(QThread):
                 if client_dict.get('client_type') == '1':
                     continue # ServerQuery client
                     
-                if filter_cid and client_dict.get('cid') != filter_cid:
+                clid = client_dict.get('clid')
+                if not clid:
                     continue
-                    
+
                 name = (client_dict.get('client_nickname') or '').strip()
                 if not name or name.lower() == 'unknown' or re.match(r"^[Uu]ser_\d+$", name):
                     continue
-                talking = client_dict.get('client_flag_talking') == '1'
-                
-                if 'clid' in client_dict:
-                    clients.append({"name": name, "talking": talking})
+
+                cid = client_dict.get('cid')
+                is_external = bool(filter_cid and cid != filter_cid)
+                flag_talking = client_dict.get('client_flag_talking') == '1'
+                is_whisper_attr = (
+                    client_dict.get('isreceivedwhisper') == '1' or
+                    client_dict.get('client_whisper') == '1'
+                )
+
+                if not flag_talking and 'client_flag_talking' in client_dict:
+                    self.talking_clids.discard(clid)
+                    self.whispering_clids.discard(clid)
+
+                talking = flag_talking or (clid in self.talking_clids)
+                if getattr(self, '_notify_registered', False):
+                    is_whisper = talking and ((clid in self.whispering_clids) or is_whisper_attr)
+                else:
+                    is_whisper = talking and ((clid in self.whispering_clids) or is_whisper_attr or is_external)
+
+                if is_external and not is_whisper:
+                    continue
+
+                clients.append({
+                    "name": name,
+                    "talking": talking,
+                    "whisper": is_whisper,
+                    "external": is_external
+                })
         return clients
 
     def run(self):

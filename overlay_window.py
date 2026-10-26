@@ -104,6 +104,8 @@ class OverlayWindow(QWidget):
         self.user_history = {}
         self.last_talk_time = {}
         self.talking_now = {}
+        self.whisper_now = {}
+        self.last_talk_was_whisper = {}
         self.last_clients = []
         self.is_initial_snapshot = True
         
@@ -416,6 +418,8 @@ class OverlayWindow(QWidget):
         if col_normal.startswith('rgba'): col_normal = '#96ffffff'
         col_talking = self.config.get('text_color_talking', '#00FFCC')
         if col_talking.startswith('rgba'): col_talking = '#00FFCC'
+        col_whisper = self.config.get('text_color_whisper', '#ff9900')
+        if col_whisper.startswith('rgba'): col_whisper = '#ff9900'
 
         sort_mode = self.config.get("sort_order", "alphabetical_fading_top")
         needs_resort = False
@@ -433,10 +437,13 @@ class OverlayWindow(QWidget):
             if last_talk > 0 and elapsed < fade_duration:
                 any_fading = True
                 progress = elapsed / fade_duration
-                col = interpolate_color(col_talking, col_normal, progress)
+                from_col = col_whisper if self.last_talk_was_whisper.get(name, False) else col_talking
+                col = interpolate_color(from_col, col_normal, progress)
                 lbl.setStyleSheet(f"color: {col}; background-color: transparent; border: none;")
             elif last_talk > 0 and elapsed >= fade_duration:
-                if col_normal not in lbl.styleSheet():
+                if data.get("external", False):
+                    needs_resort = True
+                elif col_normal not in lbl.styleSheet():
                     lbl.setStyleSheet(f"color: {col_normal}; background-color: transparent; border: none;")
                     if sort_mode == "alphabetical_fading_top":
                         needs_resort = True
@@ -486,6 +493,9 @@ class OverlayWindow(QWidget):
         else:
             if any(d.get("leave_time") is not None for d in self.user_history.values()):
                 has_pending = True
+
+        if not has_pending and any(d.get("external", False) for d in self.user_history.values()):
+            has_pending = True
 
         sort_mode = self.config.get("sort_order", "alphabetical_fading_top")
         if not has_pending and sort_mode == "alphabetical_fading_top":
@@ -631,7 +641,7 @@ class OverlayWindow(QWidget):
         # Update width & geometry settings
         self.layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetNoConstraint)
         
-        if hasattr(self, 'last_clients') and self.last_clients:
+        if hasattr(self, 'last_clients') and (self.last_clients or self.user_history):
             self.update_clients(self.last_clients, getattr(self, 'current_cid', None))
         else:
             self._update_overlay_geometry()
@@ -699,6 +709,8 @@ class OverlayWindow(QWidget):
         self.user_history.clear()
         self.last_talk_time.clear()
         self.talking_now.clear()
+        self.whisper_now.clear()
+        self.last_talk_was_whisper.clear()
         self.last_clients = []
         self.current_cid = None
         self.is_initial_snapshot = True
@@ -745,12 +757,12 @@ class OverlayWindow(QWidget):
                 self.user_history.pop(k, None)
                 self.last_talk_time.pop(k, None)
                 self.talking_now.pop(k, None)
+                self.whisper_now.pop(k, None)
+                self.last_talk_was_whisper.pop(k, None)
         
         history_enabled = self.config.get("history_enabled", False)
         history_duration = self.config.get("history_duration", 60)
-        
-        # Determine who is active right now
-        active_names = {c["name"] for c in clients}
+        fade_duration = float(self.config.get("speaker_fade_duration", 5))
         
         changed_channel = False
         prev_cid = getattr(self, 'current_cid', None)
@@ -758,24 +770,54 @@ class OverlayWindow(QWidget):
             self.user_history.clear()
             self.last_talk_time.clear()
             self.talking_now.clear()
+            self.whisper_now.clear()
+            self.last_talk_was_whisper.clear()
             changed_channel = True
         if my_cid is not None:
             self.current_cid = my_cid
+
+        # Separate channel members from cross-channel (external) whisperers
+        channel_clients = [c for c in clients if not c.get("external", False)]
+        external_clients = [c for c in clients if c.get("external", False)]
+        active_channel_names = {c["name"] for c in channel_clients}
+        active_names = {c["name"] for c in clients}
+
+        # Track talking & whisper states and timestamps
+        for name in list(self.talking_now.keys()):
+            if name not in active_names:
+                self.talking_now[name] = False
+                self.whisper_now[name] = False
+
+        for c in clients:
+            c_name = c["name"]
+            is_talking = bool(c.get("talking", False))
+            is_external = bool(c.get("external", False))
+            is_whisper = is_talking and (bool(c.get("whisper", False)) or is_external)
+            self.talking_now[c_name] = is_talking
+            self.whisper_now[c_name] = is_whisper
+            if is_talking:
+                self.last_talk_time[c_name] = current_time
+                self.last_talk_was_whisper[c_name] = is_whisper
+
+        prev_external = {
+            name: data for name, data in self.user_history.items()
+            if data.get("external", False)
+        }
         
-        was_empty = (len(self.user_history) == 0)
+        was_empty = not any(not d.get("external", False) for d in self.user_history.values())
         is_initial = getattr(self, 'is_initial_snapshot', False) or was_empty or changed_channel
-        if clients:
+        if channel_clients:
             self.is_initial_snapshot = False
 
-        # Update user history
+        # Update user history for local channel members
         if history_enabled:
             # Mark new users
-            for c in clients:
+            for c in channel_clients:
                 name = c["name"]
-                if name not in self.user_history:
-                    # User wasn't seen before, they joined now (join_time = 0 on initial snapshot/channel switch so no '+')
+                if name not in self.user_history or self.user_history[name].get("external", False):
+                    # User wasn't in our channel before, they joined now (join_time = 0 on initial snapshot/channel switch so no '+')
                     join_time = 0 if is_initial else current_time
-                    self.user_history[name] = {"join_time": join_time, "leave_time": None}
+                    self.user_history[name] = {"join_time": join_time, "leave_time": None, "external": False}
                     
                     if not is_initial and self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
                         if self.config.get("tts_join_enabled", True):
@@ -795,7 +837,7 @@ class OverlayWindow(QWidget):
                     if self.user_history[name]["leave_time"] is not None:
                         # Re-joined! We update join_time and clear leave_time
                         join_time = 0 if is_initial else current_time
-                        self.user_history[name] = {"join_time": join_time, "leave_time": None}
+                        self.user_history[name] = {"join_time": join_time, "leave_time": None, "external": False}
                         
                         if not is_initial and self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
                             if self.config.get("tts_join_enabled", True):
@@ -811,10 +853,12 @@ class OverlayWindow(QWidget):
                                 from tts_manager import get_tts_manager
                                 get_tts_manager().enqueue(text, voice=voice, volume=vol, delay=delay, rate=rate)
             
-            # Mark users who left (only when not in an initial snapshot or channel switch)
+            # Mark channel users who left (only when not in an initial snapshot or channel switch)
             if not is_initial:
                 for name, data in list(self.user_history.items()):
-                    if name not in active_names:
+                    if data.get("external", False):
+                        continue
+                    if name not in active_channel_names:
                         if data["leave_time"] is None:
                             # User just left
                             data["leave_time"] = current_time
@@ -837,20 +881,39 @@ class OverlayWindow(QWidget):
                             del self.user_history[name]
                             self.last_talk_time.pop(name, None)
                             self.talking_now.pop(name, None)
+                            self.whisper_now.pop(name, None)
+                            self.last_talk_was_whisper.pop(name, None)
         else:
-            # History disabled, just match active clients directly
+            # History disabled, match active channel clients + preserve fading external whisperers
             self.user_history = {}
-            for c in clients:
-                self.user_history[c["name"]] = {"join_time": 0, "leave_time": None}
+            for c in channel_clients:
+                self.user_history[c["name"]] = {"join_time": 0, "leave_time": None, "external": False}
+            for name, data in prev_external.items():
+                if name not in active_channel_names:
+                    self.user_history[name] = data
 
-        # Track talking states & timestamps
-        fade_duration = float(self.config.get("speaker_fade_duration", 5))
-        for c in clients:
-            c_name = c["name"]
-            is_talking = c.get("talking", False)
-            self.talking_now[c_name] = is_talking
-            if is_talking:
-                self.last_talk_time[c_name] = current_time
+        # Add active cross-channel (external) whisperers
+        for c in external_clients:
+            name = c["name"]
+            if name in active_channel_names:
+                continue
+            if c.get("talking", False):
+                self.user_history[name] = {"join_time": 0, "leave_time": None, "external": True}
+
+        # Prune external whisperers who stopped whispering and finished speaker_fade_duration
+        for name, data in list(self.user_history.items()):
+            if not data.get("external", False):
+                continue
+            if self.talking_now.get(name, False):
+                continue
+            last_talk = self.last_talk_time.get(name, 0)
+            elapsed = current_time - last_talk
+            if fade_duration <= 0 or last_talk <= 0 or elapsed >= fade_duration:
+                self.user_history.pop(name, None)
+                self.last_talk_time.pop(name, None)
+                self.talking_now.pop(name, None)
+                self.whisper_now.pop(name, None)
+                self.last_talk_was_whisper.pop(name, None)
 
         font_family = self.config.get("font_family", "Sans Serif")
         font_size = self.config.get("font_size", 11)
@@ -863,6 +926,8 @@ class OverlayWindow(QWidget):
         if col_normal.startswith('rgba'): col_normal = '#96ffffff'
         col_talking = self.config.get('text_color_talking', '#00FFCC')
         if col_talking.startswith('rgba'): col_talking = '#00FFCC'
+        col_whisper = self.config.get('text_color_whisper', '#ff9900')
+        if col_whisper.startswith('rgba'): col_whisper = '#ff9900'
         col_left = self.config.get('text_color_left', '#808080')
         if col_left.startswith('rgba'): col_left = '#808080'
 
@@ -946,7 +1011,8 @@ class OverlayWindow(QWidget):
         for name in display_names:
             data = self.user_history[name]
             is_left = data["leave_time"] is not None
-            is_new = history_enabled and not is_left and (current_time - data["join_time"] < history_duration)
+            is_external_user = data.get("external", False)
+            is_new = history_enabled and not is_left and not is_external_user and (current_time - data["join_time"] < history_duration)
             
             # Format text
             from config import clean_nickname
@@ -984,10 +1050,12 @@ class OverlayWindow(QWidget):
             if is_left:
                 lbl.setStyleSheet(f"color: {col_left}; background-color: transparent; border: none;")
             elif talking:
-                lbl.setStyleSheet(f"color: {col_talking}; background-color: transparent; border: none;")
+                active_col = col_whisper if self.whisper_now.get(name, False) else col_talking
+                lbl.setStyleSheet(f"color: {active_col}; background-color: transparent; border: none;")
             elif fade_duration > 0 and last_talk > 0 and elapsed < fade_duration:
                 progress = elapsed / fade_duration
-                col = interpolate_color(col_talking, col_normal, progress)
+                from_col = col_whisper if self.last_talk_was_whisper.get(name, False) else col_talking
+                col = interpolate_color(from_col, col_normal, progress)
                 lbl.setStyleSheet(f"color: {col}; background-color: transparent; border: none;")
             else:
                 lbl.setStyleSheet(f"color: {col_normal}; background-color: transparent; border: none;")

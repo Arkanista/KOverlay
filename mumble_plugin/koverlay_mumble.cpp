@@ -45,6 +45,7 @@ struct UserInfo {
     std::string name;
     mumble_channelid_t channel_id = -1;
     bool talking = false;
+    bool whispering = false;
 };
 
 std::atomic<bool> g_running{false};
@@ -98,12 +99,14 @@ std::string buildStateJsonLocked() {
     json += std::to_string(g_localChannel);
     json += ",\"clients\":[";
 
-    // Strictly filter: only include users who belong to the local user's current channel
+    // Include users in the local user's current channel, plus users from other channels who are actively talking/whispering to us
     if (g_localChannel != -1) {
         std::vector<const UserInfo*> channelUsers;
         for (const auto &pair : g_users) {
             const UserInfo &u = pair.second;
-            if (u.channel_id != g_localChannel) {
+            bool inLocalChannel = (u.channel_id == g_localChannel);
+            bool isExternalTalking = (!inLocalChannel && u.talking);
+            if (!inLocalChannel && !isExternalTalking) {
                 continue;
             }
 
@@ -147,10 +150,17 @@ std::string buildStateJsonLocked() {
             if (!first) json += ",";
             first = false;
 
+            bool isExternal = (u.channel_id != g_localChannel);
+            bool isWhisper = u.talking && (u.whispering || isExternal);
+
             json += "{\"name\":\"";
             json += escapeJson(u.name);
             json += "\",\"talking\":";
             json += (u.talking ? "true" : "false");
+            json += ",\"whisper\":";
+            json += (isWhisper ? "true" : "false");
+            json += ",\"external\":";
+            json += (isExternal ? "true" : "false");
             json += "}";
         }
     }
@@ -539,6 +549,8 @@ MUMBLE_PLUGIN_EXPORT void MUMBLE_PLUGIN_CALLING_CONVENTION mumble_onUserTalkingS
     bool isTalking = (talkingState == MUMBLE_TS_TALKING ||
                       talkingState == MUMBLE_TS_WHISPERING ||
                       talkingState == MUMBLE_TS_SHOUTING);
+    bool isWhisperState = (talkingState == MUMBLE_TS_WHISPERING ||
+                           talkingState == MUMBLE_TS_SHOUTING);
 
     std::lock_guard<std::mutex> lock(g_stateMutex);
     if (g_localChannel == -1 || g_users.empty()) {
@@ -547,14 +559,24 @@ MUMBLE_PLUGIN_EXPORT void MUMBLE_PLUGIN_CALLING_CONVENTION mumble_onUserTalkingS
 
     auto it = g_users.find(userID);
     if (it != g_users.end() && !it->second.name.empty() && it->second.channel_id != -1) {
-        if (it->second.talking != isTalking) {
+        if (isTalking && g_hasAPI && g_mumbleAPI.getChannelOfUser) {
+            mumble_channelid_t cid = -1;
+            if (g_mumbleAPI.getChannelOfUser(g_pluginID, connection, userID, &cid) == MUMBLE_STATUS_OK) {
+                it->second.channel_id = cid;
+            }
+        }
+        bool isWhisper = isTalking && (isWhisperState || (g_localChannel != -1 && it->second.channel_id != g_localChannel));
+        if (it->second.talking != isTalking || it->second.whispering != isWhisper) {
             it->second.talking = isTalking;
+            it->second.whispering = isWhisper;
             notifyStateChangedLocked();
         }
     } else {
         syncAllUsersLocked(connection);
         updateUserLocked(connection, userID);
-        g_users[userID].talking = isTalking;
+        auto &u = g_users[userID];
+        u.talking = isTalking;
+        u.whispering = isTalking && (isWhisperState || (g_localChannel != -1 && u.channel_id != -1 && u.channel_id != g_localChannel));
         notifyStateChangedLocked();
     }
 }

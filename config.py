@@ -62,7 +62,8 @@ def load_config():
         "tts_audio_player": "auto",
         "dynamic_width": True,
         "dynamic_width_right_anchor": False,
-        "fixed_width": 200
+        "fixed_width": 200,
+        "text_color_whisper": "#ff9900"
     }
     if not os.path.exists(CONFIG_FILE):
         return default_config
@@ -107,6 +108,8 @@ def load_config():
                 cfg["dynamic_width_right_anchor"] = False
             if "fixed_width" not in cfg:
                 cfg["fixed_width"] = 200
+            if "text_color_whisper" not in cfg:
+                cfg["text_color_whisper"] = "#ff9900"
             return cfg
     except Exception as e:
         print(f"Error loading config: {e}")
