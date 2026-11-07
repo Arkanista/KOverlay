@@ -169,6 +169,26 @@ class SettingsWindow(QWidget):
         self.discord_auth_btn = QPushButton("Authorize Discord")
         self.discord_auth_btn.clicked.connect(self._on_discord_auth_btn_clicked)
         discord_layout.addWidget(self.discord_auth_btn)
+
+        discord_layout.addSpacing(20)
+        self.discord_icons_checkbox = QCheckBox("Show status icons (mute, deafen, etc.)")
+        self.discord_icons_checkbox.setChecked(self.config.get("discord_show_status_icons", True))
+        self.discord_icons_checkbox.toggled.connect(self._on_change)
+        discord_layout.addWidget(self.discord_icons_checkbox)
+
+        discord_layout.addSpacing(10)
+        discord_layout.addWidget(QLabel("Icons side:"))
+        self.discord_icons_pos_combo = QComboBox()
+        self.discord_icons_pos_combo.addItem("Right of nickname (Default)", "right")
+        self.discord_icons_pos_combo.addItem("Left of nickname", "left")
+        cur_icon_pos = self.config.get("discord_status_icons_position", "right")
+        idx_icon_pos = self.discord_icons_pos_combo.findData(cur_icon_pos)
+        self.discord_icons_pos_combo.setCurrentIndex(idx_icon_pos if idx_icon_pos >= 0 else 0)
+        self.discord_icons_pos_combo.setEnabled(self.discord_icons_checkbox.isChecked())
+        self.discord_icons_checkbox.toggled.connect(self.discord_icons_pos_combo.setEnabled)
+        self.discord_icons_pos_combo.currentIndexChanged.connect(self._on_change)
+        discord_layout.addWidget(self.discord_icons_pos_combo)
+
         discord_layout.addStretch()
         general_group_layout.addWidget(self.discord_widget)
         self._auth_thread = None
@@ -1538,6 +1558,10 @@ class SettingsWindow(QWidget):
             self.config["limit_users_count"] = self.limit_users_input.text().strip()
         if hasattr(self, 'strip_brackets_checkbox'):
             self.config["strip_bracket_tags"] = self.strip_brackets_checkbox.isChecked()
+        if hasattr(self, 'discord_icons_checkbox'):
+            self.config["discord_show_status_icons"] = self.discord_icons_checkbox.isChecked()
+        if hasattr(self, 'discord_icons_pos_combo'):
+            self.config["discord_status_icons_position"] = self.discord_icons_pos_combo.currentData()
 
         # Emit signal to inform main app to apply changes
         self.config_changed.emit()

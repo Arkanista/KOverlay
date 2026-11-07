@@ -63,7 +63,9 @@ def load_config():
         "dynamic_width": True,
         "dynamic_width_right_anchor": False,
         "fixed_width": 200,
-        "text_color_whisper": "#ff9900"
+        "text_color_whisper": "#ff9900",
+        "discord_show_status_icons": True,
+        "discord_status_icons_position": "right"
     }
     if not os.path.exists(CONFIG_FILE):
         return default_config
@@ -110,6 +112,10 @@ def load_config():
                 cfg["fixed_width"] = 200
             if "text_color_whisper" not in cfg:
                 cfg["text_color_whisper"] = "#ff9900"
+            if "discord_show_status_icons" not in cfg:
+                cfg["discord_show_status_icons"] = True
+            if "discord_status_icons_position" not in cfg or cfg.get("discord_status_icons_position") not in ("left", "right"):
+                cfg["discord_status_icons_position"] = "right"
             return cfg
     except Exception as e:
         print(f"Error loading config: {e}")

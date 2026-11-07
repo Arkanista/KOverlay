@@ -486,6 +486,8 @@ class MainApp:
     def _on_discord_token_saved(self, token):
         self.cfg["discord_access_token"] = token
         self.save_config()
+        if hasattr(self, 'settings_dialog') and self.settings_dialog is not None:
+            self.settings_dialog._update_discord_ui()
 
     def start_voice_backend(self):
         if hasattr(self, 'voice_thread') and self.voice_thread is not None:

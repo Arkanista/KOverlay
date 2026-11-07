@@ -20,11 +20,13 @@
 
 
 > [!TIP]
-> **What's New in v1.2.0 & v1.1.9 (Cross-Channel Whisper Support, Right-Anchored Dynamic Width, Instant Height Shrink & Mumble Sync Fixes):**
-> - 📣 **Cross-Channel & In-Channel Whisper / Shout Support (TeamSpeak 3 & Mumble)**: Users whispering or shouting to you (or your channel) from **other channels** now dynamically appear on the overlay while speaking, highlighted with a dedicated **Whisper Text Color** (`Choose Text Color (Whisper)`, default `#ff9900` orange). When they stop whispering, they smoothly fade out using your global **Keep recent speakers highlighted (Fade duration)** setting and automatically disappear once the fade ends—without triggering Join/Leave TTS or `🡅`/`🡇` history arrows. In-channel whispers also use the dedicated whisper color and fade smoothly back to normal text color.
-> - ↔️ **Right-Anchored Dynamic Width (`Anchor right edge (shift left)`) (from v1.1.9)**: Added a new sub-option under **Dynamic Width (fit to text)**. When enabled, the overlay dynamically expands and shrinks to fit the longest nickname while keeping its **right edge fixed** — nicknames remain cleanly left-aligned inside the box, and the entire overlay block shifts left or right according to the longest nickname width.
-> - 📐 **Instant Overlay Height Shrink Fix (from v1.1.9)**: Fixed an issue on Windows and Linux where the overlay window height did not immediately shrink by the height of a departed user after they left the channel (or after the join/leave history timer or cross-channel whisper fade expired).
-> - 🎙️ **Mumble Plugin Initial & Mid-Session User List Sync (from v1.1.9)**: Fixed an issue where enabling the Mumble plugin while already connected to a server—or starting Mumble/KOverlay in certain orders—only displayed users who spoke. The plugin (`koverlay_mumble.dll` / `.so` / `.mumble_plugin`) now actively probes active connections on initialization and synchronizes the full channel roster immediately.
+> **What's New in v1.2.1 (Discord Status Icons, Self-Join TTS Fix & IPC Improvements):**
+> - 🎨 **Discord Voice Status Icons**: Added crisp, flat monochrome status icons rendered dynamically in the exact font color (including smooth fade-out). Displays mute, deafen, server mute, server deafen, voice suppression, screen sharing / stream, camera video, and bot badges. Configurable in Settings to display on the **Right** (default) or **Left** of nicknames, or toggle off completely.
+> - 🔇 **Discord Self-Join TTS Fix**: Joining a Discord voice channel no longer triggers a TTS voice announcement or join arrow for the local user.
+> - ⚡ **Discord IPC Protocol Resilience**: Added handling for Discord IPC opcode 2 (CLOSE) and opcode 3 (PING/PONG heartbeat response), thread-safe token persistence across background threads, channel switch synchronization guards, and preserved access tokens during transient connection timeouts.
+> - 📣 **Cross-Channel & In-Channel Whisper / Shout Support (from v1.2.0)**: Dedicated whisper text highlighting and fade-out for TeamSpeak 3 and Mumble.
+> - ↔️ **Right-Anchored Dynamic Width (`Anchor right edge (shift left)`) (from v1.1.9)**: Keep right edge anchored while dynamically expanding/shrinking.
+> - 📐 **Instant Overlay Height Shrink Fix (from v1.1.9)**: Overlay immediately shrinks when users leave.
 
 > [!IMPORTANT]
 > **KOverlay must remain running in the background (in the system tray)** for the overlay to appear over your game. If KOverlay is closed, the voice overlay will not be visible.
@@ -88,10 +90,10 @@ Building from source automatically handles dependency resolution:
 
 #### Method B: Install the Pre-compiled Pacman Package
 1. Download the pre-compiled package from GitHub releases:
-    👉 **[Download KOverlay v1.2.0 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.0/koverlay-1.2.0-1-x86_64.pkg.tar.zst)**
+    👉 **[Download KOverlay v1.2.1 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.1/koverlay-1.2.1-1-x86_64.pkg.tar.zst)**
 2. Install the downloaded package directly with `pacman`:
    ```bash
-   sudo pacman -U koverlay-1.2.0-1-x86_64.pkg.tar.zst
+   sudo pacman -U koverlay-1.2.1-1-x86_64.pkg.tar.zst
    ```
 
 ### Microsoft Windows (10 / 11)
@@ -103,7 +105,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 1: Setup Wizard (Recommended)
 1. Download the latest installer:
-   👉 **[Download KOverlay_Setup.exe (v1.2.0)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.0/KOverlay_Setup.exe)**
+   👉 **[Download KOverlay_Setup.exe (v1.2.1)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.1/KOverlay_Setup.exe)**
 2. Run `KOverlay_Setup.exe`:
    - Administrator rights are **not** required. The program installs directly into your user profile: `%LOCALAPPDATA%\Programs\KOverlay`.
    - **Mumble Check:** If Mumble is running, the installer will inform you and prompt you to close Mumble so it can safely install the Mumble plugin.
@@ -112,7 +114,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 2: Portable Archive (.zip)
 1. Download the portable package:
-   👉 **[Download KOverlay_Portable.zip (v1.2.0)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.0/KOverlay_Portable.zip)**
+   👉 **[Download KOverlay_Portable.zip (v1.2.1)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.1/KOverlay_Portable.zip)**
 2. Extract the `.zip` archive to any directory you prefer (e.g. `C:\Games\KOverlay` or your Desktop).
 3. **How to Launch KOverlay:**
    - Inside the extracted folder, double-click **`KOverlay.bat`**.
@@ -249,9 +251,9 @@ KOverlay connects to Mumble via a high-performance native plugin and a local IPC
 
 > [!TIP]
 > You can also download the standalone plugin or unified bundle directly from GitHub releases:
-> - **[koverlay_mumble.mumble_plugin (Universal Bundle)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.0/koverlay_mumble.mumble_plugin)** (Double-click or import via Mumble's "Install plugin" button)
-> - **[koverlay_mumble.dll (Windows x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.0/koverlay_mumble.dll)**
-> - **[koverlay_mumble.so (Linux x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.0/koverlay_mumble.so)**
+> - **[koverlay_mumble.mumble_plugin (Universal Bundle)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.1/koverlay_mumble.mumble_plugin)** (Double-click or import via Mumble's "Install plugin" button)
+> - **[koverlay_mumble.dll (Windows x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.1/koverlay_mumble.dll)**
+> - **[koverlay_mumble.so (Linux x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.1/koverlay_mumble.so)**
 
 ### Option C: Connecting to Discord (Local IPC / StreamKit)
 KOverlay connects directly to your running Discord desktop application using Discord's native local IPC RPC protocol:
@@ -261,6 +263,7 @@ KOverlay connects directly to your running Discord desktop application using Dis
 4. Click **Authorize** in your Discord app.
 5. KOverlay will immediately display your currently joined voice channel, active speakers, user list, and join/leave events.
 6. The authorization token is safely saved in your local configuration, so you will not need to authorize again! The button dynamically switches to **"Unauthorize Discord"** if you ever wish to disconnect or clear the authorization.
+7. **Status Icons & Settings**: Discord users display vector status badges (mic muted, deafened, server muted, server deafened, voice suppressed, camera on, screen sharing, bot). In Settings under the Discord tab, you can enable/disable icons or set their placement to **Right of nickname (Default)** or **Left of nickname**. Icons inherit the exact active nickname text color and fade smoothly together with the user row.
 
 > [!NOTE]
 > Discord integration tracks the **voice channel** you are currently connected to. When you switch voice channels, KOverlay automatically updates the overlay to show your current channel members. Zero bot configuration, developer portal setup, or server admin permissions are required!

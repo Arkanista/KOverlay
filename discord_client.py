@@ -206,16 +206,21 @@ class DiscordIpcTransport:
 class DiscordClientThread(QThread):
     clients_updated = pyqtSignal(list, object)
     error_occurred = pyqtSignal(str)
+    token_updated = pyqtSignal(str)
 
     def __init__(self, client_id=DISCORD_CLIENT_ID, access_token="", token_save_callback=None, parent=None):
         super().__init__(parent)
         self.client_id = client_id or DISCORD_CLIENT_ID
         self.access_token = access_token or ""
         self.token_save_callback = token_save_callback
+        if token_save_callback is not None:
+            self.token_updated.connect(token_save_callback)
         self.running = True
         self.transport = DiscordIpcTransport()
+        self.local_user_id = None
         self.current_channel_id = None
-        self.channel_members = {}  # {user_id: {"clid": user_id, "name": nick, "talking": False}}
+        self._channel_synced = False
+        self.channel_members = {}  # {user_id: {"clid": user_id, "name": nick, "talking": False, "is_self": bool, "status_icons": [...]}}
 
     def _send_packet(self, opcode: int, payload: dict):
         body = json.dumps(payload).encode("utf-8")
@@ -226,11 +231,23 @@ class DiscordClientThread(QThread):
         if timeout is not None:
             self.transport.set_timeout(timeout)
         try:
-            hdr = self.transport.recv_exact(8)
-            opcode, length = struct.unpack("<II", hdr)
-            body = self.transport.recv_exact(length)
-            data = json.loads(body.decode("utf-8", errors="replace"))
-            return opcode, data
+            while self.running:
+                hdr = self.transport.recv_exact(8)
+                opcode, length = struct.unpack("<II", hdr)
+                body = self.transport.recv_exact(length)
+                data = json.loads(body.decode("utf-8", errors="replace")) if length > 0 else {}
+                if opcode == 2:
+                    # CLOSE frame from Discord IPC
+                    raise ConnectionResetError("Discord IPC closed by server")
+                if opcode == 3:
+                    # PING frame from Discord IPC -> reply with PONG (opcode 4)
+                    try:
+                        self._send_packet(4, data if isinstance(data, dict) else {})
+                    except Exception:
+                        pass
+                    continue
+                return opcode, data
+            return None, None
         except (socket.timeout, TimeoutError):
             return None, None
 
@@ -251,20 +268,89 @@ class DiscordClientThread(QThread):
 
     def _extract_display_name(self, state_or_user, fallback_user=None):
         """Extracts guild nickname, global name, or username."""
+        if not isinstance(state_or_user, dict):
+            state_or_user = {}
         nick = state_or_user.get("nick")
-        if nick and nick.strip():
-            return nick.strip()
+        if nick and str(nick).strip():
+            return str(nick).strip()
 
-        user = state_or_user.get("user") or fallback_user or {}
+        user = state_or_user.get("user") if isinstance(state_or_user.get("user"), dict) else (fallback_user or {})
         global_name = user.get("global_name")
-        if global_name and global_name.strip():
-            return global_name.strip()
+        if global_name and str(global_name).strip():
+            return str(global_name).strip()
 
         username = user.get("username")
-        if username and username.strip():
-            return username.strip()
+        if username and str(username).strip():
+            return str(username).strip()
 
         return "Unknown"
+
+    def _extract_status_info(self, st: dict, fallback_user: dict = None):
+        """
+        Extracts Discord voice state flags and returns (status_icons_list, can_speak_bool).
+        Available icons:
+        - 'server_mute' / 'mute'
+        - 'server_deaf' / 'deaf'
+        - 'suppress'
+        - 'stream'
+        - 'video'
+        - 'bot'
+        """
+        if not isinstance(st, dict):
+            st = {}
+        vs = st.get("voice_state")
+        if not isinstance(vs, dict):
+            vs = st
+        u = st.get("user") if isinstance(st.get("user"), dict) else (fallback_user or {})
+
+        # Top-level 'mute' in a voice_state wrapper indicates local mute by the client user
+        local_mute = bool(st.get("mute", False)) if "voice_state" in st else False
+        self_mute = bool(vs.get("self_mute", False) or st.get("self_mute", False))
+        server_mute = bool(vs.get("mute", False))
+        self_deaf = bool(vs.get("self_deaf", False) or st.get("self_deaf", False))
+        server_deaf = bool(vs.get("deaf", False) or st.get("deaf", False))
+        suppress = bool(vs.get("suppress", False) or st.get("suppress", False))
+        self_video = bool(vs.get("self_video", False) or st.get("self_video", False) or st.get("video", False))
+        self_stream = bool(vs.get("self_stream", False) or st.get("self_stream", False) or st.get("stream", False))
+        is_bot = bool(u.get("bot", False))
+
+        icons = []
+        if server_mute:
+            icons.append("server_mute")
+        elif self_mute or local_mute:
+            icons.append("mute")
+
+        if server_deaf:
+            icons.append("server_deaf")
+        elif self_deaf:
+            icons.append("deaf")
+
+        if suppress:
+            icons.append("suppress")
+        if self_stream:
+            icons.append("stream")
+        if self_video:
+            icons.append("video")
+        if is_bot:
+            icons.append("bot")
+
+        can_speak = not (server_mute or self_mute or local_mute or server_deaf or self_deaf or suppress)
+        return icons, can_speak
+
+    def _build_member_entry(self, uid: str, st: dict, u: dict, prev_entry: dict = None) -> dict:
+        nick = self._extract_display_name(st, u)
+        if nick == "Unknown" and prev_entry and prev_entry.get("name"):
+            nick = prev_entry["name"]
+        icons, can_speak = self._extract_status_info(st, u)
+        was_talking = bool(prev_entry.get("talking", False)) if prev_entry else False
+        return {
+            "clid": str(uid),
+            "name": nick,
+            "talking": was_talking and can_speak,
+            "is_self": bool(self.local_user_id and str(uid) == str(self.local_user_id)),
+            "status_icons": icons,
+            "platform": "discord",
+        }
 
     def _exchange_code_for_token(self, code: str) -> str:
         req = urllib.request.Request(
@@ -280,15 +366,25 @@ class DiscordClientThread(QThread):
         if not self.access_token:
             return False
 
-        self._send_cmd("AUTHENTICATE", args={"access_token": self.access_token})
-        op, resp = self._recv_packet(timeout=5.0)
-        if resp and resp.get("cmd") == "AUTHENTICATE" and resp.get("evt") != "ERROR":
-            return True
+        nonce = self._send_cmd("AUTHENTICATE", args={"access_token": self.access_token})
+        deadline = time.time() + 5.0
+        while self.running and time.time() < deadline:
+            op, resp = self._recv_packet(timeout=max(0.2, deadline - time.time()))
+            if not resp or not isinstance(resp, dict):
+                continue
+            if resp.get("cmd") == "AUTHENTICATE" or (nonce and resp.get("nonce") == nonce):
+                if resp.get("evt") != "ERROR":
+                    user_obj = (resp.get("data") or {}).get("user") or {}
+                    if user_obj.get("id"):
+                        self.local_user_id = str(user_obj.get("id"))
+                    return True
+                else:
+                    # Explicit authentication rejection from Discord (token expired or revoked)
+                    self.access_token = ""
+                    self.token_updated.emit("")
+                    return False
 
-        # Token expired or invalid - clear it, but do NOT prompt Discord automatically
-        self.access_token = ""
-        if self.token_save_callback:
-            self.token_save_callback("")
+        # Timed out waiting for AUTHENTICATE response (do NOT wipe saved token on transient timeout)
         return False
 
     def _subscribe_channel_events(self, channel_id):
@@ -318,6 +414,11 @@ class DiscordClientThread(QThread):
                     self._sleep_interruptible(1.0)
                     continue
 
+                # Reset per-connection channel subscription state so reconnects always re-subscribe
+                self.current_channel_id = None
+                self._channel_synced = False
+                self.channel_members.clear()
+
                 # Connect to Discord IPC
                 if not self.transport.connect():
                     self._sleep_interruptible(2.0)
@@ -328,6 +429,10 @@ class DiscordClientThread(QThread):
                 op, ready = self._recv_packet(timeout=5.0)
                 if not ready or ready.get("evt") != "READY":
                     raise ConnectionError("Discord IPC handshake failed")
+
+                ready_user = ((ready.get("data") or {}).get("user") or {}) if isinstance(ready, dict) else {}
+                if ready_user.get("id"):
+                    self.local_user_id = str(ready_user.get("id"))
 
                 # Authenticate silently using saved token
                 if not self._authenticate():
@@ -344,7 +449,7 @@ class DiscordClientThread(QThread):
                 # Event loop
                 while self.running:
                     op, msg = self._recv_packet(timeout=0.5)
-                    if not msg:
+                    if not msg or not isinstance(msg, dict):
                         continue
 
                     cmd = msg.get("cmd")
@@ -352,85 +457,107 @@ class DiscordClientThread(QThread):
                     data = msg.get("data")
 
                     if cmd == "GET_SELECTED_VOICE_CHANNEL":
-                        if data and data.get("id"):
-                            new_cid = data.get("id")
-                            if new_cid != self.current_channel_id:
-                                self._unsubscribe_channel_events(self.current_channel_id)
+                        if isinstance(data, dict) and data.get("id"):
+                            new_cid = str(data.get("id"))
+                            if new_cid != self.current_channel_id or not self._channel_synced:
+                                if self.current_channel_id and self.current_channel_id != new_cid:
+                                    self._unsubscribe_channel_events(self.current_channel_id)
                                 self.current_channel_id = new_cid
                                 self._subscribe_channel_events(new_cid)
 
+                            prev_members = dict(self.channel_members)
                             self.channel_members.clear()
                             for st in data.get("voice_states", []):
-                                u = st.get("user", {})
+                                if not isinstance(st, dict):
+                                    continue
+                                u = st.get("user") if isinstance(st.get("user"), dict) else {}
                                 uid = u.get("id")
                                 if uid:
-                                    nick = self._extract_display_name(st, u)
-                                    self.channel_members[uid] = {
-                                        "clid": uid,
-                                        "name": nick,
-                                        "talking": False
-                                    }
+                                    uid_str = str(uid)
+                                    self.channel_members[uid_str] = self._build_member_entry(
+                                        uid_str, st, u, prev_members.get(uid_str)
+                                    )
+                            self._channel_synced = True
                             self._emit_clients()
                         else:
                             if self.current_channel_id:
                                 self._unsubscribe_channel_events(self.current_channel_id)
                             self.current_channel_id = None
+                            self._channel_synced = False
                             self.channel_members.clear()
                             self._emit_clients()
 
                     elif evt == "VOICE_CHANNEL_SELECT":
-                        new_cid = data.get("channel_id") if data else None
+                        new_cid = str(data.get("channel_id")) if (isinstance(data, dict) and data.get("channel_id")) else None
                         if new_cid != self.current_channel_id:
                             if self.current_channel_id:
                                 self._unsubscribe_channel_events(self.current_channel_id)
                             self.current_channel_id = new_cid
+                            self._channel_synced = False
                             self.channel_members.clear()
                             if new_cid:
-                                self._subscribe_channel_events(new_cid)
                                 self._send_cmd("GET_SELECTED_VOICE_CHANNEL")
                             else:
                                 self._emit_clients()
 
                     elif evt == "SPEAKING_START":
-                        uid = data.get("user_id") if data else None
+                        if not self._channel_synced:
+                            continue
+                        uid = str(data.get("user_id")) if (isinstance(data, dict) and data.get("user_id")) else None
                         if uid and uid in self.channel_members:
                             self.channel_members[uid]["talking"] = True
                             self._emit_clients()
 
                     elif evt == "SPEAKING_STOP":
-                        uid = data.get("user_id") if data else None
+                        if not self._channel_synced:
+                            continue
+                        uid = str(data.get("user_id")) if (isinstance(data, dict) and data.get("user_id")) else None
                         if uid and uid in self.channel_members:
                             self.channel_members[uid]["talking"] = False
                             self._emit_clients()
 
                     elif evt == "VOICE_STATE_CREATE":
+                        if not self._channel_synced or not isinstance(data, dict):
+                            continue
                         # User joined voice channel
-                        u = data.get("user", {}) if data else {}
-                        uid = u.get("id")
+                        u = data.get("user") if isinstance(data.get("user"), dict) else {}
+                        uid = str(u.get("id")) if u.get("id") else None
                         if uid:
-                            nick = self._extract_display_name(data, u)
-                            self.channel_members[uid] = {
-                                "clid": uid,
-                                "name": nick,
-                                "talking": False
-                            }
+                            self.channel_members[uid] = self._build_member_entry(
+                                uid, data, u, self.channel_members.get(uid)
+                            )
                             self._emit_clients()
 
                     elif evt == "VOICE_STATE_DELETE":
+                        if not self._channel_synced or not isinstance(data, dict):
+                            continue
                         # User left voice channel
-                        u = data.get("user", {}) if data else {}
-                        uid = u.get("id")
-                        if uid and uid in self.channel_members:
-                            del self.channel_members[uid]
-                            self._emit_clients()
+                        u = data.get("user") if isinstance(data.get("user"), dict) else {}
+                        uid = str(u.get("id")) if u.get("id") else None
+                        if uid:
+                            # If the local user themselves left the active voice channel, reset channel state immediately
+                            # so we never announce our own departure or leave stale channel members on screen.
+                            if self.local_user_id and uid == str(self.local_user_id):
+                                if self.current_channel_id:
+                                    self._unsubscribe_channel_events(self.current_channel_id)
+                                self.current_channel_id = None
+                                self._channel_synced = False
+                                self.channel_members.clear()
+                                self._emit_clients()
+                            elif uid in self.channel_members:
+                                del self.channel_members[uid]
+                                self._emit_clients()
 
                     elif evt == "VOICE_STATE_UPDATE":
-                        # User nickname or mute state changed
-                        u = data.get("user", {}) if data else {}
-                        uid = u.get("id")
-                        if uid and uid in self.channel_members:
-                            nick = self._extract_display_name(data, u)
-                            self.channel_members[uid]["name"] = nick
+                        if not self._channel_synced or not isinstance(data, dict):
+                            continue
+                        # User nickname or mute/deafen/status state changed
+                        u = data.get("user") if isinstance(data.get("user"), dict) else {}
+                        uid = str(u.get("id")) if u.get("id") else None
+                        if uid:
+                            self.channel_members[uid] = self._build_member_entry(
+                                uid, data, u, self.channel_members.get(uid)
+                            )
                             self._emit_clients()
 
             except Exception as e:

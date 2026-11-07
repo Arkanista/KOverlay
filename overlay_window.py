@@ -1,10 +1,154 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPoint
-from PyQt6.QtGui import QColor, QPixmap, QPainter, QPen, QFont, QFontMetrics
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPoint, QRectF, QPointF
+from PyQt6.QtGui import QColor, QPixmap, QPainter, QPen, QFont, QFontMetrics, QPolygonF
 import time
 import sys
 import os
 import re
+
+_STATUS_ICON_CACHE = {}
+
+def render_discord_status_icon(icon_type: str, size_px: int, color_str: str) -> QPixmap:
+    size_px = max(10, int(size_px))
+    c = QColor(color_str)
+    if not c.isValid():
+        c = QColor("#96ffffff")
+
+    cache_key = (icon_type, size_px, c.rgba())
+    cached = _STATUS_ICON_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    if len(_STATUS_ICON_CACHE) > 2048:
+        _STATUS_ICON_CACHE.clear()
+
+    dpr = 2.0
+    px_dim = int(round(size_px * dpr))
+    pixmap = QPixmap(px_dim, px_dim)
+    pixmap.setDevicePixelRatio(dpr)
+    pixmap.fill(Qt.GlobalColor.transparent)
+
+    p = QPainter(pixmap)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    p.scale(size_px / 24.0, size_px / 24.0)
+
+    def draw_slash():
+        p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
+        p.setPen(QPen(Qt.GlobalColor.transparent, 4.4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        p.drawLine(QPointF(3.5, 3.5), QPointF(20.5, 20.5))
+        p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
+        p.setPen(QPen(c, 2.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        p.drawLine(QPointF(3.5, 3.5), QPointF(20.5, 20.5))
+
+    def draw_lock_badge():
+        p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(Qt.GlobalColor.transparent)
+        p.drawRoundedRect(QRectF(13.6, 12.8, 10.0, 10.8), 2.0, 2.0)
+        p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(c)
+        p.drawRoundedRect(QRectF(15.0, 16.8, 7.2, 5.4), 1.3, 1.3)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(c, 1.8, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        p.drawArc(QRectF(16.5, 14.0, 4.2, 5.2), 0, 180 * 16)
+
+    if icon_type in ("mute", "server_mute"):
+        # Flat microphone capsule
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(c)
+        p.drawRoundedRect(QRectF(9.0, 2.5, 6.0, 10.5), 3.0, 3.0)
+        # U-cradle and stand
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(c, 2.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        p.drawArc(QRectF(5.5, 6.5, 13.0, 11.0), 180 * 16, 180 * 16)
+        p.drawLine(QPointF(12.0, 17.5), QPointF(12.0, 21.0))
+        p.drawLine(QPointF(8.5, 21.0), QPointF(15.5, 21.0))
+        draw_slash()
+        if icon_type == "server_mute":
+            draw_lock_badge()
+
+    elif icon_type in ("deaf", "server_deaf"):
+        # Headband arc
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(c, 2.3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        p.drawArc(QRectF(3.8, 3.5, 16.4, 15.0), 0, 180 * 16)
+        # Left & right earcups
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(c)
+        p.drawRoundedRect(QRectF(2.8, 11.2, 4.4, 7.8), 2.0, 2.0)
+        p.drawRoundedRect(QRectF(16.8, 11.2, 4.4, 7.8), 2.0, 2.0)
+        draw_slash()
+        if icon_type == "server_deaf":
+            draw_lock_badge()
+
+    elif icon_type == "suppress":
+        # Flat megaphone / speaker with suppression badge
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(c)
+        horn = QPolygonF([
+            QPointF(2.8, 9.5),
+            QPointF(7.2, 9.5),
+            QPointF(13.2, 5.0),
+            QPointF(13.2, 19.0),
+            QPointF(7.2, 14.5),
+            QPointF(2.8, 14.5),
+        ])
+        p.drawPolygon(horn)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(c, 2.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        p.drawEllipse(QRectF(15.0, 8.5, 6.8, 6.8))
+        p.drawLine(QPointF(16.8, 11.9), QPointF(20.0, 11.9))
+
+    elif icon_type == "stream":
+        # Flat monitor with play symbol (Go Live / Screen Share)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(c, 2.1, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        p.drawRoundedRect(QRectF(2.5, 4.0, 19.0, 13.0), 2.2, 2.2)
+        p.drawLine(QPointF(12.0, 17.0), QPointF(12.0, 20.5))
+        p.drawLine(QPointF(8.0, 20.5), QPointF(16.0, 20.5))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(c)
+        play_tri = QPolygonF([
+            QPointF(10.0, 7.6),
+            QPointF(10.0, 13.4),
+            QPointF(15.2, 10.5),
+        ])
+        p.drawPolygon(play_tri)
+
+    elif icon_type == "video":
+        # Flat video camera
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(c)
+        p.drawRoundedRect(QRectF(2.5, 6.2, 12.5, 11.6), 2.4, 2.4)
+        lens = QPolygonF([
+            QPointF(15.6, 9.8),
+            QPointF(21.5, 6.8),
+            QPointF(21.5, 17.2),
+            QPointF(15.6, 14.2),
+        ])
+        p.drawPolygon(lens)
+
+    elif icon_type == "bot":
+        # Flat robot head icon
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(c)
+        p.drawRoundedRect(QRectF(4.0, 7.5, 16.0, 12.0), 3.0, 3.0)
+        p.drawRoundedRect(QRectF(2.0, 11.5, 2.0, 4.0), 1.0, 1.0)
+        p.drawRoundedRect(QRectF(20.0, 11.5, 2.0, 4.0), 1.0, 1.0)
+        p.drawEllipse(QRectF(10.4, 2.0, 3.2, 3.2))
+        p.setPen(QPen(c, 2.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        p.drawLine(QPointF(12.0, 4.5), QPointF(12.0, 7.5))
+        p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(Qt.GlobalColor.transparent)
+        p.drawEllipse(QRectF(7.4, 10.8, 2.8, 2.8))
+        p.drawEllipse(QRectF(13.8, 10.8, 2.8, 2.8))
+        p.drawRoundedRect(QRectF(8.5, 15.6, 7.0, 1.6), 0.8, 0.8)
+
+    p.end()
+    _STATUS_ICON_CACHE[cache_key] = pixmap
+    return pixmap
 
 def interpolate_color(col_from_str, col_to_str, progress):
     progress = max(0.0, min(1.0, progress))
@@ -40,14 +184,72 @@ class UserRowWidget(QWidget):
         self.name_label = QLabel(self)
         self.name_label.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.name_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+
+        self.icons_container = QWidget(self)
+        self.icons_container.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.icons_container.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.icons_layout = QHBoxLayout(self.icons_container)
+        self.icons_layout.setContentsMargins(0, 0, 0, 0)
+        self.icons_layout.setSpacing(3)
+        self.icons_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        self.icons_container.setVisible(False)
+        self._icon_labels = []
+        self._status_icons = []
+        self._icon_position = "right"
+        self._icon_px = 14
+        self._current_color = "#96ffffff"
         
         self.row_layout.addWidget(self.arrow_label)
         self.row_layout.addWidget(self.name_label)
+        self.row_layout.addWidget(self.icons_container)
         self.row_layout.addStretch()
         
         self._current_stylesheet = ""
 
-    def set_content(self, clean_name: str, arrow_text: str = ""):
+    def _apply_icon_position(self, position: str):
+        pos = "left" if position == "left" else "right"
+        if pos == self._icon_position:
+            return
+        self._icon_position = pos
+        while self.row_layout.count():
+            self.row_layout.takeAt(0)
+        self.row_layout.addWidget(self.arrow_label)
+        if pos == "left":
+            self.row_layout.addWidget(self.icons_container)
+            self.row_layout.addWidget(self.name_label)
+        else:
+            self.row_layout.addWidget(self.name_label)
+            self.row_layout.addWidget(self.icons_container)
+        self.row_layout.addStretch()
+
+    def _refresh_status_icons(self):
+        if not self._status_icons:
+            self.icons_container.setVisible(False)
+            return
+
+        needed = len(self._status_icons)
+        while len(self._icon_labels) < needed:
+            lbl = QLabel(self.icons_container)
+            lbl.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.icons_layout.addWidget(lbl)
+            self._icon_labels.append(lbl)
+
+        for i, lbl in enumerate(self._icon_labels):
+            if i < needed:
+                icon_key = self._status_icons[i]
+                pm = render_discord_status_icon(icon_key, self._icon_px, self._current_color)
+                lbl.setPixmap(pm)
+                lbl.setFixedSize(self._icon_px, self._icon_px)
+                lbl.setVisible(True)
+            else:
+                lbl.setVisible(False)
+
+        total_w = needed * self._icon_px + max(0, needed - 1) * 3
+        self.icons_container.setFixedSize(total_w, self._icon_px)
+        self.icons_container.setVisible(True)
+
+    def set_content(self, clean_name: str, arrow_text: str = "", status_icons: list = None, icon_position: str = "right"):
         self.name_label.setText(clean_name)
         if arrow_text:
             self.arrow_label.setText(arrow_text)
@@ -55,19 +257,29 @@ class UserRowWidget(QWidget):
         else:
             self.arrow_label.setText("")
             self.arrow_label.setVisible(False)
+
+        self._apply_icon_position(icon_position)
+        new_icons = list(status_icons) if status_icons else []
+        if new_icons != self._status_icons or (new_icons and self.icons_container.isHidden()):
+            self._status_icons = new_icons
+            self._refresh_status_icons()
+        elif not new_icons and not self.icons_container.isHidden():
+            self._status_icons = []
+            self.icons_container.setVisible(False)
+
         self.row_layout.invalidate()
         self.updateGeometry()
             
     def setText(self, display_text: str):
         if display_text.startswith("🡅 "):
-            self.set_content(display_text[2:], "🡅")
+            self.set_content(display_text[2:], "🡅", self._status_icons, self._icon_position)
         elif display_text.startswith("🡇 "):
-            self.set_content(display_text[2:], "🡇")
+            self.set_content(display_text[2:], "🡇", self._status_icons, self._icon_position)
         else:
-            self.set_content(display_text, "")
+            self.set_content(display_text, "", self._status_icons, self._icon_position)
 
     def text(self) -> str:
-        if self.arrow_label.isVisible() and self.arrow_label.text():
+        if not self.arrow_label.isHidden() and self.arrow_label.text():
             return f"{self.arrow_label.text()} {self.name_label.text()}"
         return self.name_label.text()
 
@@ -75,6 +287,12 @@ class UserRowWidget(QWidget):
         super().setFont(font)
         self.name_label.setFont(font)
         self.arrow_label.setFont(font)
+        fm = QFontMetrics(font)
+        new_px = max(12, int(round(fm.height() * 0.82)))
+        if new_px != self._icon_px:
+            self._icon_px = new_px
+            if self._status_icons:
+                self._refresh_status_icons()
         self.row_layout.invalidate()
         self.updateGeometry()
 
@@ -85,6 +303,13 @@ class UserRowWidget(QWidget):
         self._current_stylesheet = style
         self.name_label.setStyleSheet(style)
         self.arrow_label.setStyleSheet(style)
+        m = re.search(r"color\s*:\s*([^;]+)", style)
+        if m:
+            col_val = m.group(1).strip()
+            if col_val and col_val != self._current_color:
+                self._current_color = col_val
+                if self._status_icons:
+                    self._refresh_status_icons()
 
     def styleSheet(self) -> str:
         return self._current_stylesheet
@@ -106,6 +331,7 @@ class OverlayWindow(QWidget):
         self.talking_now = {}
         self.whisper_now = {}
         self.last_talk_was_whisper = {}
+        self.user_status_icons = {}
         self.last_clients = []
         self.is_initial_snapshot = True
         
@@ -711,6 +937,7 @@ class OverlayWindow(QWidget):
         self.talking_now.clear()
         self.whisper_now.clear()
         self.last_talk_was_whisper.clear()
+        self.user_status_icons.clear()
         self.last_clients = []
         self.current_cid = None
         self.is_initial_snapshot = True
@@ -759,10 +986,15 @@ class OverlayWindow(QWidget):
                 self.talking_now.pop(k, None)
                 self.whisper_now.pop(k, None)
                 self.last_talk_was_whisper.pop(k, None)
+                self.user_status_icons.pop(k, None)
         
         history_enabled = self.config.get("history_enabled", False)
         history_duration = self.config.get("history_duration", 60)
         fade_duration = float(self.config.get("speaker_fade_duration", 5))
+        show_discord_icons = bool(self.config.get("discord_show_status_icons", True))
+        discord_icon_pos = self.config.get("discord_status_icons_position", "right")
+        if discord_icon_pos not in ("left", "right"):
+            discord_icon_pos = "right"
         
         changed_channel = False
         prev_cid = getattr(self, 'current_cid', None)
@@ -772,6 +1004,7 @@ class OverlayWindow(QWidget):
             self.talking_now.clear()
             self.whisper_now.clear()
             self.last_talk_was_whisper.clear()
+            self.user_status_icons.clear()
             changed_channel = True
         if my_cid is not None:
             self.current_cid = my_cid
@@ -781,8 +1014,9 @@ class OverlayWindow(QWidget):
         external_clients = [c for c in clients if c.get("external", False)]
         active_channel_names = {c["name"] for c in channel_clients}
         active_names = {c["name"] for c in clients}
+        self_names = {c["name"] for c in clients if c.get("is_self", False)}
 
-        # Track talking & whisper states and timestamps
+        # Track talking & whisper states, status icons, and timestamps
         for name in list(self.talking_now.keys()):
             if name not in active_names:
                 self.talking_now[name] = False
@@ -795,6 +1029,10 @@ class OverlayWindow(QWidget):
             is_whisper = is_talking and (bool(c.get("whisper", False)) or is_external)
             self.talking_now[c_name] = is_talking
             self.whisper_now[c_name] = is_whisper
+            if show_discord_icons and c.get("status_icons"):
+                self.user_status_icons[c_name] = list(c.get("status_icons", []))
+            else:
+                self.user_status_icons[c_name] = []
             if is_talking:
                 self.last_talk_time[c_name] = current_time
                 self.last_talk_was_whisper[c_name] = is_whisper
@@ -814,12 +1052,18 @@ class OverlayWindow(QWidget):
             # Mark new users
             for c in channel_clients:
                 name = c["name"]
+                is_self_user = bool(c.get("is_self", False)) or (name in self_names)
                 if name not in self.user_history or self.user_history[name].get("external", False):
-                    # User wasn't in our channel before, they joined now (join_time = 0 on initial snapshot/channel switch so no '+')
-                    join_time = 0 if is_initial else current_time
-                    self.user_history[name] = {"join_time": join_time, "leave_time": None, "external": False}
+                    # User wasn't in our channel before, they joined now (join_time = 0 on initial snapshot/channel switch or self so no '🡅')
+                    join_time = 0 if (is_initial or is_self_user) else current_time
+                    self.user_history[name] = {
+                        "join_time": join_time,
+                        "leave_time": None,
+                        "external": False,
+                        "is_self": is_self_user,
+                    }
                     
-                    if not is_initial and self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
+                    if not is_initial and not is_self_user and self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
                         if self.config.get("tts_join_enabled", True):
                             template = self.config.get("tts_join_text", "%NICK joined")
                             from tts_manager import get_tts_manager, apply_tts_aliases
@@ -833,13 +1077,21 @@ class OverlayWindow(QWidget):
                             from tts_manager import get_tts_manager
                             get_tts_manager().enqueue(text, voice=voice, volume=vol, delay=delay, rate=rate)
                 else:
+                    if is_self_user:
+                        self.user_history[name]["is_self"] = True
+                        self.user_history[name]["join_time"] = 0
                     # User is known, if they previously left, they are back
                     if self.user_history[name]["leave_time"] is not None:
                         # Re-joined! We update join_time and clear leave_time
-                        join_time = 0 if is_initial else current_time
-                        self.user_history[name] = {"join_time": join_time, "leave_time": None, "external": False}
+                        join_time = 0 if (is_initial or is_self_user) else current_time
+                        self.user_history[name] = {
+                            "join_time": join_time,
+                            "leave_time": None,
+                            "external": False,
+                            "is_self": is_self_user,
+                        }
                         
-                        if not is_initial and self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
+                        if not is_initial and not is_self_user and self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
                             if self.config.get("tts_join_enabled", True):
                                 template = self.config.get("tts_join_text", "%NICK joined")
                                 from tts_manager import get_tts_manager, apply_tts_aliases
@@ -859,6 +1111,15 @@ class OverlayWindow(QWidget):
                     if data.get("external", False):
                         continue
                     if name not in active_channel_names:
+                        if data.get("is_self", False) or (name in self_names):
+                            # Never show leave history or announce leave TTS for the local user
+                            del self.user_history[name]
+                            self.last_talk_time.pop(name, None)
+                            self.talking_now.pop(name, None)
+                            self.whisper_now.pop(name, None)
+                            self.last_talk_was_whisper.pop(name, None)
+                            self.user_status_icons.pop(name, None)
+                            continue
                         if data["leave_time"] is None:
                             # User just left
                             data["leave_time"] = current_time
@@ -883,11 +1144,17 @@ class OverlayWindow(QWidget):
                             self.talking_now.pop(name, None)
                             self.whisper_now.pop(name, None)
                             self.last_talk_was_whisper.pop(name, None)
+                            self.user_status_icons.pop(name, None)
         else:
             # History disabled, match active channel clients + preserve fading external whisperers
             self.user_history = {}
             for c in channel_clients:
-                self.user_history[c["name"]] = {"join_time": 0, "leave_time": None, "external": False}
+                self.user_history[c["name"]] = {
+                    "join_time": 0,
+                    "leave_time": None,
+                    "external": False,
+                    "is_self": bool(c.get("is_self", False)),
+                }
             for name, data in prev_external.items():
                 if name not in active_channel_names:
                     self.user_history[name] = data
@@ -898,7 +1165,7 @@ class OverlayWindow(QWidget):
             if name in active_channel_names:
                 continue
             if c.get("talking", False):
-                self.user_history[name] = {"join_time": 0, "leave_time": None, "external": True}
+                self.user_history[name] = {"join_time": 0, "leave_time": None, "external": True, "is_self": False}
 
         # Prune external whisperers who stopped whispering and finished speaker_fade_duration
         for name, data in list(self.user_history.items()):
@@ -914,6 +1181,7 @@ class OverlayWindow(QWidget):
                 self.talking_now.pop(name, None)
                 self.whisper_now.pop(name, None)
                 self.last_talk_was_whisper.pop(name, None)
+                self.user_status_icons.pop(name, None)
 
         font_family = self.config.get("font_family", "Sans Serif")
         font_size = self.config.get("font_size", 11)
@@ -1012,7 +1280,8 @@ class OverlayWindow(QWidget):
             data = self.user_history[name]
             is_left = data["leave_time"] is not None
             is_external_user = data.get("external", False)
-            is_new = history_enabled and not is_left and not is_external_user and (current_time - data["join_time"] < history_duration)
+            is_self_user = data.get("is_self", False)
+            is_new = history_enabled and not is_left and not is_external_user and not is_self_user and (current_time - data["join_time"] < history_duration)
             
             # Format text
             from config import clean_nickname
@@ -1038,8 +1307,9 @@ class OverlayWindow(QWidget):
                 lbl = self.labels[name]
                 lbl.setFont(overlay_font)
                 lbl.setFixedHeight(row_height)
-                
-            lbl.set_content(clean_name, arrow_text)
+
+            row_icons = self.user_status_icons.get(name, []) if (show_discord_icons and not is_left) else []
+            lbl.set_content(clean_name, arrow_text, row_icons, discord_icon_pos)
             lbl.setVisible(True)
                 
             # Remove from layout and re-add to enforce order
