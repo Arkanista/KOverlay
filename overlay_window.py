@@ -6,6 +6,7 @@ import sys
 import os
 import re
 
+_UNSET = object()
 _STATUS_ICON_CACHE = {}
 
 def render_discord_status_icon(icon_type: str, size_px: int, color_str: str) -> QPixmap:
@@ -518,6 +519,12 @@ class OverlayWindow(QWidget):
         Schedules multiple staggered position restorations after system sleep/resume or monitor wake
         to handle asynchronous DisplayPort/HDMI re-initialization in Plasma 6.8 and Windows.
         """
+        if getattr(self, "is_primary", False):
+            try:
+                from tts_manager import get_tts_manager
+                get_tts_manager().clear_queue()
+            except Exception:
+                pass
         for delay_ms in (500, 1500, 3000, 5000):
             QTimer.singleShot(delay_ms, lambda: self.apply_configured_position(force=True))
 
@@ -952,12 +959,22 @@ class OverlayWindow(QWidget):
         if hasattr(self, 'fade_timer') and self.fade_timer.isActive():
             self.fade_timer.stop()
 
+        if getattr(self, "is_primary", False):
+            try:
+                from tts_manager import get_tts_manager
+                get_tts_manager().clear_queue()
+            except Exception:
+                pass
+
         self._update_overlay_geometry()
 
-    def update_clients(self, clients=None, my_cid=None):
-        if clients is None:
+    def update_clients(self, clients=_UNSET, my_cid=_UNSET):
+        if clients is _UNSET:
             clients = getattr(self, 'last_clients', [])
-        if my_cid is None:
+        elif clients is None:
+            clients = []
+
+        if my_cid is _UNSET:
             my_cid = getattr(self, 'current_cid', None)
 
         # Filter out unknown/placeholder/User_XX names so they are never displayed or announced
@@ -969,8 +986,8 @@ class OverlayWindow(QWidget):
             clean_clients.append(c)
         clients = clean_clients
 
-        # If disconnected from voice / not in any channel
-        if not clients and my_cid is None:
+        # If disconnected from voice / not in any channel / empty channel
+        if not clients or my_cid is None or my_cid == "":
             self.reset_voice_state()
             return
 

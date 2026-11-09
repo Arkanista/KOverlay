@@ -20,10 +20,12 @@
 
 
 > [!TIP]
-> **What's New in v1.2.1 (Discord Status Icons, Self-Join TTS Fix & IPC Improvements):**
-> - 🎨 **Discord Voice Status Icons**: Added crisp, flat monochrome status icons rendered dynamically in the exact font color (including smooth fade-out). Displays mute, deafen, server mute, server deafen, voice suppression, screen sharing / stream, camera video, and bot badges. Configurable in Settings to display on the **Right** (default) or **Left** of nicknames, or toggle off completely.
-> - 🔇 **Discord Self-Join TTS Fix**: Joining a Discord voice channel no longer triggers a TTS voice announcement or join arrow for the local user.
-> - ⚡ **Discord IPC Protocol Resilience**: Added handling for Discord IPC opcode 2 (CLOSE) and opcode 3 (PING/PONG heartbeat response), thread-safe token persistence across background threads, channel switch synchronization guards, and preserved access tokens during transient connection timeouts.
+> **What's New in v1.2.2 (System Suspend / Disconnect TTS Flood Fix):**
+> - 🔇 **Suspend & Disconnect TTS Flood Fix**: Fixed an issue where suspending the system (Linux/Windows) or manually disconnecting from a Discord voice channel caused TTS to sequentially read out leave announcements for every user in the channel. An internal sentinel now cleanly differentiates timer re-renders from explicit channel disconnections.
+> - 🧹 **Clean Voice State Reset & Queue Flushing**: Disconnecting from voice immediately and cleanly resets overlay labels, removes active user history, and purges any pending announcements from the TTS queue, preventing ghost speech on sleep or resume.
+> - 🔌 **Discord & TeamSpeak Connection Error Resilience**: Unexpected socket drops or process terminations immediately notify the overlay to reset cleanly rather than leaving stale channel states.
+> - 🎨 **Discord Voice Status Icons (from v1.2.1)**: Crisp monochrome status badges (mute, deafen, suppress, video, stream, bot) with configurable Left/Right positioning.
+> - 🔇 **Discord Local Self-Join TTS Fix (from v1.2.1)**: Local user channel joins are completely silent.
 > - 📣 **Cross-Channel & In-Channel Whisper / Shout Support (from v1.2.0)**: Dedicated whisper text highlighting and fade-out for TeamSpeak 3 and Mumble.
 > - ↔️ **Right-Anchored Dynamic Width (`Anchor right edge (shift left)`) (from v1.1.9)**: Keep right edge anchored while dynamically expanding/shrinking.
 > - 📐 **Instant Overlay Height Shrink Fix (from v1.1.9)**: Overlay immediately shrinks when users leave.
@@ -90,10 +92,10 @@ Building from source automatically handles dependency resolution:
 
 #### Method B: Install the Pre-compiled Pacman Package
 1. Download the pre-compiled package from GitHub releases:
-    👉 **[Download KOverlay v1.2.1 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.1/koverlay-1.2.1-1-x86_64.pkg.tar.zst)**
+    👉 **[Download KOverlay v1.2.2 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.2/koverlay-1.2.2-1-x86_64.pkg.tar.zst)**
 2. Install the downloaded package directly with `pacman`:
    ```bash
-   sudo pacman -U koverlay-1.2.1-1-x86_64.pkg.tar.zst
+   sudo pacman -U koverlay-1.2.2-1-x86_64.pkg.tar.zst
    ```
 
 ### Microsoft Windows (10 / 11)
@@ -105,7 +107,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 1: Setup Wizard (Recommended)
 1. Download the latest installer:
-   👉 **[Download KOverlay_Setup.exe (v1.2.1)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.1/KOverlay_Setup.exe)**
+   👉 **[Download KOverlay_Setup.exe (v1.2.2)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.2/KOverlay_Setup.exe)**
 2. Run `KOverlay_Setup.exe`:
    - Administrator rights are **not** required. The program installs directly into your user profile: `%LOCALAPPDATA%\Programs\KOverlay`.
    - **Mumble Check:** If Mumble is running, the installer will inform you and prompt you to close Mumble so it can safely install the Mumble plugin.
@@ -114,7 +116,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 2: Portable Archive (.zip)
 1. Download the portable package:
-   👉 **[Download KOverlay_Portable.zip (v1.2.1)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.1/KOverlay_Portable.zip)**
+   👉 **[Download KOverlay_Portable.zip (v1.2.2)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.2/KOverlay_Portable.zip)**
 2. Extract the `.zip` archive to any directory you prefer (e.g. `C:\Games\KOverlay` or your Desktop).
 3. **How to Launch KOverlay:**
    - Inside the extracted folder, double-click **`KOverlay.bat`**.
@@ -251,9 +253,9 @@ KOverlay connects to Mumble via a high-performance native plugin and a local IPC
 
 > [!TIP]
 > You can also download the standalone plugin or unified bundle directly from GitHub releases:
-> - **[koverlay_mumble.mumble_plugin (Universal Bundle)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.1/koverlay_mumble.mumble_plugin)** (Double-click or import via Mumble's "Install plugin" button)
-> - **[koverlay_mumble.dll (Windows x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.1/koverlay_mumble.dll)**
-> - **[koverlay_mumble.so (Linux x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.1/koverlay_mumble.so)**
+> - **[koverlay_mumble.mumble_plugin (Universal Bundle)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.2/koverlay_mumble.mumble_plugin)** (Double-click or import via Mumble's "Install plugin" button)
+> - **[koverlay_mumble.dll (Windows x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.2/koverlay_mumble.dll)**
+> - **[koverlay_mumble.so (Linux x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.2/koverlay_mumble.so)**
 
 ### Option C: Connecting to Discord (Local IPC / StreamKit)
 KOverlay connects directly to your running Discord desktop application using Discord's native local IPC RPC protocol:

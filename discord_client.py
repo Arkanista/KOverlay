@@ -565,6 +565,11 @@ class DiscordClientThread(QThread):
                     break
                 self.error_occurred.emit(f"Discord connection error: {e}")
                 self.transport.close()
+                if self.current_channel_id is not None or self.channel_members:
+                    self.current_channel_id = None
+                    self._channel_synced = False
+                    self.channel_members.clear()
+                    self._emit_clients()
                 self._sleep_interruptible(2.0)
 
     def stop(self):
