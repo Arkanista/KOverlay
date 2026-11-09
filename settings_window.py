@@ -635,6 +635,40 @@ class SettingsWindow(QWidget):
         var_info_label.setFont(var_font)
         var_info_label.setStyleSheet("color: gray;")
         tts_layout.addWidget(var_info_label)
+
+        # Nickname formatting & Pronunciation layout
+        tts_pronunciation_layout = QHBoxLayout()
+        
+        self.tts_lowercase_checkbox = QCheckBox("Convert to lowercase (better pronunciation of ALL-CAPS)")
+        self.tts_lowercase_checkbox.setChecked(self.config.get("tts_lowercase", True))
+        self.tts_lowercase_checkbox.setToolTip("Converts uppercase letters to lowercase so TTS reads words smoothly instead of spelling letters out.")
+        self.tts_lowercase_checkbox.toggled.connect(self._on_change)
+        tts_pronunciation_layout.addWidget(self.tts_lowercase_checkbox)
+        
+        tts_pronunciation_layout.addSpacing(15)
+        
+        self.tts_replace_digits_checkbox = QCheckBox("Replace digits with letters (1337)")
+        self.tts_replace_digits_checkbox.setChecked(self.config.get("tts_replace_digits", True))
+        self.tts_replace_digits_checkbox.setToolTip("Replaces numbers with corresponding letters (e.g. 1->i, 3->e, 4->a) before reading.")
+        self.tts_replace_digits_checkbox.toggled.connect(self._on_change)
+        tts_pronunciation_layout.addWidget(self.tts_replace_digits_checkbox)
+        
+        self.tts_digits_btn = QPushButton("Digit Substitutions...")
+        self.tts_digits_btn.setToolTip("Configure number-to-letter replacements (0-9)")
+        self.tts_digits_btn.clicked.connect(self._open_digits_window)
+        self.tts_digits_btn.setEnabled(self.tts_replace_digits_checkbox.isChecked())
+        self.tts_replace_digits_checkbox.toggled.connect(self.tts_digits_btn.setEnabled)
+        tts_pronunciation_layout.addWidget(self.tts_digits_btn)
+        
+        tts_pronunciation_layout.addSpacing(10)
+        
+        self.tts_alias_btn = QPushButton("TTS Aliases...")
+        self.tts_alias_btn.setToolTip("Configure custom word/name pronunciation aliases")
+        self.tts_alias_btn.clicked.connect(self._open_alias_window)
+        tts_pronunciation_layout.addWidget(self.tts_alias_btn)
+        
+        tts_pronunciation_layout.addStretch()
+        tts_layout.addLayout(tts_pronunciation_layout)
         
         # Enable/disable sub-options based on master checkbox
         def update_tts_children(enabled):
@@ -642,6 +676,13 @@ class SettingsWindow(QWidget):
             self.tts_join_text.setEnabled(enabled and self.tts_join_checkbox.isChecked())
             self.tts_leave_checkbox.setEnabled(enabled)
             self.tts_leave_text.setEnabled(enabled and self.tts_leave_checkbox.isChecked())
+            if hasattr(self, 'tts_lowercase_checkbox'):
+                self.tts_lowercase_checkbox.setEnabled(enabled)
+            if hasattr(self, 'tts_replace_digits_checkbox'):
+                self.tts_replace_digits_checkbox.setEnabled(enabled)
+                self.tts_digits_btn.setEnabled(enabled and self.tts_replace_digits_checkbox.isChecked())
+            if hasattr(self, 'tts_alias_btn'):
+                self.tts_alias_btn.setEnabled(enabled)
             
         self.tts_checkbox.toggled.connect(update_tts_children)
         self.tts_join_checkbox.toggled.connect(lambda e: self.tts_join_text.setEnabled(e and self.tts_checkbox.isChecked()))
@@ -751,10 +792,6 @@ class SettingsWindow(QWidget):
         self.tts_checkbox.toggled.connect(self.tts_test_btn.setEnabled)
         tts_voice_layout.addWidget(self.tts_test_btn)
         tts_voice_layout.addStretch()
-        
-        self.tts_alias_btn = QPushButton("TTS Aliases")
-        self.tts_alias_btn.clicked.connect(self._open_alias_window)
-        tts_voice_layout.addWidget(self.tts_alias_btn)
         
         tts_layout.addLayout(tts_voice_layout)
         
@@ -1562,10 +1599,21 @@ class SettingsWindow(QWidget):
             self.config["discord_show_status_icons"] = self.discord_icons_checkbox.isChecked()
         if hasattr(self, 'discord_icons_pos_combo'):
             self.config["discord_status_icons_position"] = self.discord_icons_pos_combo.currentData()
+        if hasattr(self, 'tts_lowercase_checkbox'):
+            self.config["tts_lowercase"] = self.tts_lowercase_checkbox.isChecked()
+        if hasattr(self, 'tts_replace_digits_checkbox'):
+            self.config["tts_replace_digits"] = self.tts_replace_digits_checkbox.isChecked()
 
         # Emit signal to inform main app to apply changes
         self.config_changed.emit()
         
+    def _open_digits_window(self):
+        from digits_window import DigitsWindow
+        dlg = DigitsWindow(self.config.get("tts_digit_replacements"), self)
+        if dlg.exec() == DigitsWindow.Accepted:
+            self.config["tts_digit_replacements"] = dlg.get_replacements()
+            self._on_change()
+
     def _open_alias_window(self):
         from alias_window import AliasWindow
         dlg = AliasWindow(self.config.get("tts_aliases", {}), self)
@@ -1591,9 +1639,8 @@ class SettingsWindow(QWidget):
         l_t = leave_txt.text() if leave_txt else "%NICK left"
         
         test_name = self.tts_test_nick.text() or "Arkanis"
-        from tts_manager import apply_tts_aliases
-        aliases = self.config.get("tts_aliases", {})
-        spoken_name = apply_tts_aliases(test_name, aliases)
+        from tts_manager import prepare_tts_nickname
+        spoken_name = prepare_tts_nickname(test_name, self.config)
         
         custom_text = f"{j_t.replace('%NICK', spoken_name)}. {l_t.replace('%NICK', spoken_name)}."
         

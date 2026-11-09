@@ -1083,9 +1083,8 @@ class OverlayWindow(QWidget):
                     if not is_initial and not is_self_user and self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
                         if self.config.get("tts_join_enabled", True):
                             template = self.config.get("tts_join_text", "%NICK joined")
-                            from tts_manager import get_tts_manager, apply_tts_aliases
-                            from config import clean_nickname
-                            spoken_name = apply_tts_aliases(clean_nickname(name, self.config), self.config.get("tts_aliases", {}))
+                            from tts_manager import get_tts_manager, prepare_tts_nickname
+                            spoken_name = prepare_tts_nickname(name, self.config)
                             text = template.replace("%NICK", spoken_name)
                             delay = self.config.get("tts_delay_ms", 0) / 1000.0
                             voice = self.config.get("tts_voice", "en-US-AriaNeural")
@@ -1111,9 +1110,8 @@ class OverlayWindow(QWidget):
                         if not is_initial and not is_self_user and self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
                             if self.config.get("tts_join_enabled", True):
                                 template = self.config.get("tts_join_text", "%NICK joined")
-                                from tts_manager import get_tts_manager, apply_tts_aliases
-                                from config import clean_nickname
-                                spoken_name = apply_tts_aliases(clean_nickname(name, self.config), self.config.get("tts_aliases", {}))
+                                from tts_manager import get_tts_manager, prepare_tts_nickname
+                                spoken_name = prepare_tts_nickname(name, self.config)
                                 text = template.replace("%NICK", spoken_name)
                                 delay = self.config.get("tts_delay_ms", 0) / 1000.0
                                 voice = self.config.get("tts_voice", "en-US-AriaNeural")
@@ -1144,9 +1142,8 @@ class OverlayWindow(QWidget):
                             if self.config.get("tts_enabled", False) and not self.config.get("tts_muted", False) and getattr(self, "is_primary", False):
                                 if self.config.get("tts_leave_enabled", False):
                                     template = self.config.get("tts_leave_text", "%NICK left")
-                                    from tts_manager import get_tts_manager, apply_tts_aliases
-                                    from config import clean_nickname
-                                    spoken_name = apply_tts_aliases(clean_nickname(name, self.config), self.config.get("tts_aliases", {}))
+                                    from tts_manager import get_tts_manager, prepare_tts_nickname
+                                    spoken_name = prepare_tts_nickname(name, self.config)
                                     text = template.replace("%NICK", spoken_name)
                                     delay = self.config.get("tts_delay_ms", 0) / 1000.0
                                     voice = self.config.get("tts_voice", "en-US-AriaNeural")

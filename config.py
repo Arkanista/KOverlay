@@ -65,7 +65,21 @@ def load_config():
         "fixed_width": 200,
         "text_color_whisper": "#ff9900",
         "discord_show_status_icons": True,
-        "discord_status_icons_position": "right"
+        "discord_status_icons_position": "right",
+        "tts_lowercase": True,
+        "tts_replace_digits": True,
+        "tts_digit_replacements": {
+            "0": "o",
+            "1": "i",
+            "2": "z",
+            "3": "e",
+            "4": "a",
+            "5": "s",
+            "6": "b",
+            "7": "t",
+            "8": "b",
+            "9": "g"
+        }
     }
     if not os.path.exists(CONFIG_FILE):
         return default_config
@@ -116,6 +130,23 @@ def load_config():
                 cfg["discord_show_status_icons"] = True
             if "discord_status_icons_position" not in cfg or cfg.get("discord_status_icons_position") not in ("left", "right"):
                 cfg["discord_status_icons_position"] = "right"
+            if "tts_lowercase" not in cfg:
+                cfg["tts_lowercase"] = True
+            if "tts_replace_digits" not in cfg:
+                cfg["tts_replace_digits"] = True
+            if "tts_digit_replacements" not in cfg or not isinstance(cfg.get("tts_digit_replacements"), dict):
+                cfg["tts_digit_replacements"] = {
+                    "0": "o",
+                    "1": "i",
+                    "2": "z",
+                    "3": "e",
+                    "4": "a",
+                    "5": "s",
+                    "6": "b",
+                    "7": "t",
+                    "8": "b",
+                    "9": "g"
+                }
             return cfg
     except Exception as e:
         print(f"Error loading config: {e}")

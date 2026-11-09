@@ -124,6 +124,31 @@ def check_tts_status(preferred_player=None):
         "available_players": available_players,
     }
 
+DEFAULT_DIGIT_REPLACEMENTS = {
+    "0": "o",
+    "1": "i",
+    "2": "z",
+    "3": "e",
+    "4": "a",
+    "5": "s",
+    "6": "b",
+    "7": "t",
+    "8": "b",
+    "9": "g"
+}
+
+def apply_digit_replacements(name: str, digit_map: dict) -> str:
+    if not name or not digit_map or not isinstance(name, str):
+        return str(name) if name is not None else ""
+    result = []
+    for ch in name:
+        rep = digit_map.get(ch)
+        if rep is not None and rep != "":
+            result.append(rep)
+        else:
+            result.append(ch)
+    return "".join(result)
+
 def apply_tts_aliases(name, aliases):
     if not aliases:
         return name
@@ -133,6 +158,36 @@ def apply_tts_aliases(name, aliases):
             # Case insensitive substring replacement
             spoken_name = re.sub(re.escape(src), dst, spoken_name, flags=re.IGNORECASE)
     return spoken_name
+
+def prepare_tts_nickname(name: str, config: dict = None) -> str:
+    """
+    Prepares a nickname for TTS announcement:
+    1. Strips prefixes/tags (clean_nickname)
+    2. Replaces digits with letters (if tts_replace_digits is enabled)
+    3. Converts uppercase letters to lowercase (if tts_lowercase is enabled)
+    4. Applies TTS aliases (apply_tts_aliases)
+    """
+    if not name:
+        return ""
+    if config is None:
+        config = {}
+
+    from config import clean_nickname
+    spoken = clean_nickname(name, config)
+
+    # Step 1: Digit to letter replacement (executed before aliases)
+    if config.get("tts_replace_digits", True):
+        digit_map = config.get("tts_digit_replacements", DEFAULT_DIGIT_REPLACEMENTS)
+        spoken = apply_digit_replacements(spoken, digit_map)
+
+    # Step 2: Uppercase to lowercase conversion (executed before aliases)
+    if config.get("tts_lowercase", True):
+        spoken = spoken.lower()
+
+    # Step 3: Custom aliases substitution
+    aliases = config.get("tts_aliases", {})
+    spoken = apply_tts_aliases(spoken, aliases)
+    return spoken
 
 class TTSManager:
     _instance = None
