@@ -20,15 +20,12 @@
 
 
 > [!TIP]
-> **What's New in v1.2.3 (TTS 1337 Digit Substitutions & All-Caps Lowercase Pronunciation):**
-> - 🔢 **TTS 1337 Digit Substitutions**: Added automatic substitution of numbers with letters (e.g. `0`➔`o`, `1`➔`i`, `2`➔`z`, `3`➔`e`, `4`➔`a`, `5`➔`s`, `6`➔`b`, `7`➔`t`, `8`➔`b`, `9`➔`g`) executed before aliases. Nicknames like `M4R10` or `2IOMEK` are pronounced smoothly as `mario` or `ziomek` and match custom aliases. Includes a dedicated configuration window with table editing, quick reset/clear, and live pronunciation preview.
-> - 🔤 **All-Caps to Lowercase Conversion**: Added an option (enabled by default) to convert uppercase nicknames to lowercase prior to TTS, preventing Edge-TTS from awkwardly spelling capitalized nicknames letter-by-letter.
+> **What's New in v1.2.4 (Windows TTS & Settings Close Crash Fix):**
+> - 🛠️ **Settings Close Crash Fix (`RuntimeError` on Deleted Widgets)**: Fixed a crash triggered on Windows when closing the Settings window shortly after clicking **Test** voice or **Reset overlay positions** (`RuntimeError: wrapped C/C++ object has been deleted`). Deferred UI timers are now owned by the window and cleanly cancelled on close with `sip.isdeleted` guards.
+> - ⚡ **Windows Edge-TTS Latency & Hang Fix**: Switched Windows Edge-TTS synthesis to `SelectorEventLoop` with an explicit 20s timeout (`asyncio.wait_for`), atomic `.part` file caching (preventing 0-byte corrupted cache entries), COM initialization and 8.3 short paths for `winmm` MCI playback, and immediate queue clearing when clicking TTS Test.
+> - 🔢 **TTS 1337 Digit Substitutions & Lowercase Conversion (from v1.2.3)**: Configurable 0–9 leetspeak replacements before aliases and all-caps lowercase normalization.
 > - 🔇 **Suspend & Disconnect TTS Flood Fix (from v1.2.2)**: Clean voice state reset and queue flushing upon system sleep or channel disconnect.
 > - 🎨 **Discord Voice Status Icons (from v1.2.1)**: Crisp monochrome status badges (mute, deafen, suppress, video, stream, bot) with configurable Left/Right positioning.
-> - 🔇 **Discord Local Self-Join TTS Fix (from v1.2.1)**: Local user channel joins are completely silent.
-> - 📣 **Cross-Channel & In-Channel Whisper / Shout Support (from v1.2.0)**: Dedicated whisper text highlighting and fade-out for TeamSpeak 3 and Mumble.
-> - ↔️ **Right-Anchored Dynamic Width (`Anchor right edge (shift left)`) (from v1.1.9)**: Keep right edge anchored while dynamically expanding/shrinking.
-> - 📐 **Instant Overlay Height Shrink Fix (from v1.1.9)**: Overlay immediately shrinks when users leave.
 
 > [!IMPORTANT]
 > **KOverlay must remain running in the background (in the system tray)** for the overlay to appear over your game. If KOverlay is closed, the voice overlay will not be visible.
@@ -92,10 +89,10 @@ Building from source automatically handles dependency resolution:
 
 #### Method B: Install the Pre-compiled Pacman Package
 1. Download the pre-compiled package from GitHub releases:
-    👉 **[Download KOverlay v1.2.3 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.3/koverlay-1.2.3-1-x86_64.pkg.tar.zst)**
+    👉 **[Download KOverlay v1.2.4 (.pkg.tar.zst)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.4/koverlay-1.2.4-1-x86_64.pkg.tar.zst)**
 2. Install the downloaded package directly with `pacman`:
    ```bash
-   sudo pacman -U koverlay-1.2.3-1-x86_64.pkg.tar.zst
+   sudo pacman -U koverlay-1.2.4-1-x86_64.pkg.tar.zst
    ```
 
 ### Microsoft Windows (10 / 11)
@@ -107,7 +104,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 1: Setup Wizard (Recommended)
 1. Download the latest installer:
-   👉 **[Download KOverlay_Setup.exe (v1.2.3)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.3/KOverlay_Setup.exe)**
+   👉 **[Download KOverlay_Setup.exe (v1.2.4)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.4/KOverlay_Setup.exe)**
 2. Run `KOverlay_Setup.exe`:
    - Administrator rights are **not** required. The program installs directly into your user profile: `%LOCALAPPDATA%\Programs\KOverlay`.
    - **Mumble Check:** If Mumble is running, the installer will inform you and prompt you to close Mumble so it can safely install the Mumble plugin.
@@ -116,7 +113,7 @@ KOverlay offers two convenient ways to run on Windows: a standalone setup wizard
 
 #### Option 2: Portable Archive (.zip)
 1. Download the portable package:
-   👉 **[Download KOverlay_Portable.zip (v1.2.3)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.3/KOverlay_Portable.zip)**
+   👉 **[Download KOverlay_Portable.zip (v1.2.4)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.4/KOverlay_Portable.zip)**
 2. Extract the `.zip` archive to any directory you prefer (e.g. `C:\Games\KOverlay` or your Desktop).
 3. **How to Launch KOverlay:**
    - Inside the extracted folder, double-click **`KOverlay.bat`**.
@@ -253,9 +250,9 @@ KOverlay connects to Mumble via a high-performance native plugin and a local IPC
 
 > [!TIP]
 > You can also download the standalone plugin or unified bundle directly from GitHub releases:
-> - **[koverlay_mumble.mumble_plugin (Universal Bundle)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.3/koverlay_mumble.mumble_plugin)** (Double-click or import via Mumble's "Install plugin" button)
-> - **[koverlay_mumble.dll (Windows x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.3/koverlay_mumble.dll)**
-> - **[koverlay_mumble.so (Linux x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.3/koverlay_mumble.so)**
+> - **[koverlay_mumble.mumble_plugin (Universal Bundle)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.4/koverlay_mumble.mumble_plugin)** (Double-click or import via Mumble's "Install plugin" button)
+> - **[koverlay_mumble.dll (Windows x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.4/koverlay_mumble.dll)**
+> - **[koverlay_mumble.so (Linux x64)](https://github.com/Arkanista/KOverlay/releases/download/v1.2.4/koverlay_mumble.so)**
 
 ### Option C: Connecting to Discord (Local IPC / StreamKit)
 KOverlay connects directly to your running Discord desktop application using Discord's native local IPC RPC protocol:

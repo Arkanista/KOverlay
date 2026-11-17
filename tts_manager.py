@@ -345,24 +345,58 @@ class TTSManager:
                 print(f"Error in TTS worker thread: {e}")
 
     def _play_win32_mci(self, filepath, volume=80):
+        ole32 = None
+        com_initialized = False
         try:
             import ctypes
             import uuid
+
+            # DirectShow / Quartz MCI filters use COM on worker threads
+            try:
+                ole32 = ctypes.windll.ole32
+                hr = ole32.CoInitialize(None)
+                com_initialized = hr in (0, 1)
+            except Exception:
+                pass
+
+            # Prefer 8.3 short path to avoid MCI issues with '%', spaces, or long paths
+            mci_path = filepath
+            try:
+                buf = ctypes.create_unicode_buffer(512)
+                if ctypes.windll.kernel32.GetShortPathNameW(filepath, buf, 512) > 0:
+                    mci_path = buf.value
+            except Exception:
+                pass
+
             alias = f"tts_{uuid.uuid4().hex[:8]}"
             winmm = ctypes.windll.winmm
-            res = winmm.mciSendStringW(f'open "{filepath}" type mpegvideo alias {alias}', None, 0, None)
+            res = winmm.mciSendStringW(f'open "{mci_path}" type mpegvideo alias {alias}', None, 0, None)
             if res != 0:
+                err_buf = ctypes.create_unicode_buffer(256)
+                winmm.mciGetErrorStringW(res, err_buf, 256)
+                print(f"Windows MCI open error ({res}): {err_buf.value}")
                 return False
             try:
                 vol_val = max(0, min(1000, int(volume * 10)))
                 winmm.mciSendStringW(f'setaudio {alias} volume to {vol_val}', None, 0, None)
-                winmm.mciSendStringW(f'play {alias} wait', None, 0, None)
+                play_res = winmm.mciSendStringW(f'play {alias} wait', None, 0, None)
+                if play_res != 0:
+                    err_buf = ctypes.create_unicode_buffer(256)
+                    winmm.mciGetErrorStringW(play_res, err_buf, 256)
+                    print(f"Windows MCI play error ({play_res}): {err_buf.value}")
+                    return False
             finally:
                 winmm.mciSendStringW(f'close {alias}', None, 0, None)
             return True
         except Exception as e:
             print(f"Windows MCI playback error: {e}")
             return False
+        finally:
+            if com_initialized and ole32 is not None:
+                try:
+                    ole32.CoUninitialize()
+                except Exception:
+                    pass
 
     def _play_mp3_file(self, filepath, player_type, player_bin, vol):
         c_env = {**os.environ, "LC_NUMERIC": "C"}
@@ -446,22 +480,54 @@ class TTSManager:
                     safe_filename = safe_filename[:100] + "_" + hashlib.md5(cache_key.encode()).hexdigest()[:8]
                 tmp_file = os.path.join(self.cache_dir, f"{safe_filename}.mp3")
                 
-                if not os.path.exists(tmp_file):
-                    if getattr(self, "has_edge_tts_module", False) or importlib.util.find_spec("edge_tts") is not None:
-                        import edge_tts
-                        import asyncio
-                        communicate = edge_tts.Communicate(text, voice, rate=rate)
-                        asyncio.run(communicate.save(tmp_file))
-                    elif getattr(self, "edge_tts_cli", None):
-                        subprocess.run([
-                            self.edge_tts_cli,
-                            "--text", text,
-                            "--voice", voice,
-                            f"--rate={rate}",
-                            "--write-media", tmp_file
-                        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
-                    
-                if os.path.exists(tmp_file):
+                needs_download = (not os.path.exists(tmp_file)) or (os.path.getsize(tmp_file) == 0)
+                if needs_download:
+                    part_file = f"{tmp_file}.{os.getpid()}.{threading.get_ident()}.part"
+                    try:
+                        if getattr(self, "has_edge_tts_module", False) or importlib.util.find_spec("edge_tts") is not None:
+                            import edge_tts
+                            import asyncio
+
+                            async def _fetch_edge_audio():
+                                communicate = edge_tts.Communicate(
+                                    text,
+                                    voice,
+                                    rate=rate,
+                                    connect_timeout=10,
+                                    receive_timeout=20,
+                                )
+                                await asyncio.wait_for(communicate.save(part_file), timeout=20.0)
+
+                            if sys.platform == "win32":
+                                loop = asyncio.SelectorEventLoop()
+                                asyncio.set_event_loop(loop)
+                                try:
+                                    loop.run_until_complete(_fetch_edge_audio())
+                                    loop.run_until_complete(loop.shutdown_asyncgens())
+                                finally:
+                                    asyncio.set_event_loop(None)
+                                    loop.close()
+                            else:
+                                asyncio.run(_fetch_edge_audio())
+                        elif getattr(self, "edge_tts_cli", None):
+                            subprocess.run([
+                                self.edge_tts_cli,
+                                "--text", text,
+                                "--voice", voice,
+                                f"--rate={rate}",
+                                "--write-media", part_file
+                            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
+
+                        if os.path.exists(part_file) and os.path.getsize(part_file) > 0:
+                            os.replace(part_file, tmp_file)
+                    finally:
+                        if os.path.exists(part_file):
+                            try:
+                                os.remove(part_file)
+                            except OSError:
+                                pass
+
+                if os.path.exists(tmp_file) and os.path.getsize(tmp_file) > 0:
                     self._play_mp3_file(tmp_file, player_type, player_bin, vol)
             except Exception as e:
                 print(f"Edge TTS error: {e}")

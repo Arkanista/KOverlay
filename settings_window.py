@@ -85,6 +85,7 @@ class SettingsWindow(QWidget):
         """)
         
         self.config = current_config
+        self._is_closing = False
         
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
@@ -1215,11 +1216,33 @@ class SettingsWindow(QWidget):
         pass
 
     def closeEvent(self, event):
+        self._is_closing = True
+        from PyQt6.QtCore import QTimer
+        for timer in self.findChildren(QTimer):
+            timer.stop()
         if hasattr(self, '_auth_thread') and self._auth_thread is not None and self._auth_thread.isRunning():
             self._auth_thread.cancel()
         self.finished.emit(0)
         self.closed.emit()
         super().closeEvent(event)
+
+    def _schedule_ui_timer(self, delay_ms: int, callback):
+        """Schedule a single-shot timer bound to this window's lifetime."""
+        from PyQt6.QtCore import QTimer
+        from PyQt6 import sip
+
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+
+        def _on_timeout():
+            if not getattr(self, "_is_closing", False) and not sip.isdeleted(self):
+                callback()
+            if not sip.isdeleted(timer):
+                timer.deleteLater()
+
+        timer.timeout.connect(_on_timeout)
+        timer.start(delay_ms)
+        return timer
 
     def _update_opacity_normal_label(self, val):
         self.opacity_normal_val_label.setText(f"{val}%")
@@ -1372,6 +1395,9 @@ class SettingsWindow(QWidget):
         self._auth_thread.start()
 
     def _on_discord_auth_success(self, token):
+        from PyQt6 import sip
+        if getattr(self, "_is_closing", False) or sip.isdeleted(self):
+            return
         self.config["discord_access_token"] = token
         self._on_change()
         self._update_discord_ui()
@@ -1382,6 +1408,9 @@ class SettingsWindow(QWidget):
         )
 
     def _on_discord_auth_failed(self, error_msg):
+        from PyQt6 import sip
+        if getattr(self, "_is_closing", False) or sip.isdeleted(self):
+            return
         self._update_discord_ui()
         QMessageBox.warning(
             self,
@@ -1497,8 +1526,11 @@ class SettingsWindow(QWidget):
     def _on_reset_positions_clicked(self):
         self.reset_positions_requested.emit()
         self.reset_positions_btn.setText("Positions Reset! ✓")
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(2000, lambda: self.reset_positions_btn.setText("Reset overlay positions"))
+        from PyQt6 import sip
+        def _restore_reset_btn():
+            if hasattr(self, "reset_positions_btn") and not sip.isdeleted(self.reset_positions_btn):
+                self.reset_positions_btn.setText("Reset overlay positions")
+        self._schedule_ui_timer(2000, _restore_reset_btn)
 
     def _get_default_line_height(self) -> int:
         font = self.font_combo.currentFont()
@@ -1645,7 +1677,9 @@ class SettingsWindow(QWidget):
         custom_text = f"{j_t.replace('%NICK', spoken_name)}. {l_t.replace('%NICK', spoken_name)}."
         
         delay = self.config.get("tts_delay_ms", 0) / 1000.0
-        get_tts_manager(self.config).enqueue(
+        tts_mgr = get_tts_manager(self.config)
+        tts_mgr.clear_queue()
+        tts_mgr.enqueue(
             text=custom_text,
             voice=self.tts_voice_combo.currentData(),
             volume=self.tts_vol_slider.value(),
@@ -1654,14 +1688,15 @@ class SettingsWindow(QWidget):
         )
         
         # Update cache size label after test (give worker time to download)
-        from PyQt6.QtCore import QTimer
+        from PyQt6 import sip
         def update_cache():
-            size_mb = get_tts_manager().get_cache_size()
-            self.cache_size_label.setText(f"Cache size: {size_mb:.2f} MB")
+            if hasattr(self, "cache_size_label") and not sip.isdeleted(self.cache_size_label):
+                size_mb = get_tts_manager().get_cache_size()
+                self.cache_size_label.setText(f"Cache size: {size_mb:.2f} MB")
         # Poll a few times since TTS generation time varies
-        QTimer.singleShot(2000, update_cache)
-        QTimer.singleShot(5000, update_cache)
-        QTimer.singleShot(10000, update_cache)
+        self._schedule_ui_timer(2000, update_cache)
+        self._schedule_ui_timer(5000, update_cache)
+        self._schedule_ui_timer(10000, update_cache)
 
     def _open_cache_folder(self):
         cache_path = get_tts_manager(self.config).cache_dir
