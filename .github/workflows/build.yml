@@ -252,6 +252,7 @@ jobs:
       - name: Build .rpm package
         run: |
           VERSION="${{ needs.get-version.outputs.version }}"
+          REPO_DIR="$PWD"
           TOPDIR="$PWD/rpmbuild"
           mkdir -p "$TOPDIR"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
@@ -274,25 +275,25 @@ jobs:
           mkdir -p %{buildroot}/usr/share/applications
           mkdir -p %{buildroot}/usr/share/licenses/koverlay
 
-          cp $PWD/*.py %{buildroot}/opt/koverlay/
-          cp $PWD/icon.png %{buildroot}/opt/koverlay/icon.png
-          [ -f $PWD/LICENSE ] && cp $PWD/LICENSE %{buildroot}/opt/koverlay/LICENSE && cp $PWD/LICENSE %{buildroot}/usr/share/licenses/koverlay/LICENSE
-          [ -f $PWD/icon.ico ] && cp $PWD/icon.ico %{buildroot}/opt/koverlay/icon.ico
-          [ -d $PWD/icons ] && cp -r $PWD/icons %{buildroot}/opt/koverlay/
-          if [ -d $PWD/bin ]; then
+          cp "${REPO_DIR}/"*.py %{buildroot}/opt/koverlay/
+          cp "${REPO_DIR}/icon.png" %{buildroot}/opt/koverlay/icon.png
+          [ -f "${REPO_DIR}/LICENSE" ] && cp "${REPO_DIR}/LICENSE" %{buildroot}/opt/koverlay/LICENSE && cp "${REPO_DIR}/LICENSE" %{buildroot}/usr/share/licenses/koverlay/LICENSE
+          [ -f "${REPO_DIR}/icon.ico" ] && cp "${REPO_DIR}/icon.ico" %{buildroot}/opt/koverlay/icon.ico
+          [ -d "${REPO_DIR}/icons" ] && cp -r "${REPO_DIR}/icons" %{buildroot}/opt/koverlay/
+          if [ -d "${REPO_DIR}/bin" ]; then
             mkdir -p %{buildroot}/opt/koverlay/bin
-            cp -r $PWD/bin/* %{buildroot}/opt/koverlay/bin/
+            cp -r "${REPO_DIR}/bin/"* %{buildroot}/opt/koverlay/bin/
             chmod 755 %{buildroot}/opt/koverlay/bin/*
           fi
-          if [ -d $PWD/mumble_plugin ]; then
+          if [ -d "${REPO_DIR}/mumble_plugin" ]; then
             mkdir -p %{buildroot}/opt/koverlay/mumble_plugin
-            cp -r $PWD/mumble_plugin/* %{buildroot}/opt/koverlay/mumble_plugin/
+            cp -r "${REPO_DIR}/mumble_plugin/"* %{buildroot}/opt/koverlay/mumble_plugin/
           fi
 
           for size in 16 32 48 64 128 256 512; do
-            if [ -f "$PWD/icons/koverlay-${size}.png" ]; then
+            if [ -f "${REPO_DIR}/icons/koverlay-${size}.png" ]; then
               mkdir -p %{buildroot}/usr/share/icons/hicolor/${size}x${size}/apps
-              cp "$PWD/icons/koverlay-${size}.png" %{buildroot}/usr/share/icons/hicolor/${size}x${size}/apps/koverlay.png
+              cp "${REPO_DIR}/icons/koverlay-${size}.png" %{buildroot}/usr/share/icons/hicolor/${size}x${size}/apps/koverlay.png
             fi
           done
 
