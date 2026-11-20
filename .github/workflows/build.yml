@@ -1,0 +1,358 @@
+name: Build Packages
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  get-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract version from PKGBUILD
+        id: ver
+        run: |
+          VERSION=$(grep -E '^pkgver=' PKGBUILD | cut -d'=' -f2 | tr -d '[:space:]')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  build-arch:
+    needs: get-version
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update pacman and install build dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm --needed git python python-pip python-pyqt6 qt6-svg xdotool mpv
+
+      - name: Build Arch package with makepkg
+        run: |
+          useradd -m builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          su - builder -c "cd '$GITHUB_WORKSPACE' && makepkg -f --noconfirm"
+
+      - name: Upload Arch package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: koverlay-arch-x86_64
+          path: "*.pkg.tar.zst"
+
+  build-deb:
+    needs: get-version
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: debian12
+            image: debian:12
+          - distro: debian13
+            image: debian:13
+          - distro: ubuntu24.04
+            image: ubuntu:24.04
+          - distro: ubuntu26.04
+            image: ubuntu:26.04
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            dpkg-dev \
+            python3 \
+            python3-pip \
+            ca-certificates
+
+      - name: Build .deb package
+        run: |
+          VERSION="${{ needs.get-version.outputs.version }}"
+          DISTRO="${{ matrix.distro }}"
+          PKG_DIR="build_deb/koverlay_${VERSION}-1_${DISTRO}_amd64"
+
+          mkdir -p "$PKG_DIR/DEBIAN"
+          mkdir -p "$PKG_DIR/opt/koverlay"
+          mkdir -p "$PKG_DIR/usr/bin"
+          mkdir -p "$PKG_DIR/usr/share/applications"
+          mkdir -p "$PKG_DIR/usr/share/doc/koverlay"
+
+          cp *.py "$PKG_DIR/opt/koverlay/"
+          cp icon.png "$PKG_DIR/opt/koverlay/icon.png"
+          [ -f LICENSE ] && cp LICENSE "$PKG_DIR/opt/koverlay/LICENSE" && cp LICENSE "$PKG_DIR/usr/share/doc/koverlay/copyright"
+          [ -f icon.ico ] && cp icon.ico "$PKG_DIR/opt/koverlay/icon.ico"
+          [ -d icons ] && cp -r icons "$PKG_DIR/opt/koverlay/"
+          if [ -d bin ]; then
+            mkdir -p "$PKG_DIR/opt/koverlay/bin"
+            cp -r bin/* "$PKG_DIR/opt/koverlay/bin/"
+            chmod 755 "$PKG_DIR/opt/koverlay/bin/"*
+          fi
+          if [ -d mumble_plugin ]; then
+            mkdir -p "$PKG_DIR/opt/koverlay/mumble_plugin"
+            cp -r mumble_plugin/* "$PKG_DIR/opt/koverlay/mumble_plugin/"
+          fi
+
+          for size in 16 32 48 64 128 256 512; do
+            if [ -f "icons/koverlay-${size}.png" ]; then
+              mkdir -p "$PKG_DIR/usr/share/icons/hicolor/${size}x${size}/apps"
+              cp "icons/koverlay-${size}.png" "$PKG_DIR/usr/share/icons/hicolor/${size}x${size}/apps/koverlay.png"
+            fi
+          done
+
+          # Install Python dependencies not in apt (ts3, edge-tts) into /opt/koverlay/lib
+          pip3 install --no-cache-dir --break-system-packages --target="$PKG_DIR/opt/koverlay/lib" ts3 edge-tts
+
+          cat > "$PKG_DIR/usr/share/applications/koverlay.desktop" << 'EOF'
+          [Desktop Entry]
+          Version=1.5
+          Type=Application
+          Name=KOverlay
+          GenericName=Voice Overlay
+          Comment=Universal TeamSpeak 3, Mumble and Discord Overlay with TTS
+          Exec=/usr/bin/koverlay
+          Icon=koverlay
+          Terminal=false
+          Categories=Utility;Network;Audio;
+          Keywords=teamspeak;ts3;mumble;discord;overlay;tts;eve;
+          EOF
+
+          cat > "$PKG_DIR/usr/bin/koverlay" << 'EOF'
+          #!/bin/bash
+          export PATH="$PATH:/opt/koverlay/bin"
+          export PYTHONPATH="/opt/koverlay/lib:$PYTHONPATH"
+          cd /opt/koverlay || exit 1
+          exec python3 koverlay.py "$@"
+          EOF
+          chmod 755 "$PKG_DIR/usr/bin/koverlay"
+
+          cat > "$PKG_DIR/DEBIAN/control" << EOF
+          Package: koverlay
+          Version: ${VERSION}-1
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Arkanista <https://github.com/Arkanista/KOverlay>
+          Depends: python3, python3-pyqt6, python3-pyqt6.qtsvg, mpv, xdotool, libxcb-cursor0
+          Description: Universal Wayland/X11 TeamSpeak 3, Mumble and Discord overlay
+           A modern, universal Wayland/X11 TeamSpeak 3, Mumble and Discord overlay
+           with TTS voice announcements.
+          EOF
+
+          dpkg-deb --build --root-owner-group "$PKG_DIR"
+          mv "build_deb/koverlay_${VERSION}-1_${DISTRO}_amd64.deb" .
+
+      - name: Upload .deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: koverlay-${{ matrix.distro }}-amd64
+          path: "koverlay_*_${{ matrix.distro }}_amd64.deb"
+
+  build-appimage:
+    needs: get-version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends curl tar zstd libxcb-cursor0
+
+      - name: Build AppImage
+        run: |
+          VERSION="${{ needs.get-version.outputs.version }}"
+          APPDIR="AppDir"
+          mkdir -p "$APPDIR/usr" "$APPDIR/opt/koverlay"
+
+          # Download relocatable standalone Python 3.12
+          curl -L -o python-standalone.tar.gz \
+            "https://github.com/astral-sh/python-build-standalone/releases/download/20241016/cpython-3.12.7+20241016-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
+          tar -xzf python-standalone.tar.gz -C "$APPDIR/usr" --strip-components=1
+          rm python-standalone.tar.gz
+
+          # Install Python dependencies inside standalone Python
+          "$APPDIR/usr/bin/python3" -m pip install --no-cache-dir -r requirements.txt
+
+          # Copy application files
+          cp *.py "$APPDIR/opt/koverlay/"
+          cp icon.png "$APPDIR/opt/koverlay/icon.png"
+          cp icon.png "$APPDIR/koverlay.png"
+          [ -f LICENSE ] && cp LICENSE "$APPDIR/opt/koverlay/LICENSE"
+          [ -f icon.ico ] && cp icon.ico "$APPDIR/opt/koverlay/icon.ico"
+          [ -d icons ] && cp -r icons "$APPDIR/opt/koverlay/"
+          if [ -d bin ]; then
+            mkdir -p "$APPDIR/opt/koverlay/bin"
+            cp -r bin/* "$APPDIR/opt/koverlay/bin/"
+            chmod 755 "$APPDIR/opt/koverlay/bin/"*
+          fi
+          if [ -d mumble_plugin ]; then
+            mkdir -p "$APPDIR/opt/koverlay/mumble_plugin"
+            cp -r mumble_plugin/* "$APPDIR/opt/koverlay/mumble_plugin/"
+          fi
+
+          cat > "$APPDIR/koverlay.desktop" << 'EOF'
+          [Desktop Entry]
+          Version=1.5
+          Type=Application
+          Name=KOverlay
+          GenericName=Voice Overlay
+          Comment=Universal TeamSpeak 3, Mumble and Discord Overlay with TTS
+          Exec=koverlay
+          Icon=koverlay
+          Terminal=false
+          Categories=Utility;Network;Audio;
+          Keywords=teamspeak;ts3;mumble;discord;overlay;tts;eve;
+          EOF
+
+          cat > "$APPDIR/AppRun" << 'EOF'
+          #!/bin/bash
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          export PATH="$HERE/usr/bin:$HERE/opt/koverlay/bin:$PATH"
+          export LD_LIBRARY_PATH="$HERE/usr/lib:$LD_LIBRARY_PATH"
+          cd "$HERE/opt/koverlay" || exit 1
+          exec "$HERE/usr/bin/python3" "$HERE/opt/koverlay/koverlay.py" "$@"
+          EOF
+          chmod +x "$APPDIR/AppRun"
+
+          curl -L -o appimagetool "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x appimagetool
+          ARCH=x86_64 ./appimagetool --appimage-extract-and-run "$APPDIR" "KOverlay-${VERSION}-x86_64.AppImage"
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: koverlay-appimage-x86_64
+          path: "KOverlay-*-x86_64.AppImage"
+
+  build-rpm:
+    needs: get-version
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install RPM build dependencies
+        run: |
+          dnf install -y rpm-build python3 python3-pip
+
+      - name: Build .rpm package
+        run: |
+          VERSION="${{ needs.get-version.outputs.version }}"
+          TOPDIR="$PWD/rpmbuild"
+          mkdir -p "$TOPDIR"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+
+          cat > "$TOPDIR/SPECS/koverlay.spec" << EOF
+          Name:           koverlay
+          Version:        ${VERSION}
+          Release:        1%{?dist}
+          Summary:        Universal Wayland/X11 TeamSpeak 3, Mumble and Discord overlay
+          License:        GPL-3.0-or-later
+          URL:            https://github.com/Arkanista/KOverlay
+          Requires:       python3, python3-pyqt6, qt6-qtsvg, mpv, xdotool, xcb-util-cursor
+
+          %description
+          A modern, universal Wayland/X11 TeamSpeak 3, Mumble and Discord overlay
+          with TTS voice announcements.
+
+          %install
+          mkdir -p %{buildroot}/opt/koverlay
+          mkdir -p %{buildroot}/usr/bin
+          mkdir -p %{buildroot}/usr/share/applications
+          mkdir -p %{buildroot}/usr/share/licenses/koverlay
+
+          cp $PWD/*.py %{buildroot}/opt/koverlay/
+          cp $PWD/icon.png %{buildroot}/opt/koverlay/icon.png
+          [ -f $PWD/LICENSE ] && cp $PWD/LICENSE %{buildroot}/opt/koverlay/LICENSE && cp $PWD/LICENSE %{buildroot}/usr/share/licenses/koverlay/LICENSE
+          [ -f $PWD/icon.ico ] && cp $PWD/icon.ico %{buildroot}/opt/koverlay/icon.ico
+          [ -d $PWD/icons ] && cp -r $PWD/icons %{buildroot}/opt/koverlay/
+          if [ -d $PWD/bin ]; then
+            mkdir -p %{buildroot}/opt/koverlay/bin
+            cp -r $PWD/bin/* %{buildroot}/opt/koverlay/bin/
+            chmod 755 %{buildroot}/opt/koverlay/bin/*
+          fi
+          if [ -d $PWD/mumble_plugin ]; then
+            mkdir -p %{buildroot}/opt/koverlay/mumble_plugin
+            cp -r $PWD/mumble_plugin/* %{buildroot}/opt/koverlay/mumble_plugin/
+          fi
+
+          for size in 16 32 48 64 128 256 512; do
+            if [ -f "$PWD/icons/koverlay-${size}.png" ]; then
+              mkdir -p %{buildroot}/usr/share/icons/hicolor/${size}x${size}/apps
+              cp "$PWD/icons/koverlay-${size}.png" %{buildroot}/usr/share/icons/hicolor/${size}x${size}/apps/koverlay.png
+            fi
+          done
+
+          pip3 install --no-cache-dir --target=%{buildroot}/opt/koverlay/lib ts3 edge-tts
+
+          cat > %{buildroot}/usr/share/applications/koverlay.desktop << 'DESKTOP'
+          [Desktop Entry]
+          Version=1.5
+          Type=Application
+          Name=KOverlay
+          GenericName=Voice Overlay
+          Comment=Universal TeamSpeak 3, Mumble and Discord Overlay with TTS
+          Exec=/usr/bin/koverlay
+          Icon=koverlay
+          Terminal=false
+          Categories=Utility;Network;Audio;
+          Keywords=teamspeak;ts3;mumble;discord;overlay;tts;eve;
+          DESKTOP
+
+          cat > %{buildroot}/usr/bin/koverlay << 'WRAPPER'
+          #!/bin/bash
+          export PATH="$PATH:/opt/koverlay/bin"
+          export PYTHONPATH="/opt/koverlay/lib:$PYTHONPATH"
+          cd /opt/koverlay || exit 1
+          exec python3 koverlay.py "$@"
+          WRAPPER
+          chmod 755 %{buildroot}/usr/bin/koverlay
+
+          %files
+          /opt/koverlay
+          /usr/bin/koverlay
+          /usr/share/applications/koverlay.desktop
+          /usr/share/icons/hicolor/*/apps/koverlay.png
+          /usr/share/licenses/koverlay/LICENSE
+          EOF
+
+          rpmbuild --define "_topdir $TOPDIR" -bb "$TOPDIR/SPECS/koverlay.spec"
+          find "$TOPDIR/RPMS" -name "*.rpm" -exec cp {} . \;
+
+      - name: Upload .rpm artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: koverlay-rpm-x86_64
+          path: "koverlay-*.rpm"
+
+  release:
+    needs: [ get-version, build-arch, build-deb, build-appimage, build-rpm ]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
