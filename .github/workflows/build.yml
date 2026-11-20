@@ -291,9 +291,9 @@ jobs:
           fi
 
           for size in 16 32 48 64 128 256 512; do
-            if [ -f "${REPO_DIR}/icons/koverlay-${size}.png" ]; then
-              mkdir -p %{buildroot}/usr/share/icons/hicolor/${size}x${size}/apps
-              cp "${REPO_DIR}/icons/koverlay-${size}.png" %{buildroot}/usr/share/icons/hicolor/${size}x${size}/apps/koverlay.png
+            if [ -f "${REPO_DIR}/icons/koverlay-\${size}.png" ]; then
+              mkdir -p %{buildroot}/usr/share/icons/hicolor/\${size}x\${size}/apps
+              cp "${REPO_DIR}/icons/koverlay-\${size}.png" %{buildroot}/usr/share/icons/hicolor/\${size}x\${size}/apps/koverlay.png
             fi
           done
 
