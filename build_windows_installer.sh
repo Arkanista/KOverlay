@@ -67,6 +67,9 @@ echo "[4/5] Copying application files..."
 cp *.py "$BUNDLE_DIR/"
 cp icon.png icon.ico requirements.txt LICENSE "$BUNDLE_DIR/"
 cp -r icons "$BUNDLE_DIR/"
+if [ -d "locales" ]; then
+    cp -r locales "$BUNDLE_DIR/"
+fi
 if [ -d "mumble_plugin" ]; then
     cp -r mumble_plugin "$BUNDLE_DIR/"
 fi

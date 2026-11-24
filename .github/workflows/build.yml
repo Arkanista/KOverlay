@@ -419,8 +419,132 @@ jobs:
           name: koverlay-flatpak-x86_64
           path: "KOverlay-*-x86_64.flatpak"
 
+  build-windows:
+    needs: get-version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Windows Portable & Setup.exe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $Version = "${{ needs.get-version.outputs.version }}"
+          $BundleDir = "$PWD\build_win\bundle"
+          $PythonDir = "$BundleDir\python"
+          $SitePackages = "$PythonDir\Lib\site-packages"
+          $WheelsDir = "$PWD\build_win\wheels"
+          $OutDir = "$PWD\dist"
+
+          New-Item -ItemType Directory -Force -Path $WheelsDir, $SitePackages, $OutDir | Out-Null
+
+          # 1. Embeddable Python 3.11
+          Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip" -OutFile "$PWD\build_win\pyembed.zip"
+          7z x -y "$PWD\build_win\pyembed.zip" "-o$PythonDir" | Out-Null
+
+          @"
+          python311.zip
+          .
+          ..
+          Lib\site-packages
+          import site
+          "@ | Set-Content -Path "$PythonDir\python311._pth" -Encoding ASCII
+
+          # 2. Download and extract Windows wheels
+          python -m pip download --platform win_amd64 --python-version 3.11 --only-binary=:all: -d $WheelsDir -r requirements.txt
+          Get-ChildItem "$WheelsDir\*.whl" | ForEach-Object {
+            7z x -y $_.FullName "-o$SitePackages" | Out-Null
+          }
+
+          # 3. Copy app files
+          Copy-Item *.py $BundleDir\
+          Copy-Item icon.png, icon.ico, requirements.txt, LICENSE $BundleDir\
+          Copy-Item -Recurse icons $BundleDir\
+          if (Test-Path locales) { Copy-Item -Recurse locales $BundleDir\ }
+          if (Test-Path mumble_plugin) { Copy-Item -Recurse mumble_plugin $BundleDir\ }
+
+          @"
+          @echo off
+          cd /d "%~dp0"
+          start "" "%~dp0python\pythonw.exe" "%~dp0koverlay.py" %*
+          "@ | Set-Content -Path "$BundleDir\KOverlay.bat" -Encoding ASCII
+
+          @"
+          @echo off
+          cd /d "%~dp0"
+          "%~dp0python\python.exe" "%~dp0koverlay.py" %*
+          pause
+          "@ | Set-Content -Path "$BundleDir\KOverlay_Debug.bat" -Encoding ASCII
+
+          # 4. Create Portable ZIP
+          7z a -tzip -mx=7 "$OutDir\KOverlay_Portable.zip" "$BundleDir\*" | Out-Null
+
+          # 5. Build Setup.exe via Inno Setup
+          $Iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $Iscc)) {
+            choco install innosetup -y --no-progress | Out-Null
+          }
+
+          @"
+          #define MyAppName "KOverlay"
+          #define MyAppVersion "$Version"
+          #define MyAppPublisher "Arkanis"
+          #define MyAppURL "https://github.com/Arkanista/KOverlay"
+
+          [Setup]
+          AppId={{D37E8492-23A4-4A8B-814E-4CD5093551BB}
+          AppName={#MyAppName}
+          AppVersion={#MyAppVersion}
+          AppPublisher={#MyAppPublisher}
+          AppPublisherURL={#MyAppURL}
+          AppSupportURL={#MyAppURL}
+          AppUpdatesURL={#MyAppURL}
+          DefaultDirName={localappdata}\Programs\{#MyAppName}
+          DefaultGroupName={#MyAppName}
+          DisableProgramGroupPage=yes
+          PrivilegesRequired=lowest
+          OutputDir=$OutDir
+          OutputBaseFilename=KOverlay_Setup
+          SetupIconFile=$BundleDir\icon.ico
+          UninstallDisplayIcon={app}\icon.ico
+          Compression=lzma2/ultra64
+          SolidCompression=yes
+          WizardStyle=modern
+          LicenseFile=$PWD\LICENSE
+
+          [Languages]
+          Name: "english"; MessagesFile: "compiler:Default.isl"
+          Name: "polish"; MessagesFile: "compiler:Languages\Polish.isl"
+
+          [Tasks]
+          Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
+
+          [Files]
+          Source: "$BundleDir\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          Source: "$BundleDir\mumble_plugin\koverlay_mumble.dll"; DestDir: "{userappdata}\Mumble\Mumble\Plugins"; Flags: ignoreversion uninsneveruninstall
+          Source: "$BundleDir\mumble_plugin\koverlay_mumble.dll"; DestDir: "{userappdata}\Mumble\Plugins"; Flags: ignoreversion uninsneveruninstall
+          Source: "$BundleDir\mumble_plugin\koverlay_mumble.mumble_plugin"; DestDir: "{userappdata}\Mumble\Mumble\Plugins"; Flags: ignoreversion uninsneveruninstall
+
+          [Icons]
+          Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\python\pythonw.exe"; Parameters: """{app}\koverlay.py"""; WorkingDir: "{app}"; IconFilename: "{app}\icon.ico"
+          Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\python\pythonw.exe"; Parameters: """{app}\koverlay.py"""; WorkingDir: "{app}"; IconFilename: "{app}\icon.ico"; Tasks: desktopicon
+
+          [Run]
+          Filename: "{app}\python\pythonw.exe"; Parameters: """{app}\koverlay.py"""; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+          "@ | Set-Content -Path "$PWD\build_win\installer.iss" -Encoding UTF8
+
+          & $Iscc "$PWD\build_win\installer.iss"
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: koverlay-windows-x64
+          path: |
+            dist/KOverlay_Setup.exe
+            dist/KOverlay_Portable.zip
+
   release:
-    needs: [ get-version, build-arch, build-deb, build-appimage, build-rpm, build-flatpak ]
+    needs: [ get-version, build-arch, build-deb, build-appimage, build-rpm, build-flatpak, build-windows ]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
