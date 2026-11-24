@@ -80,6 +80,24 @@ def get_available_languages() -> dict:
     return langs
 
 
+def _load_user_overrides(lang_code: str) -> dict:
+    """
+    Loads user-edited overrides for lang_code.
+    If a .snapshots/<lang>.json baseline exists, only keys that actually differ
+    from that baseline are treated as overrides—so package updates to unedited
+    built-in strings always take effect immediately.
+    """
+    user_path = os.path.join(USER_LOCALES_DIR, f"{lang_code}.json")
+    user_data = _load_json_locale(user_path)
+    if not user_data:
+        return {}
+    snap_path = os.path.join(USER_LOCALES_DIR, ".snapshots", f"{lang_code}.json")
+    snap_data = _load_json_locale(snap_path)
+    if not snap_data:
+        return user_data
+    return {k: v for k, v in user_data.items() if snap_data.get(k) != v}
+
+
 def set_language(lang_code: str):
     """Loads the specified language (merging built-in + user override) with English fallback."""
     global _current_lang, _base_strings, _active_strings
@@ -88,7 +106,7 @@ def set_language(lang_code: str):
         lang_code = "en"
 
     _base_strings = _load_json_locale(os.path.join(BUILTIN_LOCALES_DIR, "en.json"))
-    user_en = _load_json_locale(os.path.join(USER_LOCALES_DIR, "en.json"))
+    user_en = _load_user_overrides("en")
     if user_en:
         _base_strings.update(user_en)
 
@@ -96,7 +114,7 @@ def set_language(lang_code: str):
         _active_strings = dict(_base_strings)
     else:
         loaded = _load_json_locale(os.path.join(BUILTIN_LOCALES_DIR, f"{lang_code}.json"))
-        user_override = _load_json_locale(os.path.join(USER_LOCALES_DIR, f"{lang_code}.json"))
+        user_override = _load_user_overrides(lang_code)
         loaded.update(user_override)
         _active_strings = loaded
 
@@ -108,20 +126,36 @@ def get_language() -> str:
 
 
 def ensure_user_locales_populated():
-    """Copies built-in locale JSONs into USER_LOCALES_DIR if missing, so users can edit them."""
+    """
+    Copies built-in locale JSONs into USER_LOCALES_DIR for user editing,
+    and updates any unedited files when a newer package version is installed.
+    """
     import shutil
+    snap_dir = os.path.join(USER_LOCALES_DIR, ".snapshots")
     os.makedirs(USER_LOCALES_DIR, exist_ok=True)
+    os.makedirs(snap_dir, exist_ok=True)
     if not os.path.isdir(BUILTIN_LOCALES_DIR):
         return
     for fname in os.listdir(BUILTIN_LOCALES_DIR):
         if fname.endswith(".json") and _VALID_LANG_RE.fullmatch(fname[:-5]):
             src = os.path.join(BUILTIN_LOCALES_DIR, fname)
             dst = os.path.join(USER_LOCALES_DIR, fname)
-            if os.path.isfile(src) and not os.path.exists(dst):
-                try:
+            snap = os.path.join(snap_dir, fname)
+            if not os.path.isfile(src):
+                continue
+            try:
+                if not os.path.exists(dst):
                     shutil.copy2(src, dst)
-                except Exception:
-                    pass
+                    shutil.copy2(src, snap)
+                elif os.path.isfile(snap):
+                    # Refresh unedited user copy when built-in locale changed after package upgrade
+                    cur_user = _load_json_locale(dst)
+                    cur_snap = _load_json_locale(snap)
+                    if cur_user == cur_snap and cur_snap != _load_json_locale(src):
+                        shutil.copy2(src, dst)
+                        shutil.copy2(src, snap)
+            except Exception:
+                pass
 
 
 def _safe_format(template: str, kwargs: dict) -> str:
