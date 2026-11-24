@@ -37,16 +37,19 @@ def _protect_tokens(text: str) -> tuple[str, list[str]]:
     def _repl(match):
         idx = len(tokens)
         tokens.append(match.group(0))
-        return f"[[KTOK{idx}]]"
+        return f" 8810{idx:03d} "
 
     return _PROTECT_RE.sub(_repl, text), tokens
 
 
 def _restore_tokens(text: str, tokens: list[str]) -> str:
     for idx, tok in enumerate(tokens):
-        # Handle occasional spaces Google Translate may insert around brackets
-        text = re.sub(rf"\[\[\s*KTOK\s*{idx}\s*\]\]", lambda _m, t=tok: t, text, flags=re.IGNORECASE)
-    return text
+        text = re.sub(rf"\s*8810{idx:03d}\s*", lambda _m, t=tok: f" {t} " if not t.startswith("<") else t, text)
+    text = re.sub(r" {2,}", " ", text)
+    text = re.sub(r"\s+([.,!?;:)])", r"\1", text)
+    text = re.sub(r"([¡¿(])\s+", r"\1", text)
+    text = re.sub(r"<br>\s+", "<br>", text)
+    return text.strip()
 
 
 def _google_translate_batch(texts: list[str], target_lang: str, source_lang: str = "en") -> list[str]:
