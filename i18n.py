@@ -125,10 +125,59 @@ def get_language() -> str:
     return _current_lang
 
 
+def _write_user_locales_readme(base_en: dict):
+    """Generates an always-up-to-date README.md inside USER_LOCALES_DIR listing all keys and usage."""
+    lines = [
+        "# KOverlay User Translations (`locales`)",
+        "",
+        "This folder lets you customize existing UI translations or add new languages without",
+        "modifying system package files (your edits survive app updates).",
+        "",
+        "## How It Works",
+        "- **Customize an existing language:** Edit `<lang>.json` (e.g. `pl.json`, `en.json`, `de.json`).",
+        "  Only keys that you actually change compared to `.snapshots/<lang>.json` override the",
+        "  built-in translations. Unchanged keys and newly added keys automatically update when you",
+        "  install a newer version of KOverlay.",
+        "- **Add a new language:** Create `<code>.json` (e.g. `fr.json`, `cs.json`) using `en.json`",
+        "  as a template, and set `_language_name` to the display name (e.g. `\"Français\"`).",
+        "- **Reset a language to built-in defaults:** Delete `<lang>.json` (and `.snapshots/<lang>.json`)",
+        "  from this folder.",
+        "",
+        "## Formatting & Safety Notes",
+        "- Files must be valid UTF-8 JSON objects (max 512 KB).",
+        "- Preserve placeholders like `{id}`, `{size}`, `{engine}`, `{path}`, `{error}`, and `%NICK`.",
+        "- Safe formatting tags (`<b>`, `<i>`, `<br>`, `<code>`, `<hr>`) are allowed; `<script>` and",
+        "  inline event handlers are stripped automatically for security.",
+        "",
+        "## Complete List of Translation Keys",
+        "",
+        "| Key | Placeholders | Default (English) |",
+        "| --- | --- | --- |",
+    ]
+    for key, val in base_en.items():
+        placeholders = ", ".join(
+            sorted(set(
+                [f"{{{m}}}" for m in _SAFE_PLACEHOLDER_RE.findall(val)]
+                + (["%NICK"] if "%NICK" in val else [])
+            ))
+        ) or "—"
+        escaped_val = val.replace("\n", "\\n").replace("|", "\\|")
+        lines.append(f"| `{key}` | `{placeholders}` | {escaped_val} |")
+    lines.append("")
+
+    readme_path = os.path.join(USER_LOCALES_DIR, "README.md")
+    try:
+        with open(readme_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+    except Exception:
+        pass
+
+
 def ensure_user_locales_populated():
     """
     Copies built-in locale JSONs into USER_LOCALES_DIR for user editing,
-    and updates any unedited files when a newer package version is installed.
+    updates any unedited files when a newer package version is installed,
+    and writes an up-to-date README.md listing all translation keys.
     """
     import shutil
     snap_dir = os.path.join(USER_LOCALES_DIR, ".snapshots")
@@ -136,6 +185,9 @@ def ensure_user_locales_populated():
     os.makedirs(snap_dir, exist_ok=True)
     if not os.path.isdir(BUILTIN_LOCALES_DIR):
         return
+    base_en = _load_json_locale(os.path.join(BUILTIN_LOCALES_DIR, "en.json"))
+    if base_en:
+        _write_user_locales_readme(base_en)
     for fname in os.listdir(BUILTIN_LOCALES_DIR):
         if fname.endswith(".json") and _VALID_LANG_RE.fullmatch(fname[:-5]):
             src = os.path.join(BUILTIN_LOCALES_DIR, fname)
