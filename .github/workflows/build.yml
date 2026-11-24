@@ -561,4 +561,3 @@ jobs:
         with:
           tag_name: v${{ needs.get-version.outputs.version }}
           files: artifacts/*
-          generate_release_notes: true
