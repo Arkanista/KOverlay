@@ -117,6 +117,21 @@ def render_discord_status_icon(icon_type: str, size_px: int, color_str: str) -> 
         ])
         p.drawPolygon(play_tri)
 
+    elif icon_type == "warning":
+        # Monochrome warning triangle with exclamation mark
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(c, 2.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        tri = QPolygonF([
+            QPointF(12.0, 3.2),
+            QPointF(21.2, 19.6),
+            QPointF(2.8, 19.6),
+        ])
+        p.drawPolygon(tri)
+        p.drawLine(QPointF(12.0, 9.2), QPointF(12.0, 14.0))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(c)
+        p.drawEllipse(QRectF(10.8, 16.0, 2.4, 2.4))
+
     elif icon_type == "video":
         # Flat video camera
         p.setPen(Qt.PenStyle.NoPen)
@@ -401,6 +416,22 @@ class OverlayWindow(QWidget):
         self.header_widget.setLayout(header_layout)
         
         self.layout.addWidget(self.header_widget)
+
+        # Auth / status warning banner (e.g. Discord authorization expired)
+        self.alert_widget = QWidget()
+        self.alert_widget.setStyleSheet("background-color: transparent; border: none;")
+        alert_layout = QHBoxLayout(self.alert_widget)
+        alert_layout.setContentsMargins(0, 2, 0, 2)
+        alert_layout.setSpacing(6)
+        self.alert_icon_label = QLabel()
+        self.alert_icon_label.setStyleSheet("background-color: transparent; border: none;")
+        self.alert_text_label = QLabel()
+        self.alert_text_label.setStyleSheet("color: #ffbe3b; background-color: transparent; border: none; font-weight: bold;")
+        alert_layout.addWidget(self.alert_icon_label)
+        alert_layout.addWidget(self.alert_text_label)
+        alert_layout.addStretch()
+        self.alert_widget.setVisible(False)
+        self.layout.addWidget(self.alert_widget)
         
         # Container for users to separate them from the header
         self.users_container = QVBoxLayout()
@@ -895,6 +926,9 @@ class OverlayWindow(QWidget):
         if self.header_widget.layout() is not None:
             self.header_widget.layout().invalidate()
         self.header_widget.updateGeometry()
+        if hasattr(self, 'alert_widget') and self.alert_widget.layout() is not None:
+            self.alert_widget.layout().invalidate()
+            self.alert_widget.updateGeometry()
         self.users_container.invalidate()
         self.layout.invalidate()
         self.layout.activate()
@@ -966,6 +1000,23 @@ class OverlayWindow(QWidget):
             except Exception:
                 pass
 
+        self._update_overlay_geometry()
+
+    def set_auth_warning(self, message: str | None):
+        """Shows or hides an in-overlay warning banner with a monochrome warning icon."""
+        if not hasattr(self, 'alert_widget'):
+            return
+        if message:
+            font_size = max(10, int(self.config.get("font_size", 14)))
+            icon_px = max(14, font_size + 2)
+            font = QFont(self.config.get("font_family", "Arial"), max(9, font_size - 1))
+            font.setBold(True)
+            self.alert_text_label.setFont(font)
+            self.alert_text_label.setText(message)
+            self.alert_icon_label.setPixmap(render_discord_status_icon("warning", icon_px, "#ffbe3b"))
+            self.alert_widget.setVisible(True)
+        else:
+            self.alert_widget.setVisible(False)
         self._update_overlay_geometry()
 
     def update_clients(self, clients=_UNSET, my_cid=_UNSET):

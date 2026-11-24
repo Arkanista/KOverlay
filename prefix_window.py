@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QLabel
 )
 from PyQt6.QtCore import Qt, QEventLoop
+from i18n import tr
 
 class PrefixWindow(QWidget):
     Accepted = 1
@@ -11,7 +12,7 @@ class PrefixWindow(QWidget):
 
     def __init__(self, current_prefixes, parent=None):
         super().__init__(None, Qt.WindowType.Window)
-        self.setWindowTitle("Nickname Prefixes & Tags")
+        self.setWindowTitle(tr("prefix.title", "Nickname Prefixes & Tags"))
         self.resize(380, 320)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
 
@@ -35,24 +36,25 @@ class PrefixWindow(QWidget):
 
         layout = QVBoxLayout(self)
 
-        info_lbl = QLabel(
+        info_lbl = QLabel(tr(
+            "prefix.info",
             "Enter prefixes to strip from nicknames (e.g. <b>[VIP]</b>, <b>CLAN |</b>).<br>"
             "Enter <b>[]</b>, <b>()</b>, or <b>{}</b> to strip any tag in brackets."
-        )
+        ))
         info_lbl.setWordWrap(True)
         layout.addWidget(info_lbl)
 
         self.table = QTableWidget()
         self.table.setColumnCount(1)
-        self.table.setHorizontalHeaderLabels(["Prefix to Remove"])
+        self.table.setHorizontalHeaderLabels([tr("prefix.col_header", "Prefix to Remove")])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
 
         btn_layout = QHBoxLayout()
-        self.add_btn = QPushButton("Add")
+        self.add_btn = QPushButton(tr("settings.btn_add", "Add"))
         self.add_btn.clicked.connect(self._add_row)
 
-        self.del_btn = QPushButton("Delete")
+        self.del_btn = QPushButton(tr("settings.btn_delete", "Delete"))
         self.del_btn.clicked.connect(self._del_row)
 
         btn_layout.addWidget(self.add_btn)
@@ -60,9 +62,9 @@ class PrefixWindow(QWidget):
         layout.addLayout(btn_layout)
 
         save_layout = QHBoxLayout()
-        self.save_btn = QPushButton("Save")
+        self.save_btn = QPushButton(tr("settings.btn_save", "Save"))
         self.save_btn.clicked.connect(self.accept)
-        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn = QPushButton(tr("settings.btn_cancel", "Cancel"))
         self.cancel_btn.clicked.connect(self.reject)
 
         save_layout.addStretch()

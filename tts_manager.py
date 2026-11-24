@@ -107,6 +107,19 @@ def find_audio_player(preferred=None):
 
     return available[0]
 
+
+def supports_live_ducking(player_type: str | None) -> bool:
+    """Returns True if the given audio player supports live volume ducking on this OS."""
+    if not player_type:
+        return False
+    if sys.platform == "win32":
+        return player_type == "win32_mci"
+    if player_type == "mpv":
+        return True
+    if player_type in ("ffplay", "pw-play", "paplay", "gst-play-1.0", "cvlc"):
+        return shutil.which("pactl") is not None
+    return False
+
 def check_tts_status(preferred_player=None):
     """Returns a dictionary with detailed TTS availability and backend info."""
     has_module, cli_path = ensure_edge_tts_available()
@@ -344,6 +357,18 @@ class TTSManager:
             except Exception as e:
                 print(f"Error in TTS worker thread: {e}")
 
+    def _get_target_volume(self, base_vol):
+        """Returns effective TTS volume, ducked if someone is actively speaking."""
+        try:
+            from audio_ducking import get_voip_audio_monitor
+            monitor = get_voip_audio_monitor(self.config)
+            if monitor.should_duck():
+                duck_pct = max(0, min(100, int(self.config.get("tts_duck_volume_pct", 25))))
+                return max(0, min(100, int(round(base_vol * (duck_pct / 100.0)))))
+        except Exception:
+            pass
+        return max(0, min(100, int(base_vol)))
+
     def _play_win32_mci(self, filepath, volume=80):
         ole32 = None
         com_initialized = False
@@ -377,14 +402,28 @@ class TTSManager:
                 print(f"Windows MCI open error ({res}): {err_buf.value}")
                 return False
             try:
-                vol_val = max(0, min(1000, int(volume * 10)))
+                cur_vol = self._get_target_volume(volume)
+                vol_val = max(0, min(1000, int(cur_vol * 10)))
                 winmm.mciSendStringW(f'setaudio {alias} volume to {vol_val}', None, 0, None)
-                play_res = winmm.mciSendStringW(f'play {alias} wait', None, 0, None)
+                play_res = winmm.mciSendStringW(f'play {alias}', None, 0, None)
                 if play_res != 0:
                     err_buf = ctypes.create_unicode_buffer(256)
                     winmm.mciGetErrorStringW(play_res, err_buf, 256)
                     print(f"Windows MCI play error ({play_res}): {err_buf.value}")
                     return False
+
+                status_buf = ctypes.create_unicode_buffer(64)
+                while self.is_running:
+                    time.sleep(0.02)
+                    if winmm.mciSendStringW(f'status {alias} mode', status_buf, 64, None) != 0:
+                        break
+                    if status_buf.value.strip().lower() != "playing":
+                        break
+                    new_vol = self._get_target_volume(volume)
+                    if new_vol != cur_vol:
+                        cur_vol = new_vol
+                        vol_val = max(0, min(1000, int(cur_vol * 10)))
+                        winmm.mciSendStringW(f'setaudio {alias} volume to {vol_val}', None, 0, None)
             finally:
                 winmm.mciSendStringW(f'close {alias}', None, 0, None)
             return True
@@ -398,62 +437,159 @@ class TTSManager:
                 except Exception:
                     pass
 
-    def _play_mp3_file(self, filepath, player_type, player_bin, vol):
-        c_env = {**os.environ, "LC_NUMERIC": "C"}
-        if player_type == "mpv":
+    def _play_mpv_live(self, player_bin, filepath, base_vol, c_env):
+        """Plays MP3 with mpv and dynamically updates volume via IPC socket."""
+        import json
+        import socket
+
+        if sys.platform == "win32":
+            eff_vol = self._get_target_volume(base_vol)
             subprocess.run([
                 player_bin,
                 "--no-video",
                 "--no-terminal",
-                f"--volume={vol}",
+                f"--volume={eff_vol}",
                 "--af=silenceremove=stop_periods=-1:stop_duration=0:stop_threshold=-70dB",
                 filepath
             ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=c_env)
-        elif player_type == "ffplay":
-            subprocess.run([
+            return
+
+        ipc_path = os.path.join(
+            tempfile.gettempdir(),
+            f"koverlay_mpv_{os.getpid()}_{threading.get_ident()}.sock",
+        )
+        try:
+            if os.path.exists(ipc_path):
+                os.unlink(ipc_path)
+        except Exception:
+            pass
+
+        cur_vol = self._get_target_volume(base_vol)
+        proc = subprocess.Popen(
+            [
                 player_bin,
-                "-nodisp",
-                "-autoexit",
-                "-loglevel", "quiet",
-                "-volume", str(max(0, min(100, int(vol)))),
-                "-af", "silenceremove=stop_periods=-1:stop_duration=0:stop_threshold=-70dB",
-                filepath
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=c_env)
-        elif player_type == "pw-play":
-            vol_float = max(0.0, min(1.0, float(vol) / 100.0))
-            subprocess.run([
-                player_bin,
-                f"--volume={vol_float:.2f}",
-                filepath
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=c_env)
-        elif player_type == "paplay":
-            vol_pa = max(0, min(65536, int((float(vol) / 100.0) * 65536)))
-            subprocess.run([
-                player_bin,
-                f"--volume={vol_pa}",
-                filepath
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=c_env)
-        elif player_type == "gst-play-1.0":
-            vol_float = max(0.0, min(1.0, float(vol) / 100.0))
-            subprocess.run([
-                player_bin,
-                "--no-interactive",
-                "--quiet",
-                f"--volume={vol_float:.2f}",
-                filepath
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=c_env)
-        elif player_type == "cvlc":
-            vol_float = max(0.0, min(2.0, float(vol) / 100.0))
-            subprocess.run([
-                player_bin,
-                "--play-and-exit",
                 "--no-video",
-                "--quiet",
-                f"--gain={vol_float:.2f}",
-                filepath
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=c_env)
-        elif player_type == "win32_mci":
-            self._play_win32_mci(filepath, vol)
+                "--no-terminal",
+                f"--volume={cur_vol}",
+                f"--input-ipc-server={ipc_path}",
+                "--af=silenceremove=stop_periods=-1:stop_duration=0:stop_threshold=-70dB",
+                filepath,
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env=c_env,
+        )
+        try:
+            while proc.poll() is None and self.is_running:
+                time.sleep(0.02)
+                new_vol = self._get_target_volume(base_vol)
+                if new_vol != cur_vol and os.path.exists(ipc_path):
+                    try:
+                        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+                            s.settimeout(0.1)
+                            s.connect(ipc_path)
+                            cmd = json.dumps({"command": ["set_property", "volume", new_vol]}) + "\n"
+                            s.sendall(cmd.encode("utf-8"))
+                        cur_vol = new_vol
+                    except Exception:
+                        pass
+        finally:
+            if proc.poll() is None:
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=0.5)
+                except Exception:
+                    pass
+            try:
+                if os.path.exists(ipc_path):
+                    os.unlink(ipc_path)
+            except Exception:
+                pass
+
+    def _play_linux_with_live_ducking(self, cmd, c_env, monitor, player_name=None):
+        """
+        Launches a Linux audio player (ffplay, pw-play, paplay, etc.) at base volume
+        and dynamically ducks its PulseAudio/PipeWire sink-input volume via pactl.
+        """
+        from audio_ducking import find_sink_input_by_pid, set_sink_input_volume_pct
+
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=c_env)
+        sink_idx = None
+        cur_rel_pct = 100
+        last_lookup = 0.0
+        try:
+            while proc.poll() is None and self.is_running:
+                now = time.monotonic()
+                if sink_idx is None and (now - last_lookup) >= 0.04:
+                    last_lookup = now
+                    sink_idx = find_sink_input_by_pid(proc.pid, player_name=player_name)
+                    if sink_idx is not None and monitor.should_duck():
+                        duck_pct = max(0, min(100, int(self.config.get("tts_duck_volume_pct", 25))))
+                        if set_sink_input_volume_pct(sink_idx, duck_pct):
+                            cur_rel_pct = duck_pct
+                elif sink_idx is not None:
+                    duck_pct = max(0, min(100, int(self.config.get("tts_duck_volume_pct", 25))))
+                    target_rel = duck_pct if monitor.should_duck() else 100
+                    if target_rel != cur_rel_pct:
+                        if set_sink_input_volume_pct(sink_idx, target_rel):
+                            cur_rel_pct = target_rel
+                time.sleep(0.02)
+        finally:
+            if proc.poll() is None:
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=0.5)
+                except Exception:
+                    pass
+
+    def _play_mp3_file(self, filepath, player_type, player_bin, vol):
+        from audio_ducking import get_voip_audio_monitor
+        monitor = get_voip_audio_monitor(self.config)
+        monitor.set_tts_playing(True)
+        try:
+            c_env = {**os.environ, "LC_NUMERIC": "C"}
+            if player_type == "mpv":
+                self._play_mpv_live(player_bin, filepath, vol, c_env)
+            elif player_type == "ffplay":
+                cmd = [
+                    player_bin,
+                    "-nodisp",
+                    "-autoexit",
+                    "-loglevel", "quiet",
+                    "-volume", str(max(0, min(100, int(vol)))),
+                    "-af", "silenceremove=stop_periods=-1:stop_duration=0:stop_threshold=-70dB",
+                    filepath,
+                ]
+                if sys.platform != "win32":
+                    self._play_linux_with_live_ducking(cmd, c_env, monitor, player_name="ffplay")
+                else:
+                    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=c_env)
+            elif player_type == "pw-play":
+                vol_float = max(0.0, min(1.0, float(vol) / 100.0))
+                self._play_linux_with_live_ducking([player_bin, f"--volume={vol_float:.2f}", filepath], c_env, monitor, player_name="pw-play")
+            elif player_type == "paplay":
+                vol_pa = max(0, min(65536, int((float(vol) / 100.0) * 65536)))
+                self._play_linux_with_live_ducking([player_bin, f"--volume={vol_pa}", filepath], c_env, monitor, player_name="paplay")
+            elif player_type == "gst-play-1.0":
+                vol_float = max(0.0, min(1.0, float(vol) / 100.0))
+                self._play_linux_with_live_ducking(
+                    [player_bin, "--no-interactive", "--quiet", f"--volume={vol_float:.2f}", filepath],
+                    c_env,
+                    monitor,
+                    player_name="gst-play-1.0",
+                )
+            elif player_type == "cvlc":
+                vol_float = max(0.0, min(2.0, float(vol) / 100.0))
+                self._play_linux_with_live_ducking(
+                    [player_bin, "--play-and-exit", "--no-video", "--quiet", f"--gain={vol_float:.2f}", filepath],
+                    c_env,
+                    monitor,
+                    player_name="vlc",
+                )
+            elif player_type == "win32_mci":
+                self._play_win32_mci(filepath, vol)
+        finally:
+            monitor.set_tts_playing(False)
 
     def _play_sync(self, item):
         text = item["text"]

@@ -125,6 +125,8 @@ class MainApp:
         self.first_run = not os.path.exists(config.CONFIG_FILE)
         self.cfg_path = os.path.join(os.path.dirname(__file__), "config.json")
         self.cfg = config.load_config()
+        import i18n
+        i18n.set_language(self.cfg.get("language", "en"))
         
         # Initialize TTS Manager early to start the worker thread
         from tts_manager import get_tts_manager
@@ -182,8 +184,11 @@ class MainApp:
 
         # Show notification so user knows KOverlay is running in system tray
         self.tray.showMessage(
-            "KOverlay",
-            "KOverlay is running in the system tray.\nIMPORTANT: KOverlay must remain running for the overlay to appear!\nRight-click tray icon to open Settings.",
+            i18n.tr("tray.startup_title", "KOverlay"),
+            i18n.tr(
+                "tray.startup_msg",
+                "KOverlay is running in the system tray.\nIMPORTANT: KOverlay must remain running for the overlay to appear!\nRight-click tray icon to open Settings.",
+            ),
             self.tray.MessageIcon.Information,
             5000
         )
@@ -196,6 +201,7 @@ class MainApp:
         self.tray.mute_toggled.connect(self.on_mute_toggled)
         self.tray.overlay_toggled.connect(self.on_tray_overlay_toggled)
         self.tray.platform_changed.connect(self.on_platform_changed)
+        self.tray.discord_reauthorize_requested.connect(self.reauthorize_discord)
         self.tray.settings_requested.connect(self.show_settings)
         self.tray.quit_requested.connect(self.quit)
         
@@ -246,6 +252,9 @@ class MainApp:
     def on_clients_updated(self, clients, my_cid=None):
         self.last_clients = clients
         self.last_cid = my_cid
+
+        from audio_ducking import get_voip_audio_monitor
+        get_voip_audio_monitor(self.cfg).set_talking_users(clients)
         
         # Choose primary overlay for TTS: first enabled overlay, or "1" if all are hidden
         primary_id = "1"
@@ -412,6 +421,11 @@ class MainApp:
 
     def on_settings_changed(self):
         config.save_config(self.cfg)
+        import i18n
+        i18n.set_language(self.cfg.get("language", "en"))
+        if hasattr(self, 'tray') and self.tray is not None:
+            self.tray.retranslate_ui()
+        self._sync_discord_tray_status()
         
         is_settings_open = hasattr(self, 'settings_dialog') and self.settings_dialog is not None
         is_move_toggled = self.tray.move_action.isChecked()
@@ -483,11 +497,101 @@ class MainApp:
         if hasattr(self, 'tracker') and hasattr(self.tracker, 'last_state'):
             self.on_active_window_changed(self.tracker.last_state)
 
-    def _on_discord_token_saved(self, token):
+    def _sync_discord_tray_status(self):
+        from i18n import tr
+        is_discord = self.cfg.get("voice_backend", "ts3") == "discord"
+        has_token = bool(self.cfg.get("discord_access_token", ""))
+        if hasattr(self, 'tray') and self.tray is not None:
+            self.tray.set_discord_auth_status(has_token, is_discord)
+        warn_msg = tr("overlay.discord_reauth_banner", "Discord: Re-authorize!") if (is_discord and not has_token) else None
+        for overlay in self.overlays.values():
+            overlay.set_auth_warning(warn_msg)
+
+    def _notify_discord_unauth(self, reason=None):
+        from i18n import tr
+        if hasattr(self, 'tray') and self.tray is not None:
+            self.tray.showMessage(
+                tr("discord.notify_title", "KOverlay — Discord"),
+                reason or tr("discord.notify_unauth", "Discord authorization is missing or expired.\nUse Tray → Platform → Discord → Re-authorize."),
+                self.tray.MessageIcon.Warning,
+                8000,
+            )
+
+    def reauthorize_discord(self):
+        from discord_client import DiscordAuthThread
+        from i18n import tr
+
+        # Stop active DiscordClientThread first so Discord IPC accepts a fresh AUTHORIZE prompt cleanly
+        if getattr(self, 'voice_backend', None) == "discord" and getattr(self, 'voice_thread', None) is not None:
+            try:
+                self.voice_thread.stop()
+                if self.voice_thread.isRunning():
+                    self.voice_thread.wait(500)
+            except Exception:
+                pass
+            self.voice_thread = None
+
+        if hasattr(self, '_tray_auth_thread') and self._tray_auth_thread is not None and self._tray_auth_thread.isRunning():
+            self._tray_auth_thread.cancel()
+        if hasattr(self, 'tray') and self.tray is not None:
+            self.tray.showMessage(
+                tr("discord.notify_title", "KOverlay — Discord"),
+                tr("discord.notify_waiting", "Waiting for authorization in Discord desktop app..."),
+                self.tray.MessageIcon.Information,
+                5000,
+            )
+        self._tray_auth_thread = DiscordAuthThread(
+            client_id=self.cfg.get("discord_client_id", "207646673902501888"),
+            parent=None,
+        )
+        self._tray_auth_thread.auth_success.connect(self._on_tray_discord_auth_success)
+        self._tray_auth_thread.auth_failed.connect(self._on_tray_discord_auth_failed)
+        self._tray_auth_thread.start()
+
+    def _on_tray_discord_auth_success(self, token):
         self.cfg["discord_access_token"] = token
         self.save_config()
+        self._sync_discord_tray_status()
         if hasattr(self, 'settings_dialog') and self.settings_dialog is not None:
             self.settings_dialog._update_discord_ui()
+        if self.cfg.get("voice_backend", "ts3") != "discord":
+            self.cfg["voice_backend"] = "discord"
+            self.save_config()
+            self.tray.set_active_platform("discord")
+            if hasattr(self, 'settings_dialog') and self.settings_dialog is not None:
+                self.settings_dialog.set_active_platform("discord")
+        self.start_voice_backend()
+        if hasattr(self, 'tray') and self.tray is not None:
+            self.tray.showMessage(
+                "KOverlay — Discord",
+                "Discord authorized successfully!",
+                self.tray.MessageIcon.Information,
+                4000,
+            )
+
+    def _on_tray_discord_auth_failed(self, error_msg):
+        print(f"[KOverlay] Discord re-auth failed: {error_msg}")
+        self._sync_discord_tray_status()
+        if self.cfg.get("voice_backend", "ts3") == "discord" and self.voice_thread is None:
+            self.start_voice_backend()
+        if hasattr(self, 'tray') and self.tray is not None:
+            from i18n import tr
+            self.tray.showMessage(
+                tr("discord.notify_failed_title", "KOverlay — Discord Authorization Failed"),
+                error_msg,
+                self.tray.MessageIcon.Warning,
+                6000,
+            )
+
+    def _on_discord_token_saved(self, token):
+        prev_token = self.cfg.get("discord_access_token", "")
+        self.cfg["discord_access_token"] = token
+        self.save_config()
+        self._sync_discord_tray_status()
+        if hasattr(self, 'settings_dialog') and self.settings_dialog is not None:
+            self.settings_dialog._update_discord_ui()
+        if not token and prev_token and self.cfg.get("voice_backend", "ts3") == "discord":
+            self._notify_discord_unauth("Discord authorization expired or was revoked.")
 
     def start_voice_backend(self):
         if hasattr(self, 'voice_thread') and self.voice_thread is not None:
@@ -507,12 +611,16 @@ class MainApp:
 
         backend = self.cfg.get("voice_backend", "ts3")
         self.voice_backend = backend
+        self._sync_discord_tray_status()
 
         if backend == "discord":
             from discord_client import DiscordClientThread
+            token = self.cfg.get("discord_access_token", "")
+            if not token:
+                self._notify_discord_unauth("Discord is not authorized.")
             self.voice_thread = DiscordClientThread(
                 client_id=self.cfg.get("discord_client_id", "207646673902501888"),
-                access_token=self.cfg.get("discord_access_token", ""),
+                access_token=token,
                 token_save_callback=self._on_discord_token_saved
             )
         elif backend == "mumble":
@@ -591,6 +699,8 @@ class MainApp:
     def quit(self):
         from tts_manager import get_tts_manager
         get_tts_manager().stop()
+        from audio_ducking import get_voip_audio_monitor
+        get_voip_audio_monitor().stop()
         if hasattr(self, 'voice_thread') and self.voice_thread:
             self.voice_thread.stop()
         self.tracker.stop()

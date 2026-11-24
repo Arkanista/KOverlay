@@ -95,6 +95,7 @@ jobs:
           [ -f LICENSE ] && cp LICENSE "$PKG_DIR/opt/koverlay/LICENSE" && cp LICENSE "$PKG_DIR/usr/share/doc/koverlay/copyright"
           [ -f icon.ico ] && cp icon.ico "$PKG_DIR/opt/koverlay/icon.ico"
           [ -d icons ] && cp -r icons "$PKG_DIR/opt/koverlay/"
+          [ -d locales ] && cp -r locales "$PKG_DIR/opt/koverlay/"
           if [ -d bin ]; then
             mkdir -p "$PKG_DIR/opt/koverlay/bin"
             cp -r bin/* "$PKG_DIR/opt/koverlay/bin/"
@@ -193,6 +194,7 @@ jobs:
           [ -f LICENSE ] && cp LICENSE "$APPDIR/opt/koverlay/LICENSE"
           [ -f icon.ico ] && cp icon.ico "$APPDIR/opt/koverlay/icon.ico"
           [ -d icons ] && cp -r icons "$APPDIR/opt/koverlay/"
+          [ -d locales ] && cp -r locales "$APPDIR/opt/koverlay/"
           if [ -d bin ]; then
             mkdir -p "$APPDIR/opt/koverlay/bin"
             cp -r bin/* "$APPDIR/opt/koverlay/bin/"
@@ -280,6 +282,7 @@ jobs:
           [ -f "${REPO_DIR}/LICENSE" ] && cp "${REPO_DIR}/LICENSE" %{buildroot}/opt/koverlay/LICENSE && cp "${REPO_DIR}/LICENSE" %{buildroot}/usr/share/licenses/koverlay/LICENSE
           [ -f "${REPO_DIR}/icon.ico" ] && cp "${REPO_DIR}/icon.ico" %{buildroot}/opt/koverlay/icon.ico
           [ -d "${REPO_DIR}/icons" ] && cp -r "${REPO_DIR}/icons" %{buildroot}/opt/koverlay/
+          [ -d "${REPO_DIR}/locales" ] && cp -r "${REPO_DIR}/locales" %{buildroot}/opt/koverlay/
           if [ -d "${REPO_DIR}/bin" ]; then
             mkdir -p %{buildroot}/opt/koverlay/bin
             cp -r "${REPO_DIR}/bin/"* %{buildroot}/opt/koverlay/bin/
@@ -388,6 +391,7 @@ jobs:
                   "if [ -f LICENSE ]; then cp LICENSE /app/opt/koverlay/LICENSE; fi",
                   "if [ -f icon.ico ]; then cp icon.ico /app/opt/koverlay/icon.ico; fi",
                   "if [ -d icons ]; then cp -r icons /app/opt/koverlay/; fi",
+                  "if [ -d locales ]; then cp -r locales /app/opt/koverlay/; fi",
                   "if [ -d bin ]; then mkdir -p /app/opt/koverlay/bin && cp -r bin/* /app/opt/koverlay/bin/ && chmod 755 /app/opt/koverlay/bin/*; fi",
                   "if [ -d mumble_plugin ]; then mkdir -p /app/opt/koverlay/mumble_plugin && cp -r mumble_plugin/* /app/opt/koverlay/mumble_plugin/; fi",
                   "for size in 16 32 48 64 128 256 512; do if [ -f icons/koverlay-${size}.png ]; then mkdir -p /app/share/icons/hicolor/${size}x${size}/apps && cp icons/koverlay-${size}.png /app/share/icons/hicolor/${size}x${size}/apps/io.github.arkanista.KOverlay.png; fi; done",

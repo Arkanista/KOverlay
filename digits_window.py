@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QEventLoop
 from PyQt6.QtGui import QIcon
+from i18n import tr
 
 DEFAULT_DIGIT_REPLACEMENTS = {
     "0": "o",
@@ -39,7 +40,7 @@ class DigitsWindow(QWidget):
 
     def __init__(self, current_replacements=None, parent=None):
         super().__init__(None, Qt.WindowType.Window)
-        self.setWindowTitle("TTS Digit Substitutions")
+        self.setWindowTitle(tr("digits.title", "TTS Digit Substitutions"))
         self.resize(480, 520)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
 
@@ -68,16 +69,21 @@ class DigitsWindow(QWidget):
 
         layout = QVBoxLayout(self)
 
-        info_lbl = QLabel(
+        info_lbl = QLabel(tr(
+            "digits.info",
             "Substitute numbers with letters to make gamer tags pronounceable by TTS.<br>"
             "<i>(Leave replacement blank to keep the number unchanged).</i>"
-        )
+        ))
         info_lbl.setWordWrap(True)
         layout.addWidget(info_lbl)
 
         self.table = QTableWidget()
         self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(["Digit", "Replacement", "Preset / Suggestion"])
+        self.table.setHorizontalHeaderLabels([
+            tr("digits.col_digit", "Digit"),
+            tr("digits.col_replacement", "Replacement"),
+            tr("digits.col_suggestion", "Preset / Suggestion"),
+        ])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         self.table.setColumnWidth(0, 60)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
@@ -87,9 +93,9 @@ class DigitsWindow(QWidget):
 
         # Quick preset buttons
         presets_layout = QHBoxLayout()
-        self.reset_btn = QPushButton("Reset to Defaults")
+        self.reset_btn = QPushButton(tr("digits.btn_reset", "Reset to Defaults"))
         self.reset_btn.clicked.connect(self._reset_to_defaults)
-        self.clear_btn = QPushButton("Clear All")
+        self.clear_btn = QPushButton(tr("digits.btn_clear", "Clear All"))
         self.clear_btn.clicked.connect(self._clear_all)
         presets_layout.addWidget(self.reset_btn)
         presets_layout.addWidget(self.clear_btn)
@@ -97,18 +103,18 @@ class DigitsWindow(QWidget):
         layout.addLayout(presets_layout)
 
         # Live preview group
-        preview_group = QGroupBox("Live Pronunciation Preview")
+        preview_group = QGroupBox(tr("digits.preview_group", "Live Pronunciation Preview"))
         preview_layout = QVBoxLayout(preview_group)
         
         in_row = QHBoxLayout()
-        in_row.addWidget(QLabel("Sample:"))
+        in_row.addWidget(QLabel(tr("digits.sample", "Sample:")))
         self.preview_input = QLineEdit("M4R10_77 (2ebra, 8oss, 9amer)")
         self.preview_input.textChanged.connect(self._update_preview)
         in_row.addWidget(self.preview_input)
         preview_layout.addLayout(in_row)
 
         out_row = QHBoxLayout()
-        out_row.addWidget(QLabel("Spoken:"))
+        out_row.addWidget(QLabel(tr("digits.spoken", "Spoken:")))
         self.preview_output = QLineEdit()
         self.preview_output.setReadOnly(True)
         self.preview_output.setStyleSheet("font-weight: bold; color: #4caf50;")
@@ -120,9 +126,9 @@ class DigitsWindow(QWidget):
         # Bottom buttons: Cancel and Save
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn = QPushButton(tr("settings.btn_cancel", "Cancel"))
         self.cancel_btn.clicked.connect(self.reject)
-        self.save_btn = QPushButton("Save")
+        self.save_btn = QPushButton(tr("settings.btn_save", "Save"))
         self.save_btn.setDefault(True)
         self.save_btn.clicked.connect(self.accept)
         btn_layout.addWidget(self.cancel_btn)

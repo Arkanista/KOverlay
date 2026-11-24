@@ -63,6 +63,9 @@ cp requirements.txt "$INSTALL_DIR/"
 if [ -d "icons" ]; then
     cp -r icons "$INSTALL_DIR/"
 fi
+if [ -d "locales" ]; then
+    cp -r locales "$INSTALL_DIR/"
+fi
 if [ -d "bin" ]; then
     echo "Copying bundled binaries..."
     mkdir -p "$INSTALL_DIR/bin"

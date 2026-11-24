@@ -44,6 +44,7 @@ def _migrate_legacy_config():
 def load_config():
     _migrate_legacy_config()
     default_config = {
+        "language": "en",
         "voice_backend": "ts3",
         "api_key": "",
         "mumble_port": 25640,
@@ -60,6 +61,9 @@ def load_config():
         "line_height": 0,
         "polling_interval_ms": 250,
         "tts_audio_player": "auto",
+        "tts_ducking_enabled": True,
+        "tts_duck_volume_pct": 25,
+        "tts_duck_release_ms": 80,
         "dynamic_width": True,
         "dynamic_width_right_anchor": False,
         "fixed_width": 200,
@@ -87,6 +91,8 @@ def load_config():
         with open(CONFIG_FILE, "r") as f:
             cfg = json.load(f)
             # Ensure defaults for newly introduced keys
+            if "language" not in cfg:
+                cfg["language"] = "en"
             if "voice_backend" not in cfg:
                 cfg["voice_backend"] = "ts3"
             if "mumble_port" not in cfg:
@@ -118,6 +124,12 @@ def load_config():
                 cfg["polling_interval_ms"] = 250
             if "tts_audio_player" not in cfg:
                 cfg["tts_audio_player"] = "auto"
+            if "tts_ducking_enabled" not in cfg:
+                cfg["tts_ducking_enabled"] = True
+            if "tts_duck_volume_pct" not in cfg:
+                cfg["tts_duck_volume_pct"] = 25
+            if "tts_duck_release_ms" not in cfg:
+                cfg["tts_duck_release_ms"] = 80
             if "dynamic_width" not in cfg:
                 cfg["dynamic_width"] = True
             if "dynamic_width_right_anchor" not in cfg:

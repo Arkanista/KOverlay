@@ -60,8 +60,8 @@ class SettingsWindow(QWidget):
         super().__init__(parent)
         self.setWindowTitle("KOverlay Settings")
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        self.setFixedWidth(1000)
-        self.resize(1000, 768)
+        self.setMinimumWidth(960)
+        self.resize(1100, 768)
         self.setMinimumHeight(400)
 
         icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
@@ -93,22 +93,47 @@ class SettingsWindow(QWidget):
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         
         self.container_widget = QWidget()
         layout = QVBoxLayout(self.container_widget)
 
         # Prominent Info Banner
         self.banner_label = QLabel("ℹ️ <b>Important:</b> KOverlay must remain running in the background (system tray) for the overlay to appear.")
+        self.banner_label.setWordWrap(True)
         layout.addWidget(self.banner_label)
         self._update_banner_style()
         
         # General Settings Group
-        self.general_group = QGroupBox("General settings")
+        from i18n import tr, get_available_languages, set_language, USER_LOCALES_DIR
+        self.general_group = QGroupBox(tr("settings.group_general", "Voice Backend & Connection"))
         general_group_layout = QVBoxLayout()
+
+        # Language Selector
+        lang_layout = QHBoxLayout()
+        self.language_label = QLabel(f"<b>{tr('settings.language', 'Language:')}</b>")
+        lang_layout.addWidget(self.language_label)
+        self.language_combo = QComboBox()
+        for code, disp_name in get_available_languages().items():
+            self.language_combo.addItem(f"{disp_name} ({code})", code)
+        cur_lang = self.config.get("language", "en")
+        lang_idx = self.language_combo.findData(cur_lang)
+        if lang_idx >= 0:
+            self.language_combo.setCurrentIndex(lang_idx)
+        self.language_combo.currentIndexChanged.connect(self._on_language_changed)
+        lang_layout.addWidget(self.language_combo)
+
+        self.open_locales_btn = QPushButton(tr("settings.open_locales_btn", "Open Locales Folder"))
+        self.open_locales_btn.setToolTip(f"User-editable translations folder: {USER_LOCALES_DIR}")
+        self.open_locales_btn.clicked.connect(self._open_locales_folder)
+        lang_layout.addWidget(self.open_locales_btn)
+        lang_layout.addStretch()
+        general_group_layout.addLayout(lang_layout)
         
         # Voice Platform Selection
         backend_layout = QHBoxLayout()
-        backend_layout.addWidget(QLabel("<b>Voice Platform:</b>"))
+        self.voice_platform_label = QLabel("<b>Voice Platform:</b>")
+        backend_layout.addWidget(self.voice_platform_label)
         self.backend_ts3_radio = QRadioButton("TeamSpeak 3")
         self.backend_mumble_radio = QRadioButton("Mumble")
         self.backend_discord_radio = QRadioButton("Discord")
@@ -140,7 +165,8 @@ class SettingsWindow(QWidget):
         self.api_key_input.setText(self.config.get("api_key", ""))
         self.api_key_input.setPlaceholderText("Enter TS3 API Key here")
         self.api_key_input.editingFinished.connect(self._on_change)
-        ts3_layout.addWidget(QLabel("TS3 API Key:"))
+        self.ts3_key_label = QLabel("TS3 API Key:")
+        ts3_layout.addWidget(self.ts3_key_label)
         ts3_layout.addWidget(self.api_key_input)
         general_group_layout.addWidget(self.ts3_widget)
 
@@ -148,7 +174,8 @@ class SettingsWindow(QWidget):
         self.mumble_widget = QWidget()
         mumble_layout = QHBoxLayout(self.mumble_widget)
         mumble_layout.setContentsMargins(0, 0, 0, 0)
-        mumble_layout.addWidget(QLabel("Mumble IPC Port:"))
+        self.mumble_port_label = QLabel("Mumble IPC Port:")
+        mumble_layout.addWidget(self.mumble_port_label)
         self.mumble_port_spin = QSpinBox()
         self.mumble_port_spin.setRange(1024, 65535)
         self.mumble_port_spin.setValue(self.config.get("mumble_port", 25640))
@@ -161,24 +188,35 @@ class SettingsWindow(QWidget):
         mumble_layout.addStretch()
         general_group_layout.addWidget(self.mumble_widget)
 
-        # 3. Discord Widget
+        # 3. Discord Widget (2 rows so translations never overflow horizontally)
         self.discord_widget = QWidget()
-        discord_layout = QHBoxLayout(self.discord_widget)
+        discord_layout = QVBoxLayout(self.discord_widget)
         discord_layout.setContentsMargins(0, 0, 0, 0)
+        discord_layout.setSpacing(6)
+
+        discord_row1 = QHBoxLayout()
         self.discord_status_label = QLabel("Discord connects automatically via local IPC.")
-        discord_layout.addWidget(self.discord_status_label)
+        discord_row1.addWidget(self.discord_status_label)
         self.discord_auth_btn = QPushButton("Authorize Discord")
         self.discord_auth_btn.clicked.connect(self._on_discord_auth_btn_clicked)
-        discord_layout.addWidget(self.discord_auth_btn)
+        discord_row1.addWidget(self.discord_auth_btn)
 
-        discord_layout.addSpacing(20)
+        self.discord_reauth_btn = QPushButton("Re-authorize")
+        self.discord_reauth_btn.setToolTip("Request a fresh Discord authorization token without unauthorizing first.")
+        self.discord_reauth_btn.clicked.connect(self._start_discord_authorization)
+        discord_row1.addWidget(self.discord_reauth_btn)
+        discord_row1.addStretch()
+        discord_layout.addLayout(discord_row1)
+
+        discord_row2 = QHBoxLayout()
         self.discord_icons_checkbox = QCheckBox("Show status icons (mute, deafen, etc.)")
         self.discord_icons_checkbox.setChecked(self.config.get("discord_show_status_icons", True))
         self.discord_icons_checkbox.toggled.connect(self._on_change)
-        discord_layout.addWidget(self.discord_icons_checkbox)
+        discord_row2.addWidget(self.discord_icons_checkbox)
 
-        discord_layout.addSpacing(10)
-        discord_layout.addWidget(QLabel("Icons side:"))
+        discord_row2.addSpacing(10)
+        self.discord_icons_side_label = QLabel("Icons side:")
+        discord_row2.addWidget(self.discord_icons_side_label)
         self.discord_icons_pos_combo = QComboBox()
         self.discord_icons_pos_combo.addItem("Right of nickname (Default)", "right")
         self.discord_icons_pos_combo.addItem("Left of nickname", "left")
@@ -188,9 +226,10 @@ class SettingsWindow(QWidget):
         self.discord_icons_pos_combo.setEnabled(self.discord_icons_checkbox.isChecked())
         self.discord_icons_checkbox.toggled.connect(self.discord_icons_pos_combo.setEnabled)
         self.discord_icons_pos_combo.currentIndexChanged.connect(self._on_change)
-        discord_layout.addWidget(self.discord_icons_pos_combo)
+        discord_row2.addWidget(self.discord_icons_pos_combo)
+        discord_row2.addStretch()
+        discord_layout.addLayout(discord_row2)
 
-        discord_layout.addStretch()
         general_group_layout.addWidget(self.discord_widget)
         self._auth_thread = None
 
@@ -204,7 +243,8 @@ class SettingsWindow(QWidget):
         self.keywords_input.setText(", ".join(current_keywords))
         self.keywords_input.setPlaceholderText("e.g. EVE - , exefile.exe")
         self.keywords_input.editingFinished.connect(self._on_change)
-        keywords_layout.addWidget(QLabel("Target Window Keywords (comma separated):"))
+        self.keywords_label = QLabel("Target Window Keywords (comma separated):")
+        keywords_layout.addWidget(self.keywords_label)
         keywords_layout.addWidget(self.keywords_input)
         general_group_layout.addLayout(keywords_layout)
         
@@ -258,7 +298,8 @@ class SettingsWindow(QWidget):
         self.history_dur_slider.setEnabled(self.history_checkbox.isChecked())
         self.history_checkbox.toggled.connect(self.history_dur_slider.setEnabled)
         
-        history_dur_layout.addWidget(QLabel("Duration:"))
+        self.history_dur_label = QLabel("Duration:")
+        history_dur_layout.addWidget(self.history_dur_label)
         history_dur_layout.addWidget(self.history_dur_slider)
         history_dur_layout.addWidget(self.history_dur_val_label)
         
@@ -277,7 +318,8 @@ class SettingsWindow(QWidget):
 
         # Row 1: Sorting options & Limit users
         row1_layout = QHBoxLayout()
-        row1_layout.addWidget(QLabel("User list sorting:"))
+        self.sorting_label = QLabel("User list sorting:")
+        row1_layout.addWidget(self.sorting_label)
         
         self.sort_order_combo = QComboBox()
         self.sort_order_combo.addItem("Alphabetical (recent speakers on top while fading)", "alphabetical_fading_top")
@@ -314,17 +356,19 @@ class SettingsWindow(QWidget):
         self.limit_users_checkbox.toggled.connect(self.limit_users_input.setEnabled)
         self.limit_users_input.textChanged.connect(self._on_change)
         row1_layout.addWidget(self.limit_users_input)
-        row1_layout.addWidget(QLabel("users"))
+        self.users_suffix_label = QLabel("users")
+        row1_layout.addWidget(self.users_suffix_label)
         row1_layout.addStretch()
         speakers_layout.addLayout(row1_layout)
 
         # Informational note regarding users who left
-        sort_note = QLabel("<span style='color: gray; font-size: 11px;'>Note: Users who left the channel are always placed at the bottom of the list.</span>")
-        speakers_layout.addWidget(sort_note)
+        self.sort_note_label = QLabel("<span style='color: gray; font-size: 11px;'>Note: Users who left the channel are always placed at the bottom of the list.</span>")
+        speakers_layout.addWidget(self.sort_note_label)
 
         # Row 2: Speaker fade duration (0-60s)
         fade_layout = QHBoxLayout()
-        fade_layout.addWidget(QLabel("Keep recent speakers highlighted (fade duration):"))
+        self.fade_label = QLabel("Keep recent speakers highlighted (fade duration):")
+        fade_layout.addWidget(self.fade_label)
         self.speaker_fade_slider = QSlider(Qt.Orientation.Horizontal)
         self.speaker_fade_slider.setRange(0, 60)
         self.speaker_fade_slider.setValue(int(self.config.get("speaker_fade_duration", 5)))
@@ -406,8 +450,9 @@ class SettingsWindow(QWidget):
             p_desc = player_short_names.get(p_type, p_type or "none")
 
             if available:
+                from i18n import tr
                 self.install_tts_btn.setVisible(False)
-                self.tts_checkbox.setText("Enable TTS Voice Announcements")
+                self.tts_checkbox.setText(tr("settings.tts_enable", "Enable TTS Voice Announcements"))
                 self.tts_checkbox.setEnabled(True)
                 if auto_enable_on_ready:
                     self.tts_checkbox.setChecked(True)
@@ -500,7 +545,8 @@ class SettingsWindow(QWidget):
         if sys.platform != "win32":
             available_players = tts_status.get("available_players", [])
             player_row_layout = QHBoxLayout()
-            player_row_layout.addWidget(QLabel("Audio Engine (Linux):"))
+            self.tts_engine_label = QLabel("Audio Engine (Linux):")
+            player_row_layout.addWidget(self.tts_engine_label)
 
             self.tts_player_combo = QComboBox()
             best_auto = available_players[0][0] if available_players else "none"
@@ -542,44 +588,27 @@ class SettingsWindow(QWidget):
             self.tts_player_info_btn.setCursor(Qt.CursorShape.PointingHandCursor)
 
             def show_player_recommendations():
+                from i18n import tr
                 cur_st = check_tts_status(self.tts_player_combo.currentData())
                 det_list = cur_st.get("available_players", [])
                 active_p = cur_st.get("player_type")
+                active_badge = tr("settings.engine_dlg_active", "[ACTIVE]")
                 if det_list:
                     detected_html = "".join(
                         f"&bull; <b>{pt}</b> (<code>{pb}</code>)"
-                        + (" &mdash; <span style='color:#4caf50;'><b>[ACTIVE]</b></span>" if pt == active_p else "")
+                        + (f" &mdash; <span style='color:#4caf50;'><b>{active_badge}</b></span>" if pt == active_p else "")
                         + "<br>"
                         for pt, pb in det_list
                     )
                 else:
-                    detected_html = "<i>No supported audio players detected!</i><br>"
+                    detected_html = tr("settings.engine_dlg_none", "<i>No supported audio players detected!</i><br>")
 
                 msg = (
-                    "<h3>Linux TTS Audio Engines — Comparison & Recommendations</h3>"
-                    "<b>Currently Detected on Your System:</b><br>"
-                    f"{detected_html}<br>"
-                    "<hr>"
-                    "<b>★ Tier 1 — Recommended: <code>mpv</code> &amp; <code>ffplay</code></b><br>"
-                    "&bull; <b>Why recommended:</b> Both support real-time hardware-accelerated audio filtering "
-                    "(<code>silenceremove</code>). Microsoft Edge TTS audio files include ~200–400ms of leading and trailing silence. "
-                    "<code>mpv</code> and <code>ffplay</code> strip this silence on the fly, delivering <b>instant, gapless voice announcements</b> "
-                    "with zero delay when multiple users join/leave rapidly, and very low CPU overhead.<br><br>"
-                    "<b>● Tier 2 — Standard Native Fallback: <code>pw-play</code> (PipeWire)</b><br>"
-                    "&bull; <b>Why worse than mpv/ffplay:</b> Pre-installed out-of-the-box on modern and immutable Linux distributions "
-                    "(such as <b>Bazzite, SteamOS, Fedora Silverblue/Kinoite</b>), allowing TTS to work immediately without extra packages. "
-                    "However, <code>pw-play</code> does <b>not</b> support real-time silence trimming, so announcements have a slight natural pause "
-                    "before and after each phrase.<br><br>"
-                    "<b>○ Tier 3 — Secondary Fallbacks: <code>paplay</code>, <code>gst-play-1.0</code>, <code>cvlc</code></b><br>"
-                    "&bull; <b><code>paplay</code> (PulseAudio):</b> No silence trimming and routes audio through the PulseAudio compatibility layer "
-                    "(<code>pipewire-pulse</code>) instead of native PipeWire.<br>"
-                    "&bull; <b><code>gst-play-1.0</code> (GStreamer) &amp; <code>cvlc</code> (VLC):</b> No silence trimming and noticeably higher process "
-                    "startup latency when initializing the GStreamer/VLC pipeline for every short TTS clip.<br><br>"
-                    "<i><b>Tip for Bazzite / Immutable Linux users:</b> If only <code>pw-play</code>/<code>paplay</code> are detected and you want "
-                    "gapless <code>mpv</code> playback without modifying your read-only root system, you can install <code>mpv</code> in user-space via "
-                    "Homebrew: <code>brew install mpv</code> (then reopen Settings).</i>"
+                    tr("settings.engine_dlg_header", "<h3>Linux TTS Audio Engines — Comparison & Recommendations</h3><b>Currently Detected on Your System:</b><br>")
+                    + f"{detected_html}<br>"
+                    + tr("settings.engine_dlg_body", "")
                 )
-                QMessageBox.information(self, "TTS Audio Engines — Recommendations", msg)
+                QMessageBox.information(self, tr("settings.engine_dlg_title", "TTS Audio Engines — Recommendations"), msg)
 
             self.tts_player_info_btn.clicked.connect(show_player_recommendations)
             player_row_layout.addWidget(self.tts_player_info_btn)
@@ -590,13 +619,13 @@ class SettingsWindow(QWidget):
             note_text = "Note: Uses high-quality voices over the internet. Requires 'edge-tts' Python module (supports built-in Windows audio or mpv.exe)."
         else:
             note_text = "Note: Uses high-quality voices over the internet. Requires 'edge-tts' and an audio player (mpv, ffplay, pw-play, paplay, or gst-play-1.0)."
-        info_label = QLabel(note_text)
-        font = info_label.font()
+        self.tts_info_label = QLabel(note_text)
+        font = self.tts_info_label.font()
         font.setPointSize(font.pointSize() - 2)
-        info_label.setFont(font)
-        info_label.setStyleSheet("color: gray;")
-        info_label.setWordWrap(True)
-        tts_layout.addWidget(info_label)
+        self.tts_info_label.setFont(font)
+        self.tts_info_label.setStyleSheet("color: gray;")
+        self.tts_info_label.setWordWrap(True)
+        tts_layout.addWidget(self.tts_info_label)
         
         # Join & Leave Event TTS
         events_layout = QHBoxLayout()
@@ -630,12 +659,12 @@ class SettingsWindow(QWidget):
         tts_layout.addLayout(events_layout)
         
         # Variable Info Label
-        var_info_label = QLabel("Use %NICK in the text above to insert the user's name.")
-        var_font = var_info_label.font()
+        self.var_info_label = QLabel("Use %NICK in the text above to insert the user's name.")
+        var_font = self.var_info_label.font()
         var_font.setPointSize(var_font.pointSize() - 2)
-        var_info_label.setFont(var_font)
-        var_info_label.setStyleSheet("color: gray;")
-        tts_layout.addWidget(var_info_label)
+        self.var_info_label.setFont(var_font)
+        self.var_info_label.setStyleSheet("color: gray;")
+        tts_layout.addWidget(self.var_info_label)
 
         # Nickname formatting & Pronunciation layout
         tts_pronunciation_layout = QHBoxLayout()
@@ -726,7 +755,8 @@ class SettingsWindow(QWidget):
         
         # Voice selection
         tts_voice_layout = QHBoxLayout()
-        tts_voice_layout.addWidget(QLabel("Voice:"))
+        self.tts_voice_label = QLabel("Voice:")
+        tts_voice_layout.addWidget(self.tts_voice_label)
         self.tts_voice_combo = QComboBox()
         self.tts_voices = [
             ("English (US, Female) - Aria", "en-US-AriaNeural"),
@@ -757,7 +787,8 @@ class SettingsWindow(QWidget):
         
         tts_voice_layout.addWidget(self.tts_voice_combo)
         
-        tts_voice_layout.addWidget(QLabel("Speed:"))
+        self.tts_speed_label = QLabel("Speed:")
+        tts_voice_layout.addWidget(self.tts_speed_label)
         self.tts_rate_combo = QComboBox()
         self.tts_rates = [
             ("Slow (-25%)", "-25%"),
@@ -820,12 +851,110 @@ class SettingsWindow(QWidget):
         tts_sliders_layout.addWidget(self.tts_vol_slider)
         tts_sliders_layout.addWidget(self.tts_vol_val_label)
         tts_layout.addLayout(tts_sliders_layout)
+
+        # Ducking controls (lower TTS volume while someone is actively speaking)
+        duck_enable_layout = QHBoxLayout()
+        self.tts_duck_checkbox = QCheckBox("Duck TTS volume when someone is speaking (real audio)")
+        self.tts_duck_checkbox.setChecked(self.config.get("tts_ducking_enabled", True))
+        self.tts_duck_checkbox.setToolTip(
+            "Lowers TTS volume when a user on the userlist is talking and audio is actually detected from the VoIP app (ignores silent PTT key-up)."
+        )
+        self.tts_duck_checkbox.toggled.connect(self._on_change)
+        duck_enable_layout.addWidget(self.tts_duck_checkbox)
+        duck_enable_layout.addStretch()
+        tts_layout.addLayout(duck_enable_layout)
+
+        duck_vol_layout = QHBoxLayout()
+        self.tts_duck_vol_label = QLabel("Ducking volume:")
+        self.tts_duck_vol_slider = QSlider(Qt.Orientation.Horizontal)
+        self.tts_duck_vol_slider.setMinimum(0)
+        self.tts_duck_vol_slider.setMaximum(100)
+        self.tts_duck_vol_slider.setSingleStep(5)
+        self.tts_duck_vol_slider.setTickInterval(10)
+        self.tts_duck_vol_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+
+        current_duck_pct = self.config.get("tts_duck_volume_pct", 25)
+        self.tts_duck_vol_val_label = QLabel()
+        self.tts_duck_vol_val_label.setMinimumWidth(95)
+
+        def _update_duck_vol_label(*_):
+            pct = self.tts_duck_vol_slider.value()
+            eff = int(round(self.tts_vol_slider.value() * (pct / 100.0)))
+            self.tts_duck_vol_val_label.setText(f"{pct}% (eff: {eff}%)")
+
+        self.tts_duck_vol_slider.blockSignals(True)
+        self.tts_duck_vol_slider.setValue(current_duck_pct)
+        self.tts_duck_vol_slider.blockSignals(False)
+        _update_duck_vol_label()
+        self.tts_duck_vol_slider.valueChanged.connect(_update_duck_vol_label)
+        self.tts_vol_slider.valueChanged.connect(_update_duck_vol_label)
+        self.tts_duck_vol_slider.valueChanged.connect(self._on_change)
+
+        duck_vol_layout.addWidget(self.tts_duck_vol_label)
+        duck_vol_layout.addWidget(self.tts_duck_vol_slider)
+        duck_vol_layout.addWidget(self.tts_duck_vol_val_label)
+        tts_layout.addLayout(duck_vol_layout)
+
+        duck_probe_layout = QHBoxLayout()
+        self.tts_duck_release_label = QLabel("Probing / release time:")
+        self.tts_duck_release_spin = QSpinBox()
+        self.tts_duck_release_spin.setRange(20, 500)
+        self.tts_duck_release_spin.setSingleStep(10)
+        self.tts_duck_release_spin.setValue(self.config.get("tts_duck_release_ms", 80))
+        self.tts_duck_release_spin.setSuffix(" ms")
+        self.tts_duck_release_spin.setToolTip(
+            "How long to keep TTS ducked after voice audio drops below threshold. Recommended for testing: 60-100 ms."
+        )
+        self.tts_duck_release_spin.valueChanged.connect(self._on_change)
+        self.duck_probe_hint_label = QLabel("(Recommended: 60–100 ms, test)")
+        self.duck_probe_hint_label.setStyleSheet("color: gray; font-size: 11px;")
+
+        duck_probe_layout.addWidget(self.tts_duck_release_label)
+        duck_probe_layout.addWidget(self.tts_duck_release_spin)
+        duck_probe_layout.addWidget(self.duck_probe_hint_label)
+        duck_probe_layout.addStretch()
+
+        self.tts_duck_test_btn = QPushButton("Test Ducking")
+        self.tts_duck_test_btn.setToolTip(
+            "Plays a test announcement and simulates someone speaking in the middle so you can hear the ducking level."
+        )
+        self.tts_duck_test_btn.clicked.connect(self._test_ducking)
+        duck_probe_layout.addWidget(self.tts_duck_test_btn)
+
+        tts_layout.addLayout(duck_probe_layout)
+
+        def _sync_duck_enabled(*_):
+            from tts_manager import find_audio_player, supports_live_ducking
+            enabled = self.tts_checkbox.isChecked()
+            pref = self.tts_player_combo.currentData() if hasattr(self, "tts_player_combo") else self.config.get("tts_audio_player", "auto")
+            p_type, _ = find_audio_player(pref)
+            supported = supports_live_ducking(p_type)
+            duck_on = enabled and supported and self.tts_duck_checkbox.isChecked()
+            self.tts_duck_checkbox.setEnabled(enabled and supported)
+            self.tts_duck_vol_slider.setEnabled(duck_on)
+            self.tts_duck_release_spin.setEnabled(duck_on)
+            self.tts_duck_test_btn.setEnabled(duck_on)
+            if not supported:
+                self.tts_duck_checkbox.setToolTip(
+                    "Live ducking is not supported for the selected audio player (requires mpv or pactl on Linux, or win32_mci on Windows)."
+                )
+            else:
+                self.tts_duck_checkbox.setToolTip(
+                    "Lowers TTS volume when a user on the userlist is talking and audio is actually detected from the VoIP app (ignores silent PTT key-up)."
+                )
+
+        _sync_duck_enabled()
+        self.tts_checkbox.toggled.connect(_sync_duck_enabled)
+        self.tts_duck_checkbox.toggled.connect(_sync_duck_enabled)
+        if hasattr(self, "tts_player_combo"):
+            self.tts_player_combo.currentIndexChanged.connect(_sync_duck_enabled)
         
         # Cache controls
         tts_cache_layout = QHBoxLayout()
         from tts_manager import get_tts_manager
         tts_manager = get_tts_manager(self.config)
         size_mb = tts_manager.get_cache_size()
+        self._last_cache_size_mb = size_mb
         
         self.cache_size_label = QLabel(f"Cache size: {size_mb:.2f} MB")
         self.cache_size_label.setFixedWidth(140)
@@ -860,8 +989,9 @@ class SettingsWindow(QWidget):
         
         # Path label
         cache_path = get_tts_manager(self.config).cache_dir
-        path_label = QLabel(f"<span style='color: gray; font-size: 10px;'>Path: {cache_path}</span>")
-        tts_layout.addWidget(path_label)
+        self._cache_path_str = cache_path
+        self.cache_path_label = QLabel(f"<span style='color: gray; font-size: 10px;'>Path: {cache_path}</span>")
+        tts_layout.addWidget(self.cache_path_label)
         
         self.tts_group.setLayout(tts_layout)
         layout.addWidget(self.tts_group)
@@ -965,7 +1095,8 @@ class SettingsWindow(QWidget):
         self.dynamic_width_checkbox.toggled.connect(lambda checked: self.fixed_width_slider.setEnabled(not checked))
         
         width_layout.addLayout(dyn_width_col)
-        width_layout.addWidget(QLabel("Fixed Width:"))
+        self.fixed_width_label = QLabel("Fixed Width:")
+        width_layout.addWidget(self.fixed_width_label)
         width_layout.addWidget(self.fixed_width_slider)
         width_layout.addWidget(self.fixed_width_val_label)
         
@@ -1015,11 +1146,14 @@ class SettingsWindow(QWidget):
         self.line_height_spin.setValue(self.config.get("line_height", 0))
         self.line_height_spin.valueChanged.connect(self._on_change)
 
-        font_layout.addWidget(QLabel("Font:"))
+        self.font_label = QLabel("Font:")
+        font_layout.addWidget(self.font_label)
         font_layout.addWidget(self.font_combo)
-        font_layout.addWidget(QLabel("Size:"))
+        self.font_size_label = QLabel("Size:")
+        font_layout.addWidget(self.font_size_label)
         font_layout.addWidget(self.font_size)
-        font_layout.addWidget(QLabel("Line height:"))
+        self.line_height_label = QLabel("Line height:")
+        font_layout.addWidget(self.line_height_label)
         font_layout.addWidget(self.line_height_spin)
         self.line_height_auto_btn = QPushButton("Auto")
         self.line_height_auto_btn.setToolTip("Reset line height to Auto (calculated dynamically from font size)")
@@ -1100,10 +1234,13 @@ class SettingsWindow(QWidget):
         layout.addStretch()
         layout.addLayout(button_layout)
         
+        # Only wrap full-width banner/note labels (never short inline row labels)
+        self.retranslate_ui()
+
         self.scroll_area.setWidget(self.container_widget)
         self.main_layout.addWidget(self.scroll_area)
-        
-        self.resize(1000, min(self.container_widget.sizeHint().height() + 20, 768))
+
+        self._fit_window_to_content()
         
         # Prevent accidental scrolling changes
         self.scroll_filter = ScrollFilter(self)
@@ -1321,16 +1458,22 @@ class SettingsWindow(QWidget):
             self._update_discord_ui()
 
     def _update_discord_ui(self):
+        from i18n import tr
         if hasattr(self, 'discord_status_label') and hasattr(self, 'discord_auth_btn'):
             token = self.config.get("discord_access_token", "")
             if token:
-                self.discord_status_label.setText("Discord: Authorized (Local IPC)")
-                self.discord_auth_btn.setText("Unauthorize Discord")
+                self.discord_status_label.setText(tr("settings.discord_status_auth", "Discord: Authorized (Local IPC)"))
+                self.discord_auth_btn.setText(tr("settings.discord_btn_unauth", "Unauthorize Discord"))
                 self.discord_auth_btn.setEnabled(True)
+                if hasattr(self, 'discord_reauth_btn'):
+                    self.discord_reauth_btn.setVisible(True)
+                    self.discord_reauth_btn.setEnabled(True)
             else:
-                self.discord_status_label.setText("Discord: Not authorized")
-                self.discord_auth_btn.setText("Authorize Discord")
+                self.discord_status_label.setText(tr("settings.discord_status_unauth", "Discord: Not authorized"))
+                self.discord_auth_btn.setText(tr("settings.discord_btn_auth", "Authorize Discord"))
                 self.discord_auth_btn.setEnabled(True)
+                if hasattr(self, 'discord_reauth_btn'):
+                    self.discord_reauth_btn.setVisible(False)
 
     def _on_backend_toggled(self, checked=True):
         if not checked:
@@ -1355,13 +1498,17 @@ class SettingsWindow(QWidget):
             self._sync_backend_widgets()
 
     def _on_discord_auth_btn_clicked(self):
+        from i18n import tr
         token = self.config.get("discord_access_token", "")
         if token:
             reply = QMessageBox.question(
                 self,
-                "Unauthorize Discord",
-                "Are you sure you want to unauthorize Discord?<br><br>"
-                "This will disconnect KOverlay from Discord and clear the saved authorization token.",
+                tr("settings.discord_dlg_unauth_title", "Unauthorize Discord"),
+                tr(
+                    "settings.discord_dlg_unauth_msg",
+                    "Are you sure you want to unauthorize Discord?<br><br>"
+                    "This will disconnect KOverlay from Discord and clear the saved authorization token.",
+                ),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No
             )
@@ -1371,17 +1518,20 @@ class SettingsWindow(QWidget):
                 self._update_discord_ui()
                 QMessageBox.information(
                     self,
-                    "Discord Unauthorized",
-                    "Discord access token has been cleared successfully."
+                    tr("settings.discord_dlg_unauth_done_title", "Discord Unauthorized"),
+                    tr("settings.discord_dlg_unauth_done_msg", "Discord access token has been cleared successfully."),
                 )
         else:
             self._start_discord_authorization()
 
     def _start_discord_authorization(self):
         from discord_client import DiscordAuthThread
+        from i18n import tr
         self.discord_auth_btn.setEnabled(False)
-        self.discord_auth_btn.setText("Authorizing... (Check Discord)")
-        self.discord_status_label.setText("Discord: Waiting for authorization in Discord...")
+        if hasattr(self, 'discord_reauth_btn'):
+            self.discord_reauth_btn.setEnabled(False)
+        self.discord_auth_btn.setText(tr("settings.discord_btn_authorizing", "Authorizing... (Check Discord)"))
+        self.discord_status_label.setText(tr("settings.discord_status_waiting", "Discord: Waiting for authorization in Discord..."))
 
         if hasattr(self, '_auth_thread') and self._auth_thread is not None and self._auth_thread.isRunning():
             self._auth_thread.cancel()
@@ -1396,6 +1546,7 @@ class SettingsWindow(QWidget):
 
     def _on_discord_auth_success(self, token):
         from PyQt6 import sip
+        from i18n import tr
         if getattr(self, "_is_closing", False) or sip.isdeleted(self):
             return
         self.config["discord_access_token"] = token
@@ -1403,19 +1554,20 @@ class SettingsWindow(QWidget):
         self._update_discord_ui()
         QMessageBox.information(
             self,
-            "Discord Authorized",
-            "Discord authorization successful!<br>KOverlay is now connected to Discord."
+            tr("settings.discord_dlg_auth_ok_title", "Discord Authorized"),
+            tr("settings.discord_dlg_auth_ok_msg", "Discord authorization successful!<br>KOverlay is now connected to Discord."),
         )
 
     def _on_discord_auth_failed(self, error_msg):
         from PyQt6 import sip
+        from i18n import tr
         if getattr(self, "_is_closing", False) or sip.isdeleted(self):
             return
         self._update_discord_ui()
         QMessageBox.warning(
             self,
-            "Discord Authorization Failed",
-            f"Could not authorize Discord:<br><br>{error_msg}"
+            tr("settings.discord_dlg_auth_fail_title", "Discord Authorization Failed"),
+            tr("settings.discord_dlg_auth_fail_msg", "Could not authorize Discord:<br><br>{error}", error=error_msg),
         )
 
     def _install_mumble_plugin(self):
@@ -1603,6 +1755,14 @@ class SettingsWindow(QWidget):
         self.config["tts_rate"] = self.tts_rate_combo.currentData()
         self.config["tts_delay_ms"] = self.tts_delay_slider.value()
         self.config["tts_volume"] = self.tts_vol_slider.value()
+        if hasattr(self, 'language_combo'):
+            self.config["language"] = self.language_combo.currentData()
+        if hasattr(self, 'tts_duck_checkbox'):
+            self.config["tts_ducking_enabled"] = self.tts_duck_checkbox.isChecked()
+        if hasattr(self, 'tts_duck_vol_slider'):
+            self.config["tts_duck_volume_pct"] = self.tts_duck_vol_slider.value()
+        if hasattr(self, 'tts_duck_release_spin'):
+            self.config["tts_duck_release_ms"] = self.tts_duck_release_spin.value()
         if hasattr(self, 'tts_player_combo'):
             self.config["tts_audio_player"] = self.tts_player_combo.currentData()
         
@@ -1661,6 +1821,255 @@ class SettingsWindow(QWidget):
             count = len(self.config["nickname_prefixes"])
             self.prefix_count_label.setText(f"({count} custom)" if count > 0 else "")
             self._on_change()
+
+    def retranslate_ui(self):
+        from i18n import tr
+        self.setWindowTitle(tr("settings.title", "KOverlay Settings"))
+        if hasattr(self, 'banner_label'):
+            self.banner_label.setText(tr("settings.banner_important", "ℹ️ <b>Important:</b> KOverlay must remain running in the background (system tray) for the overlay to appear."))
+        if hasattr(self, 'general_group'):
+            self.general_group.setTitle(tr("settings.group_general", "Voice Backend & Connection"))
+        if hasattr(self, 'language_label'):
+            self.language_label.setText(f"<b>{tr('settings.language', 'Language:')}</b>")
+        if hasattr(self, 'open_locales_btn'):
+            self.open_locales_btn.setText(tr("settings.open_locales_btn", "Open Locales Folder"))
+        if hasattr(self, 'voice_platform_label'):
+            self.voice_platform_label.setText(f"<b>{tr('settings.voice_platform', 'Voice Platform:')}</b>")
+        if hasattr(self, 'ts3_key_label'):
+            self.ts3_key_label.setText(tr("settings.ts3_api_key", "TS3 API Key:"))
+        if hasattr(self, 'mumble_port_label'):
+            self.mumble_port_label.setText(tr("settings.mumble_port", "Mumble IPC Port:"))
+        if hasattr(self, 'backend_ts3_radio'):
+            self.backend_ts3_radio.setText(tr("settings.backend_ts3", "TeamSpeak 3"))
+        if hasattr(self, 'backend_mumble_radio'):
+            self.backend_mumble_radio.setText(tr("settings.backend_mumble", "Mumble"))
+        if hasattr(self, 'backend_discord_radio'):
+            self.backend_discord_radio.setText(tr("settings.backend_discord", "Discord"))
+        if hasattr(self, 'mumble_install_btn'):
+            self.mumble_install_btn.setText(tr("settings.mumble_install_btn", "Install / Recompile Mumble Plugin"))
+        if hasattr(self, 'discord_reauth_btn'):
+            self.discord_reauth_btn.setText(tr("settings.discord_btn_reauth", "Re-authorize"))
+        self._update_discord_ui()
+        if hasattr(self, 'discord_icons_checkbox'):
+            self.discord_icons_checkbox.setText(tr("settings.discord_show_icons", "Show status icons (mute, deafen, etc.)"))
+        if hasattr(self, 'discord_icons_side_label'):
+            self.discord_icons_side_label.setText(tr("settings.discord_icons_side", "Icons side:"))
+        if hasattr(self, 'discord_icons_pos_combo'):
+            side_texts = {
+                "right": tr("settings.discord_icons_right", "Right of nickname (Default)"),
+                "left": tr("settings.discord_icons_left", "Left of nickname"),
+            }
+            for i in range(self.discord_icons_pos_combo.count()):
+                d_val = self.discord_icons_pos_combo.itemData(i)
+                if d_val in side_texts:
+                    self.discord_icons_pos_combo.setItemText(i, side_texts[d_val])
+        if hasattr(self, 'game_only_checkbox'):
+            self.game_only_checkbox.setText(tr("settings.game_only", "Show ONLY when game is active"))
+        if hasattr(self, 'hide_delay_checkbox'):
+            self.hide_delay_checkbox.setText(tr("settings.hide_delay", "Delay hiding when game loses focus"))
+        if hasattr(self, 'keywords_label'):
+            self.keywords_label.setText(tr("settings.target_keywords", "Target Window Keywords (comma separated):"))
+        if hasattr(self, 'history_group'):
+            self.history_group.setTitle(tr("settings.group_history", "Join/Leave History"))
+        if hasattr(self, 'history_checkbox'):
+            self.history_checkbox.setText(tr("settings.history_enable", "Enable Join/Leave History (🡅 / 🡇 indicators)"))
+        if hasattr(self, 'history_dur_label'):
+            self.history_dur_label.setText(tr("settings.history_duration", "Duration:"))
+        if hasattr(self, 'speakers_group'):
+            self.speakers_group.setTitle(tr("settings.group_speakers", "User List & Speaking Behavior"))
+        if hasattr(self, 'sorting_label'):
+            self.sorting_label.setText(tr("settings.user_sorting", "User list sorting:"))
+        if hasattr(self, 'sort_order_combo'):
+            sort_texts = {
+                "alphabetical_fading_top": tr("settings.sort_alpha_fading", "Alphabetical (recent speakers on top while fading)"),
+                "recent_speakers": tr("settings.sort_recent_top", "Recent speakers on top (most recent first)"),
+                "alphabetical": tr("settings.sort_alpha_inplace", "Alphabetical (speakers in-place)"),
+            }
+            for i in range(self.sort_order_combo.count()):
+                key_data = self.sort_order_combo.itemData(i)
+                if key_data in sort_texts:
+                    self.sort_order_combo.setItemText(i, sort_texts[key_data])
+        if hasattr(self, 'limit_users_checkbox'):
+            self.limit_users_checkbox.setText(tr("settings.limit_users", "Limit user list to:"))
+        if hasattr(self, 'users_suffix_label'):
+            self.users_suffix_label.setText(tr("settings.users_suffix", "users"))
+        if hasattr(self, 'sort_note_label'):
+            self.sort_note_label.setText(f"<span style='color: gray; font-size: 11px;'>{tr('settings.sort_note', 'Note: Users who left the channel are always placed at the bottom of the list.')}</span>")
+        if hasattr(self, 'fade_label'):
+            self.fade_label.setText(tr("settings.fade_duration", "Keep recent speakers highlighted (fade duration):"))
+        if hasattr(self, 'strip_brackets_checkbox'):
+            self.strip_brackets_checkbox.setText(tr("settings.strip_brackets", "Remove all bracket tags ([...], (...), {...})"))
+        if hasattr(self, 'nick_prefix_btn'):
+            self.nick_prefix_btn.setText(tr("settings.nick_prefixes_btn", "Nick Prefixes..."))
+        if hasattr(self, 'tts_group'):
+            self.tts_group.setTitle(tr("settings.group_tts", "Text-to-Speech (TTS)"))
+        if hasattr(self, 'tts_checkbox'):
+            self.tts_checkbox.setText(tr("settings.tts_enable", "Enable TTS voice announcements"))
+        if hasattr(self, 'tts_engine_label'):
+            self.tts_engine_label.setText(tr("settings.tts_audio_engine", "Audio Engine (Linux):"))
+        if hasattr(self, 'tts_player_combo'):
+            desc_keys = {
+                "mpv": ("settings.engine_desc_mpv", "mpv ★ Recommended (gapless silence removal)"),
+                "ffplay": ("settings.engine_desc_ffplay", "ffplay ★ Recommended (gapless silence removal)"),
+                "pw-play": ("settings.engine_desc_pw_play", "pw-play ● Standard (PipeWire native, no silence trim)"),
+                "paplay": ("settings.engine_desc_paplay", "paplay ○ Fallback (PulseAudio, no silence trim)"),
+                "gst-play-1.0": ("settings.engine_desc_gst", "gst-play-1.0 ○ Fallback (GStreamer, higher latency)"),
+                "cvlc": ("settings.engine_desc_cvlc", "cvlc ○ Fallback (VLC CLI, higher overhead)"),
+            }
+            from tts_manager import find_available_audio_players
+            avail = find_available_audio_players()
+            best_auto = avail[0][0] if avail else "none"
+            bin_map = dict(avail)
+            for i in range(self.tts_player_combo.count()):
+                p_val = self.tts_player_combo.itemData(i)
+                if p_val == "auto":
+                    self.tts_player_combo.setItemText(
+                        i,
+                        tr("settings.tts_engine_auto", "Auto (Best detected: {engine})", engine=best_auto),
+                    )
+                elif p_val in desc_keys:
+                    k, default_desc = desc_keys[p_val]
+                    p_bin = bin_map.get(p_val, "")
+                    suffix = f"  [{p_bin}]" if p_bin else ""
+                    self.tts_player_combo.setItemText(i, f"{tr(k, default_desc)}{suffix}")
+        if hasattr(self, 'tts_player_info_btn'):
+            self.tts_player_info_btn.setText(tr("settings.tts_which_engine", "Which engine is best?"))
+        if hasattr(self, 'tts_join_checkbox'):
+            self.tts_join_checkbox.setText(tr("settings.tts_join", "Announce Join:"))
+        if hasattr(self, 'tts_leave_checkbox'):
+            self.tts_leave_checkbox.setText(tr("settings.tts_leave", "Announce Leave:"))
+        if hasattr(self, 'var_info_label'):
+            self.var_info_label.setText(tr("settings.tts_var_info", "Use %NICK in the text above to insert the user's name."))
+        if hasattr(self, 'tts_lowercase_checkbox'):
+            self.tts_lowercase_checkbox.setText(tr("settings.tts_lowercase", "Convert to lowercase (better pronunciation of ALL-CAPS)"))
+        if hasattr(self, 'tts_replace_digits_checkbox'):
+            self.tts_replace_digits_checkbox.setText(tr("settings.tts_replace_digits", "Replace digits with letters (1337)"))
+        if hasattr(self, 'tts_digits_btn'):
+            self.tts_digits_btn.setText(tr("settings.tts_digits_btn", "Digit Substitutions..."))
+        if hasattr(self, 'tts_alias_btn'):
+            self.tts_alias_btn.setText(tr("settings.tts_alias_btn", "TTS Aliases..."))
+        if hasattr(self, 'tts_delay_label'):
+            self.tts_delay_label.setText(tr("settings.tts_delay", "Read Delay:"))
+        if hasattr(self, 'tts_voice_label'):
+            self.tts_voice_label.setText(tr("settings.tts_voice", "Voice:"))
+        if hasattr(self, 'tts_speed_label'):
+            self.tts_speed_label.setText(tr("settings.tts_speed", "Speed:"))
+        if hasattr(self, 'tts_vol_label'):
+            self.tts_vol_label.setText(tr("settings.tts_volume", "Volume:"))
+        if hasattr(self, 'tts_duck_checkbox'):
+            self.tts_duck_checkbox.setText(tr("settings.tts_duck_enable", "Duck TTS volume on actual speech (ignores silent key-up)"))
+        if hasattr(self, 'tts_duck_vol_label'):
+            self.tts_duck_vol_label.setText(tr("settings.tts_duck_volume", "Ducking volume:"))
+        if hasattr(self, 'tts_duck_release_label'):
+            self.tts_duck_release_label.setText(tr("settings.tts_duck_release", "Probing / release time:"))
+        if hasattr(self, 'duck_probe_hint_label'):
+            self.duck_probe_hint_label.setText(tr("settings.tts_duck_hint", "(Recommended: 60–100 ms, test)"))
+        if hasattr(self, 'tts_duck_test_btn'):
+            self.tts_duck_test_btn.setText(tr("settings.tts_duck_test_btn", "Test Ducking"))
+        if hasattr(self, 'tts_test_btn'):
+            self.tts_test_btn.setText(tr("settings.tts_test_btn", "Test"))
+        if hasattr(self, 'tts_info_label'):
+            if sys.platform == "win32":
+                self.tts_info_label.setText(tr("settings.tts_note_win", "Note: Uses high-quality voices over the internet. Requires 'edge-tts' Python module (supports built-in Windows audio or mpv.exe)."))
+            else:
+                self.tts_info_label.setText(tr("settings.tts_note_linux", "Note: Uses high-quality voices over the internet. Requires 'edge-tts' and an audio player (mpv, ffplay, pw-play, paplay, or gst-play-1.0)."))
+        if hasattr(self, 'cache_path_label'):
+            p_str = getattr(self, '_cache_path_str', '')
+            self.cache_path_label.setText(f"<span style='color: gray; font-size: 10px;'>{tr('settings.tts_cache_path', 'Path: {path}', path=p_str)}</span>")
+        if hasattr(self, 'cache_size_label'):
+            self.cache_size_label.setText(tr("settings.tts_cache_size", "Cache size: {size} MB", size=f"{getattr(self, '_last_cache_size_mb', 0.0):.2f}"))
+        if hasattr(self, 'cache_retention_checkbox'):
+            self.cache_retention_checkbox.setText(tr("settings.tts_auto_clear", "Auto-clear older than:"))
+        if hasattr(self, 'clear_cache_btn'):
+            self.clear_cache_btn.setText(tr("settings.tts_clear_cache", "Clear Cache"))
+        if hasattr(self, 'open_cache_btn'):
+            self.open_cache_btn.setText(tr("settings.tts_open_folder", "Open Folder"))
+        if hasattr(self, 'monitors_group'):
+            self.monitors_group.setTitle(tr("settings.group_overlays", "Overlays"))
+        if hasattr(self, 'monitor_checkboxes'):
+            for oid, cb in self.monitor_checkboxes.items():
+                cb.setText(tr("settings.enable_overlay", "Enable Overlay {id}", id=oid))
+        if hasattr(self, 'reset_positions_btn'):
+            self.reset_positions_btn.setText(tr("settings.reset_positions", "Reset overlay positions"))
+        if hasattr(self, 'poll_label'):
+            self.poll_label.setText(tr("settings.poll_interval", "Active Window Check Interval:"))
+        if hasattr(self, 'dynamic_width_checkbox'):
+            self.dynamic_width_checkbox.setText(tr("settings.dynamic_width", "Dynamic Width (fit to text)"))
+        if hasattr(self, 'dynamic_width_right_anchor_checkbox'):
+            self.dynamic_width_right_anchor_checkbox.setText(tr("settings.anchor_right", "Anchor right edge (shift left)"))
+        if hasattr(self, 'fixed_width_label'):
+            self.fixed_width_label.setText(tr("settings.fixed_width", "Fixed Width:"))
+        if hasattr(self, 'opacity_normal_label'):
+            self.opacity_normal_label.setText(tr("settings.opacity_normal", "Background Opacity (Normal Mode):"))
+        if hasattr(self, 'opacity_move_label'):
+            self.opacity_move_label.setText(tr("settings.opacity_move", "Opacity (Move Mode):"))
+        if hasattr(self, 'font_label'):
+            self.font_label.setText(tr("settings.font", "Font:"))
+        if hasattr(self, 'font_size_label'):
+            self.font_size_label.setText(tr("settings.font_size", "Size:"))
+        if hasattr(self, 'line_height_label'):
+            self.line_height_label.setText(tr("settings.line_height", "Line height:"))
+        if hasattr(self, 'line_height_auto_btn'):
+            self.line_height_auto_btn.setText(tr("settings.line_height_auto", "Auto"))
+        if hasattr(self, 'color_btn'):
+            self.color_btn.setText(tr("settings.color_bg", "Choose Background Color"))
+        if hasattr(self, 'text_color_normal_btn'):
+            self.text_color_normal_btn.setText(tr("settings.color_normal", "Choose Text Color (Normal)"))
+        if hasattr(self, 'text_color_talking_btn'):
+            self.text_color_talking_btn.setText(tr("settings.color_talking", "Choose Text Color (Talking)"))
+        if hasattr(self, 'text_color_whisper_btn'):
+            self.text_color_whisper_btn.setText(tr("settings.color_whisper", "Choose Text Color (Whisper)"))
+        if hasattr(self, 'text_color_left_btn'):
+            self.text_color_left_btn.setText(tr("settings.color_left", "Choose Text Color (Left)"))
+        if hasattr(self, 'header_checkbox'):
+            self.header_checkbox.setText(tr("settings.show_header", "Show Title Header (Logo + Text)"))
+        if hasattr(self, 'three_dots_checkbox'):
+            self.three_dots_checkbox.setText(tr("settings.show_dots", "Show Dots Indicator (number of dots indicates ID number of overlay)"))
+        if hasattr(self, 'disable_blink_checkbox'):
+            self.disable_blink_checkbox.setText(tr("settings.disable_blink", "Disable border blinking on startup"))
+        if hasattr(self, 'save_btn'):
+            self.save_btn.setText(tr("settings.btn_close", "Close"))
+
+    def _fit_window_to_content(self):
+        if hasattr(self, 'container_widget'):
+            self.container_widget.adjustSize()
+            hint = self.container_widget.sizeHint()
+            target_w = max(1040, min(hint.width() + 48, 1320))
+            target_h = min(max(self.height(), hint.height() + 24), 820)
+            self.setMinimumWidth(min(target_w, 1120))
+            self.resize(target_w, target_h)
+
+    def _on_language_changed(self):
+        from i18n import set_language
+        lang = self.language_combo.currentData()
+        if lang:
+            set_language(lang)
+            self.retranslate_ui()
+            self._fit_window_to_content()
+        self._on_change()
+
+    def _open_locales_folder(self):
+        from PyQt6.QtGui import QDesktopServices
+        from PyQt6.QtCore import QUrl
+        from i18n import USER_LOCALES_DIR, ensure_user_locales_populated
+        ensure_user_locales_populated()
+        QDesktopServices.openUrl(QUrl.fromLocalFile(USER_LOCALES_DIR))
+
+    def _test_ducking(self):
+        self._on_change()
+        voice = self.tts_voice_combo.currentData()
+        vol = self.tts_vol_slider.value()
+        rate = self.tts_rate_combo.currentData()
+        tts_mgr = get_tts_manager(self.config)
+        tts_mgr.clear_queue()
+
+        from audio_ducking import get_voip_audio_monitor
+        monitor = get_voip_audio_monitor(self.config)
+        monitor.schedule_test_duck_on_next_play(0.9, 1.8)
+
+        # Start at full volume, duck for ~1.8s once playback starts, then return to normal
+        test_text = "Testing voice ducking. Volume is lowered now, and should return to normal."
+        tts_mgr.enqueue(text=test_text, voice=voice, volume=vol, delay=0, rate=rate)
 
     def _test_voice(self):
         voice = self.tts_voice_combo.currentData()
