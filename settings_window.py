@@ -458,8 +458,8 @@ class SettingsWindow(QWidget):
                     self.tts_checkbox.setChecked(True)
                 is_recommended = p_type in ("mpv", "ffplay", "win32_mci")
                 badge_color = "#4caf50" if is_recommended else "#ffb74d"
-                rec_note = " ★ Recommended" if p_type in ("mpv", "ffplay") else (" (Fallback)" if sys.platform != "win32" else "")
-                self.tts_status_label.setText(f"✓ Ready — Active engine: <b>{p_desc}</b>{rec_note}")
+                rec_note = tr("settings.tts_rec_badge", " ★ Recommended") if p_type in ("mpv", "ffplay") else (tr("settings.tts_fallback_badge", " (Fallback)") if sys.platform != "win32" else "")
+                self.tts_status_label.setText(tr("settings.tts_status_ready", "✓ Ready — Active engine: <b>{engine}</b>{rec}", engine=p_desc, rec=rec_note))
                 self.tts_status_label.setStyleSheet(f"color: {badge_color}; font-size: 11px;")
                 if p_bin and p_bin != "win32_mci":
                     self.tts_status_label.setToolTip(f"Executable: {p_bin}")
@@ -495,6 +495,7 @@ class SettingsWindow(QWidget):
                 self.tts_status_label.setStyleSheet("color: #e57373; font-size: 11px;")
                 self.tts_status_label.setToolTip("")
 
+        self.tts_update_status_fn = lambda: update_tts_status_ui(check_tts_status(self.tts_player_combo.currentData() if hasattr(self, 'tts_player_combo') else self.config.get("tts_audio_player", "auto")))
         update_tts_status_ui(tts_status)
 
         def on_install_edge_tts():
@@ -1651,37 +1652,42 @@ class SettingsWindow(QWidget):
             return
 
         plugin_script = os.path.join(os.path.dirname(__file__), "mumble_plugin", "build_and_install.sh")
+        from i18n import tr
         if not os.path.exists(plugin_script):
-            QMessageBox.critical(self, "Error", f"Build script not found at:\n{plugin_script}")
+            QMessageBox.critical(self, tr("settings.dlg_error", "Error"), tr("settings.mumble_dlg_noscript", "Build script not found at:\n{path}", path=plugin_script))
             return
         try:
             res = subprocess.run(["bash", plugin_script], capture_output=True, text=True)
             if res.returncode == 0:
                 QMessageBox.information(
                     self,
-                    "Mumble Plugin Installed",
-                    "KOverlay Mumble Plugin successfully built and installed!\n\n"
-                    "Next step:\n"
-                    "1. Open Mumble\n"
-                    "2. Go to: Configure -> Settings -> Plugins\n"
-                    "3. Ensure 'KOverlay Mumble Plugin' is enabled."
+                    tr("settings.mumble_dlg_ok_title", "Mumble Plugin Installed"),
+                    tr(
+                        "settings.mumble_dlg_ok_msg",
+                        "KOverlay Mumble Plugin successfully built and installed!\n\n"
+                        "Next step:\n"
+                        "1. Open Mumble\n"
+                        "2. Go to: Configure -> Settings -> Plugins\n"
+                        "3. Ensure 'KOverlay Mumble Plugin' is enabled.",
+                    ),
                 )
             else:
                 QMessageBox.critical(
                     self,
-                    "Installation Failed",
-                    f"Failed to build/install plugin:\n\n{res.stderr or res.stdout}"
+                    tr("settings.mumble_dlg_fail_title", "Installation Failed"),
+                    tr("settings.mumble_dlg_fail_msg", "Failed to build/install plugin:\n\n{error}", error=res.stderr or res.stdout),
                 )
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to execute build script:\n{e}")
+            QMessageBox.critical(self, tr("settings.dlg_error", "Error"), tr("settings.mumble_dlg_exec_err", "Failed to execute build script:\n{error}", error=e))
 
     def _on_reset_positions_clicked(self):
+        from i18n import tr
         self.reset_positions_requested.emit()
-        self.reset_positions_btn.setText("Positions Reset! ✓")
+        self.reset_positions_btn.setText(tr("settings.positions_reset_done", "Positions Reset! ✓"))
         from PyQt6 import sip
         def _restore_reset_btn():
             if hasattr(self, "reset_positions_btn") and not sip.isdeleted(self.reset_positions_btn):
-                self.reset_positions_btn.setText("Reset overlay positions")
+                self.reset_positions_btn.setText(tr("settings.reset_positions", "Reset overlay positions"))
         self._schedule_ui_timer(2000, _restore_reset_btn)
 
     def _get_default_line_height(self) -> int:
@@ -1835,6 +1841,8 @@ class SettingsWindow(QWidget):
             self.open_locales_btn.setText(tr("settings.open_locales_btn", "Open Locales Folder"))
         if hasattr(self, 'voice_platform_label'):
             self.voice_platform_label.setText(f"<b>{tr('settings.voice_platform', 'Voice Platform:')}</b>")
+        if hasattr(self, 'api_key_input'):
+            self.api_key_input.setPlaceholderText(tr("settings.ts3_api_placeholder", "Enter TS3 API Key here"))
         if hasattr(self, 'ts3_key_label'):
             self.ts3_key_label.setText(tr("settings.ts3_api_key", "TS3 API Key:"))
         if hasattr(self, 'mumble_port_label'):
@@ -1954,6 +1962,21 @@ class SettingsWindow(QWidget):
             self.tts_voice_label.setText(tr("settings.tts_voice", "Voice:"))
         if hasattr(self, 'tts_speed_label'):
             self.tts_speed_label.setText(tr("settings.tts_speed", "Speed:"))
+        if hasattr(self, 'tts_rate_combo'):
+            rate_texts = {
+                "-25%": tr("settings.speed_slow", "Slow (-25%)"),
+                "+0%": tr("settings.speed_normal", "Normal"),
+                "+25%": tr("settings.speed_fast", "Fast (+25%)"),
+                "+50%": tr("settings.speed_very_fast", "Very Fast (+50%)"),
+            }
+            for i in range(self.tts_rate_combo.count()):
+                rv = self.tts_rate_combo.itemData(i)
+                if rv in rate_texts:
+                    self.tts_rate_combo.setItemText(i, rate_texts[rv])
+        if hasattr(self, 'tts_update_status_fn'):
+            self.tts_update_status_fn()
+        if hasattr(self, 'cache_retention_spin'):
+            self.cache_retention_spin.setSuffix(tr("settings.tts_days_suffix", " days"))
         if hasattr(self, 'tts_vol_label'):
             self.tts_vol_label.setText(tr("settings.tts_volume", "Volume:"))
         if hasattr(self, 'tts_duck_checkbox'):
@@ -2113,9 +2136,10 @@ class SettingsWindow(QWidget):
         QDesktopServices.openUrl(QUrl.fromLocalFile(cache_path))
 
     def _clear_tts_cache(self):
+        from i18n import tr
         reply = QMessageBox.question(
-            self, "Clear Cache", 
-            "Are you sure you want to delete all cached TTS audio files?",
+            self, tr("settings.tts_clear_cache", "Clear Cache"),
+            tr("settings.clear_cache_confirm", "Are you sure you want to delete all cached TTS audio files?"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No
         )
@@ -2123,7 +2147,8 @@ class SettingsWindow(QWidget):
             from tts_manager import get_tts_manager
             mgr = get_tts_manager()
             if mgr.clear_cache():
-                self.cache_size_label.setText("Cache size: 0.00 MB")
-                QMessageBox.information(self, "Success", "Cache cleared successfully.")
+                self._last_cache_size_mb = 0.0
+                self.cache_size_label.setText(tr("settings.tts_cache_size", "Cache size: {size} MB", size="0.00"))
+                QMessageBox.information(self, tr("settings.dlg_success", "Success"), tr("settings.cache_cleared", "Cache cleared successfully."))
             else:
-                QMessageBox.warning(self, "Error", "Failed to clear cache.")
+                QMessageBox.warning(self, tr("settings.dlg_error", "Error"), tr("settings.cache_clear_failed", "Failed to clear cache."))
